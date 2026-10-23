@@ -4,6 +4,8 @@
 
 ![01 全体フロー URL→描画](diagrams/page1.png)
 
+> **この章が答える問い**: マッピングを変えずに画面の一部を差し込む・置き換える手段は何か
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 `spartacus/core-libs/storefront/cms-structure/outlet/outlet.model.ts:9-13`

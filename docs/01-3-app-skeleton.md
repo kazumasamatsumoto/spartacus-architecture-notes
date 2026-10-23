@@ -4,6 +4,8 @@
 
 ![06 Angular アプリの骨格と設定 DI](diagrams/page6.png)
 
+> **この章が答える問い**: 分割したコンポーネントがなぜ 1 枚の画面になるのか。利用者が持つコードの形は何か
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 `ng add @spartacus/schematics` が生成する構造は、参照アプリ `spartacus/projects/storefrontapp/` と同じ形である。

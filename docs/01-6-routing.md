@@ -4,6 +4,8 @@
 
 ![01 全体フロー URL→描画](diagrams/page1.png)
 
+> **この章が答える問い**: URL がなぜ Angular のルート定義ではなく CMS で決まるのか
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 - `AppRoutingModule` は `RouterModule.forRoot([], { initialNavigation: 'enabledBlocking' })`(`core-libs/storefront/router/app-routing.module.ts:13-19`)。ルート配列は空。

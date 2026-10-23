@@ -9,7 +9,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(10 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(11 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -23,6 +23,7 @@
 | 08 リソースごとの呼び出し方法の違い | 通信層は共通、状態層は 2 方式、リソースごとの文脈・捨てる条件・バッチの比較表(11 章) | [page8.png](diagrams/page8.png) |
 | 09 アプリケーションのライフサイクル | index.html 取得 → 起動 → APP_INITIALIZER → ゲート → 描画 → 実行中イベント → SSR → 永続化の 9 フェーズ(12 章) | [page9.png](diagrams/page9.png) |
 | 10 呼び出しの 4 階層と毎回・初回 | セッション / ページ / コンポーネント / アクションの 4 階層と、再訪時に何が飛ぶかの実測(13 章) | [page10.png](diagrams/page10.png) |
+| 11 OCC リソースの 3 層とカスタムの置き場所 | サイト設定 / CMS / 業務データの 3 層、決め方の順序、業務データ層の主なリソース一覧(10 章) | [page11.png](diagrams/page11.png) |
 
 ![全体フロー](diagrams/page1.png)
 

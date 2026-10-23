@@ -4,6 +4,8 @@
 
 ![07 API 呼び出しを減らす仕組み](diagrams/page7.png)
 
+> **この章が答える問い**: 取得したデータはどこに置かれ、なぜ「取得済みなら取らない」が成り立つのか(②)
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 - ルートストアはアプリ側 `StoreModule.forRoot({})`(1.3)。各機能が `StoreModule.forFeature(CMS_FEATURE, ...)` で自分のスライスを追加(`cms-store.module.ts:33-45`)。

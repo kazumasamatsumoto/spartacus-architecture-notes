@@ -4,6 +4,8 @@
 
 ![03 カスタムコンポーネントのデータ経路](diagrams/page3.png)
 
+> **この章が答える問い**: CMS コンポーネントの Angular 側は実際にどう書かれているか(雛形の根拠)
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 `spartacus/core-libs/storefront/cms-components/content/paragraph/paragraph.component.ts:20-26, 44-47`

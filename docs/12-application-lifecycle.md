@@ -1,8 +1,10 @@
 # 12. アプリケーションのライフサイクル: index.html 取得から永続化まで
 
-> **図**: 09 アプリケーションのライフサイクル(`diagrams/spartacus-architecture.drawio`)。0〜8 の 9 フェーズを縦に並べ、各フェーズで「ブラウザ / Angular / Spartacus で起きること」と「その段階で飛ぶ OCC 呼び出し・永続化」を対応させた
+> **図**: 09 アプリケーションのライフサイクル(`diagrams/spartacus-architecture.drawio`)。左: 0〜8 の 9 フェーズで何が起きるか。右: フェーズごとの OCC 呼び出し / localStorage の読み書き / ストアの破棄 / 発火するイベントの表
 
 ![09 アプリケーションのライフサイクル](diagrams/page9.png)
+
+> **この章が答える問い**: アプリは起動から何をどの順にやり、いつ何を呼び、いつ何を捨てるか(②)
 
 > 根拠は全て `spartacus/`(develop, b7b028f)のソース。参照アプリ `projects/storefrontapp` の起動構成を基準にしている。`ng add @spartacus/schematics` で生成したアプリも同じ構成になる(1.3)。
 

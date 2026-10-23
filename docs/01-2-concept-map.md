@@ -4,6 +4,8 @@
 
 ![06 Angular アプリの骨格と設定 DI](diagrams/page6.png)
 
+> **この章が答える問い**: Angular の各概念は Spartacus のどのファイルに当たるか
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 | Angular の概念 | 一言で | Spartacus での実体(ファイル) |

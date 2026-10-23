@@ -4,6 +4,8 @@
 
 ![06 Angular アプリの骨格と設定 DI](diagrams/page6.png)
 
+> **この章が答える問い**: どのライブラリの、どのバージョンで動いているか
+
 > 1 章の目次: [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
 
 | 技術 | バージョン | 役割 |

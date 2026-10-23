@@ -231,113 +231,114 @@ d7.edge(r1,r2); d7.edge(r2,r3,"いいえ"); d7.edge(r3,r4); d7.edge(r4,r5); d7.e
 d7.text("実測(2026-10-23 デモ, CSR): ホーム = cms/pages 1 + cms/components 2 + products/search 1 + サイト情報 4 + cart 1。PDP への SPA 遷移 = 6 本、サイト情報/カートは再取得なし。", 40, 905, 1460, 30, 12)
 
 
-# ---------- 8. per-resource call patterns ----------
+# ---------- shared helpers for the "paired + grid" style ----------
+HEAD=("#666666","#666666")
+def paired(d, x, y, rows, w1, w2, h, gap=12):
+    for label,color,text in rows:
+        d.box(label, x, y, w1, h, *color, 11, "fontStyle=1;")
+        d.box(text, x+w1+10, y, w2, h, *YEL, 11)
+        y+=h+gap
+    return y
+def grid(d, x, y, cols, rows, h=44, gap=6, hh=44):
+    xs=[]; cx=x
+    for name,w in cols:
+        xs.append((cx,w)); d.box(name, cx, y, w, hh, *HEAD, 11, "fontColor=#ffffff;fontStyle=1;"); cx+=w+gap
+    y+=hh+gap
+    for cells in rows:
+        for (t,c),(gx,gw) in zip(cells, xs):
+            d.box(t, gx, y, gw, h, *c, 11)
+        y+=h+gap
+    return y
+NA=("", ("#ffffff","#cccccc"))
+
+# ---------- 8. per-resource call patterns (ch.11) ----------
 d8=D("08 リソースごとの呼び出し方法の違い")
-d8.text("フロント側の呼び出し: 通信層は共通、状態層は 2 方式、リソース固有なのは「文脈」と「捨てる条件」(11 章)", 40, 20, 1400, 30, 16, "fontStyle=1;")
-gT=d8.group("A. 通信層: 全リソース共通(Connector から下はコードの形が同じ。違うのは設定値だけ)", 40, 70, 1580, 140, "#f5f5f5", "#666666")
-t1=d8.box("Angular コンポーネント\nfacade.get() | async", 60, 110, 230, 70, *BLUE)
-t2=d8.box("Facade\n★ 中身の方式はリソースで異なる(B)\n文脈・捨てる条件もここで決まる(C)", 320, 110, 230, 70, *YEL)
-t3=d8.box("Connector\n抽象 Adapter に委譲", 580, 110, 230, 70, *GREEN)
-t4=d8.box("OccAdapter\nOccEndpointsService.buildUrl(key, params)\n+ ConverterService.pipeable(NORMALIZER)", 840, 110, 230, 70, *GREEN)
-t5=d8.box("HTTP インターセプタ\nlang / curr 自動付与(SiteContextInterceptor)\nBearer 自動付与・401 で更新", 1100, 110, 230, 70, *GREEN)
-t6=d8.box("OCC\n{baseUrl}/occ/v2/{site}/...", 1360, 110, 230, 70, *ORANGE)
-for a,b in [(t1,t2),(t2,t3),(t3,t4),(t4,t5),(t5,t6)]: d8.edge(a,b)
-gS=d8.group("B. 状態層: 2 方式(機能ライブラリごとに固定。SAP ガイド state-management.md「既存に合わせよ、第 3 の方式を持ち込むな」)", 40, 240, 1580, 250, "#f5f5f5", "#666666")
-s1=d8.box("NgRx(古い機能)  Action → Effect → Reducer → Selector / Entity Loader\n\nCMS / 商品(詳細・検索・レビュー・参照)/ サイトコンテキスト(言語・通貨・サイト)/ 認証\nカート本体(MultiCart / ActiveCart)/ 保存カート / ウィッシュリスト / 店舗検索 / 店舗受取\n注文履歴・返品・定期注文履歴 / ユーザー配下(住所・支払・同意・クーポン・通知・関心商品)\nB2B 組織管理(ユニット・ユーザー・予算・コストセンタ・承認)/ ASM\n\n読み込み状態 = LoaderState { loading, success, error, value }", 60, 280, 760, 160, *PURP)
-s2=d8.box("Query / Command(新しい機能)  query.create(loader, {reloadOn, resetOn}) / command.create(fn, {strategy})\n\nユーザー本体・プロフィール・登録・パスワード / チェックアウト全般(配送先・配送方法・支払・請求先・B2B)\n注文確定・再注文・定期注文の確定 / 見積(Quote)/ 問い合わせチケット / B2B ユーザー登録\nカートの検証・アクセスコード・ゲスト / 商品在庫(ProductAvailability)/ サブスクリプション課金\nOPF / Digital Payments / S4 Service / Punchout\n\n読み込み状態 = QueryState { loading, error, data }", 840, 280, 760, 160, *GREEN)
-d8.text("同じリソース内で混在する例: 注文(履歴・返品 = NgRx / 確定・再注文 = Command)、カート(本体 = NgRx / 検証・アクセスコード・ゲスト = Query・Command)、商品(本体 = NgRx / 在庫 = Query)", 60, 452, 1540, 30, 11)
-gR=d8.group("C. リソースごとに違う点: 文脈(必要な ID)/ 捨てる条件 / バッチ", 40, 520, 1580, 610, "#fff7e6", "#d79b00")
-cols=[("リソース",190),("方式",170),("文脈(必要な ID・前提)",380),("キャッシュを捨てる・再読込する条件",520),("バッチ / 最適化",250)]
-x0=60; y0=560
-xs=[]; x=x0
-for name,w in cols:
-    xs.append((x,w)); d8.box(name, x, y0, w, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;"); x+=w+10
-NG=("NgRx",PURP); QC=("Query / Command",GREEN); MIX=lambda t:(t,YEL)
-NONE=GREY; USER=BLUE; CART=ORANGE
+d8.text("フロント側の呼び出し: 通信層は共通、状態層は 2 方式、リソース固有なのは「文脈」と「捨てる条件」(11 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
+gA=d8.group("A. 3 層に分けると、何が共通で何が違うか", 40, 70, 560, 760, "#f5f5f5", "#666666")
+paired(d8, 60, 110, [
+ ("通信層\nConnector → Adapter →\nConverter → HttpClient", GREEN, "全リソース共通。URL は buildUrl(OCC アダプタ 75 中 74)、変換は pipeable(59)、lang / curr と Bearer はインターセプタが自動付与。違うのは設定値(URL テンプレート、Normalizer)だけ"),
+ ("状態層\nFacade の中身", PURP, "2 方式のどちらか(機能ライブラリごとに固定)。NgRx: CMS・商品・サイト・カート本体・注文履歴・ユーザー配下・店舗・B2B 組織。Query / Command: ユーザー本体・チェックアウト・注文確定・見積・チケット・カート検証・在庫。SAP ガイド「既存に合わせよ」"),
+ ("文脈と捨てる条件\nFacade の設計", BLUE, "リソースごとに違う。必要な ID(userId / cartId / PageContext / scope)、前提条件、再読込・破棄のきっかけ、バッチ化。右の表がその一覧"),
+ ("コンポーネントから見た形", GREY, "どのリソースでも facade.get() が Observable<T> を返す。違いは Facade の内側だけ。カスタムリソースで決めるのは「方式」「文脈」「捨てる条件」「更新系」の 4 問(11.5)"),
+], 190, 330, 150)
+d8.text("混在の例: 注文(履歴 = NgRx / 確定 = Command)、カート(本体 = NgRx / 検証 = Query)、商品(本体 = NgRx / 在庫 = Query)。境界はリソースではなく「機能ライブラリが書かれた時期」。", 60, 760, 520, 60, 11)
+gB=d8.group("B. リソースごとの文脈 / 捨てる条件 / バッチ(色: 灰 = サイト共通、青 = ユーザー固有、橙 = カート配下)", 640, 70, 980, 760, "#fff7e6", "#d79b00")
+NG=("NgRx",PURP); QC=("Query / Command",GREEN)
 rows=[
- ("CMS(pages / components)", NG, ("PageContext {type,id} + userId(anonymous / current)",USER), "言語変更・ログイン・ログアウトで CMS ストア全体を破棄", "componentIds を 50 件ずつ / uid × context をメモ化"),
- ("商品", MIX("NgRx(在庫のみ Query)"), ("productCode + scope(details / list / price …)",NONE), "言語・通貨変更で商品ストア全体を破棄。scope ごとに maxAge / reloadOn 設定可", "コード検索 100 件 / 同一 URL の fields 結合 / scope include 展開"),
- ("サイトコンテキスト", NG, ("なし(起動時)",NONE), "なし(起動時 1 回)", "SSR なら TransferState"),
- ("店舗(検索・受取)", NG, ("検索条件 / storeId",NONE), "検索ごとに上書き", "なし"),
- ("カート", MIX("NgRx(検証・ゲストは Query・Command)"), ("userId + cartId(未確定なら current)+ 安定待ち(processesCount)",CART), "ログイン時に匿名カートを loadOrMerge。更新 1 回ごとにカート全体を再取得。ID は localStorage", "なし"),
- ("チェックアウト", QC, ("userId + cartId + 前提条件(匿名ならゲストカート)",CART), "更新 Command の成功イベント → CheckoutQueryReloadEvent / ResetEvent で単一 Query を更新", "なし(1 Query に集約)"),
- ("注文", MIX("混在(履歴・返品 NgRx / 確定 Command)"), ("userId(履歴は loggedIn = true)",USER), "履歴・詳細は明示 Clear。確定は CancelPrevious + OrderPlacedEvent", "なし"),
- ("ユーザー本体・プロフィール", QC, ("userId(loggedIn = true、匿名なら例外)",USER), "UserAccountChangedEvent で再読込 / LoginEvent・LogoutEvent で破棄 / 言語依存は LanguageSetEvent", "なし"),
- ("ユーザー配下(住所・支払・同意・クーポン・保存カート)", NG, ("userId",USER), "ログアウトでユーザーストアを破棄。更新アクション後に再読込", "なし"),
- ("問い合わせチケット / 見積", QC, ("userId + ticketId / quoteCode(ルートから)",USER), "専用の Reload / Reset イベント(1 件・一覧・カテゴリで別 Query)", "なし"),
- ("B2B 組織", NG, ("userId + 各 ID(orgUnitId, budgetCode …)",USER), "更新アクションで該当エンティティを再読込", "なし"),
+ [("CMS(pages / components)",GREY), NG, ("PageContext + userId(anonymous / current)",BLUE), ("言語変更・ログイン・ログアウトで全破棄",YEL), ("componentIds 50 件ずつ",ORANGE)],
+ [("商品",GREY), ("NgRx(在庫は Query)",YEL), ("productCode + scope",GREY), ("言語・通貨変更で全破棄。scope ごとに maxAge / reloadOn",YEL), ("コード検索 100 件 / fields 結合",ORANGE)],
+ [("サイトコンテキスト",GREY), NG, ("なし(起動時)",GREY), ("なし(起動時 1 回)",YEL), ("SSR なら TransferState",ORANGE)],
+ [("店舗(検索・受取)",GREY), NG, ("検索条件 / storeId",GREY), ("検索ごとに上書き",YEL), ("なし",GREY)],
+ [("カート",GREY), ("NgRx(検証・ゲストは Query)",YEL), ("userId + cartId(current)+ 安定待ち",ORANGE), ("ログイン時 loadOrMerge。更新ごとに全体再取得。ID は localStorage",YEL), ("なし",GREY)],
+ [("チェックアウト",GREY), QC, ("userId + cartId + 前提条件",ORANGE), ("更新 Command の成功イベント → 単一 Query を Reload / Reset",YEL), ("なし(1 Query に集約)",ORANGE)],
+ [("注文",GREY), ("混在(履歴 NgRx / 確定 Command)",YEL), ("userId(履歴は loggedIn)",BLUE), ("履歴・詳細は明示 Clear。確定は CancelPrevious + OrderPlacedEvent",YEL), ("なし",GREY)],
+ [("ユーザー本体・プロフィール",GREY), QC, ("userId(loggedIn、匿名なら例外)",BLUE), ("UserAccountChangedEvent で再読込 / Login・Logout で破棄 / 言語依存は LanguageSetEvent",YEL), ("なし",GREY)],
+ [("ユーザー配下(住所・支払・同意・クーポン)",GREY), NG, ("userId",BLUE), ("ログアウトでユーザーストア破棄。更新後に再読込",YEL), ("なし",GREY)],
+ [("問い合わせチケット / 見積",GREY), QC, ("userId + ticketId / quoteCode",BLUE), ("専用の Reload / Reset イベント",YEL), ("なし",GREY)],
+ [("B2B 組織",GREY), NG, ("userId + 各 ID",BLUE), ("更新アクションで該当エンティティ再読込",YEL), ("なし",GREY)],
 ]
-y=y0+40
-for name,(mode,mc),(ctx,cc),inval,batch in rows:
-    d8.box(name, xs[0][0], y, xs[0][1], 44, *GREY, 11)
-    d8.box(mode, xs[1][0], y, xs[1][1], 44, *mc, 11)
-    d8.box(ctx, xs[2][0], y, xs[2][1], 44, *cc, 11)
-    d8.box(inval, xs[3][0], y, xs[3][1], 44, *YEL, 11)
-    d8.box(batch, xs[4][0], y, xs[4][1], 44, *(ORANGE if batch!="なし" else GREY), 11)
-    y+=48
-d8.text("文脈の色: 灰 = サイト共通(lang / curr のみ)、青 = ユーザー固有(users/{userId})、橙 = カート配下(+ cartId)。URL の階層がそのままフロントで必要な ID の数になる(10.4)。", 60, y+6, 1540, 30, 11)
+yend=grid(d8, 660, 110, [("リソース",170),("方式",150),("文脈(必要な ID)",190),("捨てる・再読込する条件",270),("バッチ",140)], rows, h=50)
+d8.text("URL の階層(users/{userId}/carts/{cartId}/...)が、そのままフロントで必要な ID の数になる(10.4)。", 660, yend+4, 940, 30, 11)
 
-
-# ---------- 9. application lifecycle ----------
+# ---------- 9. application lifecycle (ch.12) ----------
 d9=D("09 アプリケーションのライフサイクル")
-d9.text("Spartacus アプリのライフサイクル: index.html 取得 → 起動 → 初期化 → 初回ナビゲーション → 描画 → 実行中イベント → 永続化(12 章)。右列はその段階で飛ぶ OCC 呼び出し", 40, 20, 1500, 30, 16, "fontStyle=1;")
-d9.box("フェーズ", 60, 70, 170, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
-d9.box("ブラウザ / Angular / Spartacus で起きること(左→右の順)", 250, 70, 950, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
-d9.box("OCC 呼び出し / 永続化", 1220, 70, 380, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
+d9.text("Spartacus アプリのライフサイクル: index.html 取得 → 起動 → 初期化 → ゲート → 描画 → 実行中イベント → SSR → 永続化(12 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
+gA=d9.group("A. 9 フェーズ: 何が起きるか", 40, 70, 700, 900, "#f5f5f5", "#666666")
+paired(d9, 60, 110, [
+ ("0. HTML 取得", GREY, "index.html は <app-root> だけ(CSR)。meta occ-backend-base-url でビルド後に接続先を差し替え可能"),
+ ("1. 起動と DI 構築\nmain.ts:17", BLUE, "bootstrapApplication(AppComponent, appConfig)→ importProvidersFrom(AppModule)→ Config を deepMerge で合成。イベントビルダー(Navigation / Login・Logout / LanguageSet)が登録される"),
+ ("2. APP_INITIALIZER(23 個)", YEL, "並列に走る。順序保証が無いので各自が configInit.getStable(scope) を待つ。サイトコンテキストは URL > localStorage > config 既定。'**' ルート追加、i18next 初期化、MODULE_INITIALIZER(カート ID 復元)"),
+ ("3. ゲート\nLOCATION_INITIALIZED", RED, "Promise.all(LOCATION_INITIALIZED_MULTI): ① Config が stable ② 認証(localStorage のトークン復元 → OAuth コールバック判定)→ userId = current / anonymous。通過後に Router の初回ナビゲーション"),
+ ("4. ルーティング → 描画\n(3 章)", BLUE, "NavigationStart で URL(/site/lang/curr/...)からサイトコンテキスト確定 → CmsPageGuard → cms/pages → PageLayout → スロット → NavigationEnd(スクロール復元・SEO)"),
+ ("5. コンポーネント", GREEN, "ComponentWrapperDirective.ngOnInit → 遅延ロード判定 → createComponent(Injector に CmsComponentData)→ ComponentCreateEvent → ngOnInit / data$ | async(OnPush)→ 遷移で ngOnDestroy → ComponentDestroyEvent"),
+ ("6. 実行中のイベント", PURP, "ページ遷移 / 言語・通貨変更 / ログイン / ログアウト / 401 / HTTP エラー / 遅延ロード。それぞれ「何を捨てて何を取り直すか」が決まっている(右表)"),
+ ("7. SSR の場合\n(デモは CSR)", GREY, "OptimizedSsrEngine: timeout 3 秒で CSR にフォールバック、concurrency 10、cache 既定 off。サーバで 1〜5 を実行し TransferState(cms / product / siteContext / siteTheme)を HTML へ。ブラウザは再取得なし + hydration"),
+ ("8. 永続化と終了", GREY, "明示的な終了処理は無い。StatePersistenceService が実行中ずっと localStorage へ書き、次回起動の 2〜3 で復元(トークン / カート ID / 言語 / 通貨 / 同意 / テーマ)"),
+], 170, 490, 78, 10)
+gB=d9.group("B. フェーズごとの OCC 呼び出し / localStorage / ストアの破棄 / イベント", 780, 70, 840, 900, "#fff7e6", "#d79b00")
 rows=[
- ("0. HTML 取得", 70, GREY,
-  [("index.html: <app-root>Loading...</app-root> と meta occ-backend-base-url / media-backend-base-url\n(CSR なら中身は空。SSR なら描画済み HTML + <script id=cx-state>)", 950, GREY)],
-  ("なし", GREY)),
- ("1. 起動と DI 構築\nmain.ts:17", 90, BLUE,
-  [("bootstrapApplication(AppComponent, appConfig)\nappConfig = provideHttpClient / provideClientHydration / importProvidersFrom(AppModule)", 460, BLUE),
-   ("DI グラフ構築: provideConfig / provideDefaultConfig の配列 → deepMerge → Config(1.4)\nイベントビルダー(NavigationEvent, LoginEvent/LogoutEvent, LanguageSetEvent)が登録される", 470, PURP)],
-  ("なし", GREY)),
- ("2. APP_INITIALIZER\n(23 個、並列。多くは\nconfigInit.getStable() を待つ)", 150, YEL,
-  [("ConfigInitializer\nCONFIG_INITIALIZER の\nscope が全部解決 → stable", 180, ORANGE),
-   ("サイトコンテキスト\nlanguage / currency / baseSite:\nURL セグメント > localStorage > config 既定", 230, YEL),
-   ("ルーティング\nConfigurableRoutes 初期化、外部ルート、\n'**' ルート追加(CmsPageGuard)", 220, YEL),
-   ("i18next 初期化\nfallbackLang / backend(chunk ロード)\n言語変更に追従", 160, YEL),
-   ("その他\nテーマ / アウトレット登録 / SEO / スキップリンク\nMODULE_INITIALIZER(カート ID 復元など)/ ASM", 150, GREY)],
-  ("GET languages\nGET currencies\nGET basesites\n(context が stable になった後)", ORANGE)),
- ("3. 初回ナビゲーション前の\nゲート(LOCATION_INITIALIZED)", 110, RED,
-  [("locationInitializedFactory = Promise.all(LOCATION_INITIALIZED_MULTI)\n① Config が stable  ② 認証: AuthStatePersistence.initSync(localStorage のトークン復元)→ checkOAuthParamsInUrl(OAuth コールバック / 保存トークン)\n→ userId = current(トークンあり)または anonymous  ③ 通過後に Router の初回ナビゲーション(initialNavigation: enabledBlocking)", 950, RED)],
-  ("トークンがあれば\n以降の users/current/... が有効", GREY)),
- ("4. ルーティング → 描画\n(3 章)", 110, BLUE,
-  [("NavigationStart → SiteContextRoutesHandler が URL(/electronics-spa/en/USD/...)から site / lang / curr を確定", 300, BLUE),
-   ("CmsPageGuard → CmsService.getPage → cms/pages(既定で毎回。loadStrategy=ONCE なら初回のみ)→ PageLayoutComponent → LayoutConfig.layoutSlots → <cx-page-slot> × N", 330, BLUE),
-   ("NavigationEnd → OnNavigateService(スクロール復元)\nSeoMetaService(title / meta)\nNavigationEvent / PageEvent 発火", 290, GREEN)],
-  ("GET users/{anonymous|current}/cms/pages?...\nGET cms/components?componentIds=...(不足分)\nカート ID が復元されていれば GET users/{id}/carts/{cartId}", ORANGE)),
- ("5. コンポーネントの\nライフサイクル", 130, GREEN,
-  [("ComponentWrapperDirective.ngOnInit\n→ determineMappings(flexType)\n→ featureModules に属すなら遅延ロード", 230, GREEN),
-   ("ComponentHandler → createComponent\n(Injector に CmsComponentData{uid, data$})\n→ ComponentCreateEvent", 230, GREEN),
-   ("Angular フック: constructor → ngOnInit\n→ data$ | async(OnPush)→ ngOnDestroy\ncxOutletDefer: ビューポート外は生成を遅延", 240, GREEN),
-   ("ngOnDestroy → ComponentDestroyEvent\n(遷移で前ページのコンポーネントは破棄)", 210, GREY)],
-  ("業務データは Facade 経由\nGET products/{code}, products/search 等\n(11 章の文脈 / 捨てる条件に従う)", ORANGE)),
- ("6. 実行中のイベント", 220, PURP,
-  [("ページ遷移\nRoutingService.go → 4 へ戻る\ncms/pages は既定で毎回、それ以外はストア済みなら HTTP なし", 180, BLUE),
-   ("言語 / 通貨変更\nSET_ACTIVE → LANGUAGE_CHANGE\n→ CMS / 商品ストア全破棄\n→ LanguageSetEvent(Query 再読込)\n→ URL を replaceState\n(トグルで location.reload)", 190, YEL),
-   ("ログイン\nOAuth password flow →\nuserId = current → AuthActions.Login\n→ LoginEvent: CMS 破棄 /\nカート loadOrMerge(匿名カート併合)\n/ Query resetOn → redirect", 200, GREEN),
-   ("ログアウト\ncxRoute logout → coreLogout:\nuserId = anonymous → トークン失効\n→ AuthActions.Logout → LogoutEvent:\nCMS / ユーザーストア破棄、カート index リセット", 200, RED),
-   ("401 / HTTP エラー\nAuthHttpHeaderService: refresh または logout\nHttpErrorInterceptor → 状態別ハンドラ\n→ GlobalMessage", 170, GREY)],
-  ("遷移: cms/pages(既定で毎回)、コンポーネント・商品はストア済みなら無し\n言語変更: cms/pages 再取得 + lang=xx\nログイン: POST authorizationserver/oauth/token、\n  carts 併合、users/current\nログアウト: POST revoke", ORANGE)),
- ("7. SSR の場合\n(デモは CSR)", 110, GREY,
-  [("server.ts: NgExpressEngineDecorator(OptimizedSsrEngine)\ntimeout 3 秒で CSR シェルにフォールバック / concurrency 10 / cache 既定 off / reuseCurrentRendering", 470, GREY),
-   ("サーバで 1〜5 を実行(OAuth コールバックは skip)→ HTML + TransferState(cms / product / siteContext / siteTheme)\n→ ブラウザは 1〜3 を再実行、ストアは転送状態で初期化され再取得なし、hydration(event replay)", 470, GREY)],
-  ("サーバ側で同じ OCC 呼び出し\nブラウザ側はゼロで開始", ORANGE)),
- ("8. 永続化と終了", 80, GREY,
-  [("SPA なので明示的な終了処理はない(タブを閉じる)。StatePersistenceService.syncWithStorage が実行中ずっと localStorage に書く\n→ 次回起動の 2〜3 で復元: 認証トークン / カート ID / 言語 / 通貨 / 匿名同意 / ASM / テーマ", 950, GREY)],
-  ("localStorage キー: spartacus + 区切り文字 + {site} + 区切り文字 + auth / cart / language / currency …\n(state-persistence.service.ts:128-130)", GREY)),
+ [("0",GREY), ("なし",GREY), ("—",GREY), ("—",GREY), ("—",GREY)],
+ [("1",GREY), ("なし",GREY), ("—",GREY), ("—",GREY), ("ビルダー登録のみ",GREY)],
+ [("2",GREY), ("GET languages / currencies / basesites",ORANGE), ("読む: 言語・通貨・カート ID・テーマ・同意",BLUE), ("—",GREY), ("—",GREY)],
+ [("3",GREY), ("OAuth コールバック時のみ token 交換",ORANGE), ("読む: 認証トークン",BLUE), ("—",GREY), ("LoginEvent(新規トークン時)",PURP)],
+ [("4",GREY), ("GET cms/pages / cms/components(不足分)/ carts/{id}(復元時)",ORANGE), ("—",GREY), ("—",GREY), ("NavigationEvent / PageEvent",PURP)],
+ [("5",GREY), ("業務データ(products/... 等、Facade 経由・初回のみ)",ORANGE), ("—",GREY), ("—",GREY), ("ComponentCreateEvent / DestroyEvent",PURP)],
+ [("6 遷移",GREY), ("GET cms/pages(既定で毎回)。他はストア済みなら無し",ORANGE), ("—",GREY), ("—",GREY), ("NavigationEvent",PURP)],
+ [("6 言語変更",GREY), ("全部を lang=xx で再取得",ORANGE), ("書く: 言語",BLUE), ("CMS + 商品ストア全破棄",RED), ("LanguageSetEvent → Query 再読込",PURP)],
+ [("6 ログイン",GREY), ("POST oauth/token、carts 併合、users/current、cms/pages",ORANGE), ("書く: トークン・カート ID",BLUE), ("CMS ストア破棄",RED), ("LoginEvent → Query resetOn",PURP)],
+ [("6 ログアウト",GREY), ("POST revoke、cms/pages(匿名)",ORANGE), ("消す: トークン",BLUE), ("CMS + ユーザーストア破棄、カート index リセット",RED), ("LogoutEvent",PURP)],
+ [("6 401 / エラー",GREY), ("POST oauth/token(refresh)または logout へ",ORANGE), ("—",GREY), ("—",GREY), ("GlobalMessage",PURP)],
+ [("7",GREY), ("サーバ側で同じ呼び出し。ブラウザはゼロで開始",ORANGE), ("—",GREY), ("—",GREY), ("TransferState",PURP)],
+ [("8",GREY), ("なし",GREY), ("書き続ける",BLUE), ("—",GREY), ("—",GREY)],
 ]
-y=110
-for label,h,lc,items,(occ,oc) in rows:
-    d9.box(label, 60, y, 170, h, *lc, 12, "fontStyle=1;")
-    x=250
-    for text,w,c in items:
-        d9.box(text, x, y, w, h, *c, 11); x+=w+10
-    d9.box(occ, 1220, y, 380, h, *oc, 11)
-    y+=h+16
-d9.text("ゲートの意味: フェーズ 3 を通るまで Router は動かないので、フェーズ 4 以降のコードは「Config は確定済み、userId は確定済み、サイトコンテキストは URL から確定済み」を前提にできる。", 60, y, 1540, 30, 11)
+yend=grid(d9, 800, 110, [("フェーズ",90),("OCC 呼び出し",250),("localStorage",150),("ストアの破棄",150),("イベント",140)], rows, h=50)
+d9.text("ゲート(3)を通るまで Router は動かないので、4 以降は「Config・userId・サイトコンテキストは確定済み」を前提にできる。", 800, yend+4, 800, 30, 11)
 
+# ---------- 11. resource catalog (ch.10) ----------
+d11=D("11 OCC リソースの 3 層とカスタムの置き場所")
+d11.text("OCC リソースの 3 層(左)と、業務データ層の主なリソース・カスタムの置き場所(右)。10 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
+gA=d11.group("A. リソースの 3 層(+ 別 Web サービス)とカスタムの置き場所", 40, 70, 600, 760, "#f5f5f5", "#666666")
+paired(d11, 60, 110, [
+ ("A. サイト設定層\nbasesites / languages /\ncurrencies / countries / titles", GREY, "読み取り専用のマスタ。カスタムの対象になることはまれ(サイト固有の値は CMS 属性か別リソースへ)"),
+ ("B. CMS 層\ncms/pages →\ncms/components/{uid}", BLUE, "AbstractCMSComponent の全サブタイプを返す汎用リソース。items.xml に型を足せば typeCode と属性が自動で返る。★ カスタム CMS コンポーネントはここに現れる。新しい URL は要らない"),
+ ("C. 業務データ層\n商品 / ユーザー / カート /\n注文 / 店舗 / B2B 組織", GREEN, "コンポーネントが参照する「もの」(ItemType)。属性を足す = WsDTO + Populator 拡張 + fields。該当する型が無い概念だけが新リソース(8.3 の設計ルール)"),
+ ("D. 別 Web サービス\nASM / punchout /\nsubscriptions", ORANGE, "OCC の prefix を持たない絶対パス。OCC とは別の独立 Web アプリを立てる場合の前例"),
+], 200, 360, 130)
+d11.box("決め方の順序:  ① B 層の属性で済むか(コントローラ不要) → ② C 層の既存リソースに参照 ID で済むか → ③ C 層の DTO 拡張で済むか → ④ C 層に新リソース(8.1 ①〜④)", 60, 680, 560, 60, *RED, 11, "fontStyle=1;")
+gB=d11.group("B. 業務データ層の主なリソース(URL は {baseUrl}/occ/v2/{site}/ の後ろ)", 680, 70, 940, 760, "#fff7e6", "#d79b00")
+rows=[
+ [("商品",GREY), ("products/{code}?fields=... / products/search / .../reviews / .../stock",BLUE), ("Product, CustomerReview, StockLevel",GREY), ("ProductWsDTO 拡張 + fields レベル追加",YEL), ("productCodes(カルーセル)",GREEN)],
+ [("ユーザー本体",GREY), ("users/{userId}",BLUE), ("Customer(User)",GREY), ("UserWsDTO 拡張",YEL), ("—",GREY)],
+ [("ユーザー配下",GREY), ("users/{userId}/addresses / paymentdetails / consents / customercoupons / wishlists / tickets",BLUE), ("Address, PaymentInfo, Consent, CustomerCoupon, CsTicket",GREY), ("各 WsDTO 拡張",YEL), ("—",GREY)],
+ [("カート",GREY), ("users/{userId}/carts/{cartId} / .../entries / .../vouchers",BLUE), ("Cart, CartEntry, Voucher",GREY), ("CartWsDTO / OrderEntryWsDTO 拡張 + fields",YEL), ("—",GREY)],
+ [("チェックアウト",GREY), ("carts/{cartId}/addresses/delivery / deliverymodes / paymentdetails / costcenter",BLUE), ("Address, DeliveryMode, PaymentInfo",GREY), ("配送・支払の選択肢はデータ追加",YEL), ("—",GREY)],
+ [("注文",GREY), ("users/{userId}/orders/{id} / .../cancellation / orderReturns / replenishmentOrders",BLUE), ("Order, Consignment, ReturnRequest",GREY), ("OrderWsDTO 拡張 + fields",YEL), ("orderCode(注文確認バナー)",GREEN)],
+ [("店舗",GREY), ("stores?query=... / stores/{storeId}",BLUE), ("PointOfService",GREY), ("PointOfServiceWsDTO 拡張",YEL), ("storeCode(店舗バナー)",GREEN)],
+ [("B2B 組織",GREY), ("users/{userId}/orgUnits / orgCustomers / budgets / costcenters / orderapprovals / quotes",BLUE), ("B2BUnit, B2BCustomer, B2BBudget, B2BCostCenter, Quote",GREY), ("各 WsDTO 拡張",YEL), ("—",GREY)],
+ [("新しい概念",GREY), ("users/{userId}/campaignEntries/{code}(例)",RED), ("新 ItemType",RED), ("新コントローラ + WsDTO(8.4)",RED), ("campaignCode",GREEN)],
+]
+yend=grid(d11, 700, 110, [("分類",100),("URL パターン",280),("ItemType(要確認)",170),("属性を足すなら",170),("CMS 属性に持たせる参照 ID",160)], rows, h=60)
+d11.text("ItemType 名は SAP Commerce 標準型システムの一般知識で、本リポジトリでは検証不能(Backoffice の型検索で確認)。URL パターンは Spartacus の default-occ-*-config.ts 45 ファイルから収集。", 700, yend+4, 900, 40, 11)
 
 # ---------- 10. four tiers + measured timeline ----------
 d10=D("10 呼び出しの 4 階層と毎回・初回")
@@ -382,6 +383,6 @@ for name,cells,tier in rowsT:
     y+=48
 d10.text("読み方: 橙 = HTTP が飛んだ、灰 = ストアにあるので飛ばない、赤 = 再訪でも飛ぶ(cms/pages は loadStrategy の既定 ALWAYS、references はコンポーネントが初期化時に cleanReferences() する設計)。\n「毎回」なのは cms/pages だけで、同梱されたコンポーネントデータも一緒に毎回届く。業務データは初回のみ。", 740, y+6, 860, 60, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+'</mxfile>'
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

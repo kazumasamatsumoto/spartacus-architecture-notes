@@ -4,6 +4,8 @@
 
 ![01 全体フロー URL→描画](diagrams/page1.png)
 
+> **この章が答える問い**: URL を開いてから画面が出るまでの 1 回の遷移で、何がどの順に起きるか(①)
+
 
 ```
 ブラウザ URL  /electronics-spa/en/USD/product/300938/...

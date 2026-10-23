@@ -4,6 +4,8 @@
 
 ![04 バックエンド判断フロー](diagrams/page4.png)
 
+> **この章が答える問い**: バックエンド側で何を用意すればフロントが困らないか
+
 
 - [ ] `*-items.xml` で `SimpleCMSComponent`(または適切な親)を継承した ItemType を定義し、`typeCode` を決める
 - [ ] OCC で属性が公開されるようにする(`cmsocc` の DTO / Converter / `fields=DEFAULT` のフィールド定義)。開発 OCC で `GET /occ/v2/{baseSite}/users/anonymous/cms/pages?pageType=ContentPage&pageLabelOrId=homepage` を叩いて JSON に出ることを確認
