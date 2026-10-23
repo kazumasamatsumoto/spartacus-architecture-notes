@@ -19,3 +19,13 @@ SAP Composable Storefront (Spartacus) のアーキテクチャを、ソースコ
 文書中に引用している TypeScript / HTML のコード断片は SAP/spartacus のものであり、
 [Apache License 2.0](https://github.com/SAP/spartacus/blob/develop/LICENSE.txt) に基づきます。
 Copyright SAP SE or an SAP affiliate company and Spartacus contributors.
+
+## 図の再生成
+
+`docs/diagrams/spartacus-architecture.drawio` が draw.io の元ファイルです(draw.io / diagrams.net でそのまま開けます)。
+このファイルは `tools/gen_drawio.py` から生成しており、再生成と画像書き出しは次のとおりです。
+
+```bash
+python3 tools/gen_drawio.py                      # → docs/diagrams/spartacus-architecture.drawio
+drawio -x -f png -s 1.5 -p 1 -o docs/diagrams/page1.png docs/diagrams/spartacus-architecture.drawio   # ページ番号は 1〜5
+```
