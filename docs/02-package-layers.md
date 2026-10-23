@@ -22,4 +22,4 @@
 
 ---
 
-[目次](README.md) | ← [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md) | [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) →
+[目次](README.md) | ← [1.9 コンポーネントの書き方(標準ライブラリの実例)](01-9-component-style.md) | [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) →
