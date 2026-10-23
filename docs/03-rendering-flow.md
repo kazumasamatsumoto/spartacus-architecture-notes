@@ -1,5 +1,10 @@
 # 3. 全体像: URL からコンポーネント描画まで
 
+> **図**: 01 全体フロー URL→描画(`diagrams/spartacus-architecture.drawio`)。本章の 10 ステップと、右側の OCC 呼び出しの対応
+
+![01 全体フロー URL→描画](diagrams/page1.png)
+
+
 ```
 ブラウザ URL  /electronics-spa/en/USD/product/300938/...
    │

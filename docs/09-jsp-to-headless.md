@@ -1,5 +1,10 @@
 # 9. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか
 
+> **図**: 05 JSP→ヘッドレス 責務の移行(`diagrams/spartacus-architecture.drawio`)。JSP コントローラの責務 (a)〜(f) がヘッドレスでどこへ移るか
+
+![05 JSP→ヘッドレス 責務の移行](diagrams/page5.png)
+
+
 ### 9.1 何が変わるか
 
 JSP ストアフロントでは、CMS コンポーネント 1 つに対して `AbstractCMSComponentController` 派生のコントローラがあり、`fillModel()` で派生データを計算して `Model` に詰め、`cms/<TypeCode>.jsp` を返していた。つまり 1 コントローラが **(a) 属性の取り出し、(b) 派生データの計算、(c) URL 生成、(d) HTML 描画、(e) 他コンポーネントのインクルード、(f) フォーム処理** をすべて担っていた。

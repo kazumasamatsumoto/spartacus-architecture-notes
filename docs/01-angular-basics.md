@@ -1,5 +1,10 @@
 # 1. Angular 入門(バックエンド担当者向け)と Spartacus への対応
 
+> **図**: 06 Angular アプリの骨格と設定 DI(`diagrams/spartacus-architecture.drawio`)。左: main.ts → AppModule → SpartacusModule の骨格。右: provideConfig / provideDefaultConfig が deepMerge で 1 つの Config になる流れ(1.3, 1.4)
+
+![06 Angular アプリの骨格と設定 DI](diagrams/page6.png)
+
+
 > この章は、Angular を知らない読者が 2 章以降を読めるようにするための最小限の対応表です。各概念の「Spartacus ではここ」を実ファイルで示します。
 
 ### 1.1 技術スタック(根拠: `spartacus/package.json`)

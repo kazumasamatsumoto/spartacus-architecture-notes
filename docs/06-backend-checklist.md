@@ -1,5 +1,10 @@
 # 6. バックエンド側のチェックリスト
 
+> **図**: 04 バックエンド判断フロー(`diagrams/spartacus-architecture.drawio`)。チェックリストの前提になる「何を・どの単位で返すか」の判断木(詳細は 8 章)
+
+![04 バックエンド判断フロー](diagrams/page4.png)
+
+
 - [ ] `*-items.xml` で `SimpleCMSComponent`(または適切な親)を継承した ItemType を定義し、`typeCode` を決める
 - [ ] OCC で属性が公開されるようにする(`cmsocc` の DTO / Converter / `fields=DEFAULT` のフィールド定義)。開発 OCC で `GET /occ/v2/{baseSite}/users/anonymous/cms/pages?pageType=ContentPage&pageLabelOrId=homepage` を叩いて JSON に出ることを確認
 - [ ] ページテンプレート / コンテンツスロットにコンポーネントを配置し、カタログ同期(Staged → Online)

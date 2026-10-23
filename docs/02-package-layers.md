@@ -1,5 +1,10 @@
 # 2. Spartacus のパッケージ構成
 
+> **図**: 02 レイヤ構成(`diagrams/spartacus-architecture.drawio`)。利用者アプリ → 機能ライブラリ → @spartacus/storefront → @spartacus/core → OCC → SAP Commerce の依存方向
+
+![02 レイヤ構成](diagrams/page2.png)
+
+
 | パッケージ(npm 名) | リポジトリ内の場所 | 役割 |
 |---|---|---|
 | `@spartacus/core` | `spartacus/core-libs/core/` | 非 UI。モデル、NgRx ストア、OCC アダプタ(HTTP)、Facade サービス、設定の仕組み、ルーティング、i18n |

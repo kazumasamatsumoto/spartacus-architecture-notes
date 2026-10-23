@@ -1,5 +1,10 @@
 # 7. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方
 
+> **図**: 03 カスタムコンポーネントのデータ経路(`diagrams/spartacus-architecture.drawio`)。本章が扱うのは右の経路 B(Facade → Query/Store → Connector → Adapter → Normalizer → OCC)
+
+![03 カスタムコンポーネントのデータ経路](diagrams/page3.png)
+
+
 5 章は「CMS 属性だけで完結するコンポーネント」だった。商品・在庫・会員情報・外部システムのデータなど**バックオフィスで編集しない動的データ**を表示するコンポーネントでは、Spartacus の階層に沿ってフロント側に 5〜6 ファイルを追加する。図は `docs/diagrams/spartacus-architecture.drawio` の「03 カスタムコンポーネントのデータ経路」。
 
 ### 7.1 原則(リポジトリ同梱ガイド)

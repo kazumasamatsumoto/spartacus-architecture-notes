@@ -1,5 +1,10 @@
 # 4. なぜデモサイトの API 呼び出しが少ないのか
 
+> **図**: 07 API 呼び出しを減らす仕組み(`diagrams/spartacus-architecture.drawio`)。ページ取得 / コンポーネントデータ / 業務データの 3 系統で、HTTP が飛ぶ前に通る 16 個の「止め弁」
+
+![07 API 呼び出しを減らす仕組み](diagrams/page7.png)
+
+
 ### 4.1 実測(Chrome, 2026-10-23, OPTIONS プリフライト除外)
 
 **ホーム初回ロード** `/electronics-spa/en/USD/`
