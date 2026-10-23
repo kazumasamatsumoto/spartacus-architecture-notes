@@ -24,6 +24,20 @@
 3. **バックエンドの `typeCode`(CMSFlexComponent なら `flexType`)が、フロントの Angular コンポーネントを選ぶキー**になる。フロント側の作業は原則「`provideConfig({ cmsComponents: { <typeCode>: { component: XxxComponent } } })` を 1 つ追加し、`CmsComponentData<T>` を注入して `data$` を描く」だけ。
 4. **API が少ないのは設計どおり**。`cms/pages` のレスポンスに全コンポーネントのデータが同梱され、NgRx ストアに入る。足りない分だけ `cms/components?componentIds=...` でまとめて取り、取得済みは再取得しない。商品カルーセルも `products/search?filters=code:...` で一括取得する。
 5. デモサイトは **CSR 配信(SSR なし)**。それでもホーム初回表示の OCC GET は 9 本程度、商品詳細への SPA 遷移は 6 本だった。SSR を有効にすると TransferState でさらに減る。
+6. **動的な業務データ**を表示するコンポーネントは、フロントに Facade / Connector / Adapter / Normalizer を追加し(7 章)、バックエンドは**コンポーネント単位ではなくリソース単位**の OCC エンドポイントを用意する(8 章)。
+
+### 図(draw.io)
+
+`docs/diagrams/spartacus-architecture.drawio`(4 ページ)。PNG / SVG 書き出し済み。
+
+| ページ | 内容 | 画像 |
+|---|---|---|
+| 01 全体フロー URL→描画 | 3 章の 10 ステップと OCC 呼び出しの対応 | [page1.png](diagrams/page1.png) |
+| 02 レイヤ構成 | アプリ → 機能ライブラリ → storefront → core → OCC → SAP Commerce | [page2.png](diagrams/page2.png) |
+| 03 カスタムコンポーネントのデータ経路 | 経路 A(CMS 属性)と経路 B(業務データ: Facade〜Java Controller) | [page3.png](diagrams/page3.png) |
+| 04 バックエンド判断フロー | 何を・どの単位で返すかの判断木 | [page4.png](diagrams/page4.png) |
+
+![全体フロー](diagrams/page1.png)
 
 ---
 
@@ -774,6 +788,311 @@ CMS 属性に「商品コード」「カテゴリコード」のような参照�
 - [ ] フロントが参照する属性名・値の表現を固定し、依頼書(5.8)を書く
 - [ ] 参照系データ(商品など)は OCC 商品 API で取得できる前提にする。CMS 属性へコピーしない
 - [ ] 既存の `cms/pages` レスポンスサイズに注意する(ホームで 73KB)。巨大な HTML や大量リストを 1 コンポーネントに詰めない
+
+---
+
+## 7. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方
+
+5 章は「CMS 属性だけで完結するコンポーネント」だった。商品・在庫・会員情報・外部システムのデータなど**バックオフィスで編集しない動的データ**を表示するコンポーネントでは、Spartacus の階層に沿ってフロント側に 5〜6 ファイルを追加する。図は `docs/diagrams/spartacus-architecture.drawio` の「03 カスタムコンポーネントのデータ経路」。
+
+### 7.1 原則(リポジトリ同梱ガイド)
+
+`spartacus/core-libs/skills/skills/spartacus-developer/references/backend-communication.md:5-16`
+> NEVER inject `HttpClient` in components or services. All backend communication goes through a layered pipeline: `Component → Facade → state layer → Connector → Adapter → Converter`. … Only **Adapters** use `HttpClient`.
+> Facade — Public API consumed by components. / Connector — Thin delegation layer injecting the abstract Adapter. / Adapter — Abstract class in `connectors/`, OCC implementation in `occ/adapters/`. This is the ONLY layer that uses `HttpClient`. / Converter — Normalizers (backend→UI) and Serializers (UI→backend) are registered as `multi: true` providers on typed `InjectionToken`s.
+
+同 `:20`: 「NEVER hardcode endpoint URLs. Configure them via `provideConfig`」。
+
+### 7.2 各層の実物(`feature-libs/user/account` を例に)
+
+標準ライブラリは 1 機能を `root` / `core` / `occ` / `components` の 4 エントリポイントに分ける(`spartacus/tsconfig.json:49-64` のパスマッピング、各ディレクトリの `ng-package.json`)。
+
+| 層 | 置き場所 | 役割 | 実物 |
+|---|---|---|---|
+| Facade(抽象) | `root/facade/` | コンポーネントが使う公開 API。DI トークン兼契約。遅延ロード前はプロキシ | `feature-libs/user/account/root/facade/user-account.facade.ts:13-25` |
+| Facade 実装 | `core/facade/` | 状態層(Query/Command または NgRx)。Connector を呼ぶ | `core/facade/user-account.service.ts:24-56` |
+| Connector | `core/connectors/` | 機能向けの薄い委譲。Adapter 抽象を注入 | `core/connectors/user-account.connector.ts:16-29` |
+| Adapter(抽象) | `core/connectors/` | バックエンド契約。OCC 以外にも差し替え可能 | `core/connectors/user-account.adapter.ts:14-20` |
+| OCC Adapter | `occ/adapters/` | **唯一 `HttpClient` を使う層**。URL 組み立てと Normalizer 適用 | `occ/adapters/occ-user-account.adapter.ts:34-52` |
+| エンドポイント設定 | `occ/adapters/config/` | `backend.occ.endpoints` に URL テンプレート | `occ/adapters/config/default-occ-user-account-endpoint.config.ts:9-18` |
+| Converter / Normalizer | `occ/converters/` + `core/connectors/converters.ts` | OCC DTO → FE モデル | `feature-libs/organization/order-approval/occ/converters/occ-order-approval-normalizer.ts:12-29` |
+| 配線 | `core/*-core.module.ts`, `occ/*-occ.module.ts`, `root/*-root.module.ts` | providers の束ね | `core/user-account-core.module.ts:11-14`, `occ/user-account-occ.module.ts:13-19` |
+
+**Facade(抽象)** `spartacus/feature-libs/user/account/root/facade/user-account.facade.ts:13-25`
+```ts
+@Injectable({
+  providedIn: 'root',
+  useFactory: () =>
+    facadeFactory({
+      facade: UserAccountFacade,
+      feature: USER_ACCOUNT_CORE_FEATURE,
+      methods: ['get', 'getById'],
+    }),
+})
+export abstract class UserAccountFacade {
+  abstract get(): Observable<User | undefined>;
+  abstract getById(userId: string): Observable<User | undefined>;
+}
+```
+`facadeFactory` は「最初のメソッド呼び出し時に機能チャンクを遅延ロードし、その中の実装へ転送するプロキシ」を作る(`core-libs/core/src/lazy-loading/facade-factory/facade-factory.ts:11-24`, `facade-factory.service.ts:110-131`)。NgRx を使う機能は `async: true` を付ける(`feature-libs/storefinder/root/facade/store-finder.facade.ts:21-43`)。
+
+**Facade 実装(Query パターン)** `spartacus/feature-libs/user/account/core/facade/user-account.service.ts:24-56`
+```ts
+@Injectable()
+export class UserAccountService implements UserAccountFacade {
+  protected userQuery: Query<User> = this.query.create(
+    () =>
+      this.userIdService
+        .takeUserId(true)
+        .pipe(switchMap((userId) => this.userAccountConnector.get(userId))),
+    {
+      reloadOn: [UserAccountChangedEvent],
+      resetOn: [LoginEvent, LogoutEvent],
+    }
+  );
+  ...
+  get(): Observable<User | undefined> {
+    return this.userQuery.get();
+  }
+}
+```
+`QueryService.create`(`core-libs/core/src/util/command-query/query.service.ts:31-60, 77-103`)は `loading / error / data` を保持し、購読中は 1 回しかロードしない。`reloadOn` は data を保ったまま再取得、`resetOn` は初期状態へ戻す。新規機能ではこの Query/Command が推奨で、NgRx は旧来機能に合わせる場合に使う(`backend-communication.md:5-11`)。書き込みは `CommandService`(`command.service.ts:27-53`、既定戦略 Queue)。
+
+**Connector と Adapter 抽象** `spartacus/feature-libs/user/account/core/connectors/user-account.connector.ts:16-29`, `user-account.adapter.ts:14-20`
+```ts
+@Injectable()
+export class UserAccountConnector {
+  constructor(protected adapter: UserAccountAdapter) {}
+  get(userId: string): Observable<User> {
+    return this.adapter.load(userId);
+  }
+}
+export abstract class UserAccountAdapter {
+  abstract load(userId: string): Observable<User>;
+}
+```
+
+**OCC Adapter** `spartacus/feature-libs/user/account/occ/adapters/occ-user-account.adapter.ts:34-52`
+```ts
+@Injectable()
+export class OccUserAccountAdapter implements UserAccountAdapter {
+  protected logger = inject(LoggerService);
+  constructor(
+    protected http: HttpClient,
+    protected occEndpoints: OccEndpointsService,
+    protected converter: ConverterService
+  ) {}
+  load(userId: string): Observable<User> {
+    const url = this.occEndpoints.buildUrl('user', { urlParams: { userId } });
+    return this.http.get<Occ.User>(url).pipe(
+      catchError((error) => {
+        throw tryNormalizeHttpError(error, this.logger);
+      }),
+      this.converter.pipeable(USER_ACCOUNT_NORMALIZER)
+    );
+  }
+```
+
+**エンドポイント設定と型拡張** `occ/adapters/config/default-occ-user-account-endpoint.config.ts:9-18`, `occ-user-account-endpoint.model.ts:9-22`
+```ts
+export const defaultOccUserAccountConfig: OccConfig = {
+  backend: { occ: { endpoints: {
+    user: 'users/${userId}',
+    createVerificationToken: 'users/anonymous/verificationToken',
+  } } },
+};
+declare module '@spartacus/core' {
+  interface OccEndpoints extends UserAccountOccEndpoints {}
+}
+```
+`OccEndpointsService.buildUrl`(`core-libs/core/src/occ/services/occ-endpoints.service.ts:86-150`)は `baseUrl + prefix + 現在の baseSite + endpoint` を組み立て、`${userId}` などを `urlParams` で埋め、`queryParams` を結合する。**`baseSiteId` はプレースホルダではなく `getBaseUrl()` がパスとして前置する**(同 `:233-238`)。
+
+**Normalizer** `spartacus/feature-libs/organization/order-approval/occ/converters/occ-order-approval-normalizer.ts:12-29` と登録 `order-approval-occ.module.ts:24-36`
+```ts
+@Injectable({ providedIn: 'root' })
+export class OccOrderApprovalNormalizer implements Converter<Occ.OrderApproval, OrderApproval> {
+  convert(source: Occ.OrderApproval, target?: OrderApproval): OrderApproval {
+    if (target === undefined) {
+      target = { ...(source as any) } as OrderApproval;
+    }
+    if (source.order) {
+      target.order = this.converter.convert(source.order, ORDER_NORMALIZER);
+    }
+    return target;
+  }
+}
+...
+providers: [
+  provideDefaultConfig(defaultOccOrderApprovalConfig),
+  { provide: OrderApprovalAdapter, useClass: OccOrderApprovalAdapter },
+  { provide: ORDER_APPROVAL_NORMALIZER, useExisting: OccOrderApprovalNormalizer, multi: true },
+```
+`ConverterService.pipeable`(`core-libs/core/src/util/converter.service.ts:77-88, 130-137`)は登録された Normalizer を順に reduce し、未登録なら素通しする。**`multi: true` を忘れると既存の変換チェーンを丸ごと置き換えてしまう**(`normalizers.md:5-7`)。
+
+**配線** `core/facade/facade-providers.ts:15-26`, `core/user-account-core.module.ts:11-14`, `occ/user-account-occ.module.ts:13-19`
+```ts
+export const facadeProviders: Provider[] = [
+  UserAccountService,
+  { provide: UserAccountFacade, useExisting: UserAccountService },
+];
+@NgModule({ providers: [UserAccountConnector, ...facadeProviders] })
+export class UserAccountCoreModule {}
+@NgModule({ providers: [
+  provideDefaultConfig(defaultOccUserAccountConfig),
+  { provide: UserAccountAdapter, useClass: OccUserAccountAdapter },
+] })
+export class UserAccountOccModule {}
+```
+
+**コンポーネントから使う** `components/login/login.component.ts:34-54` は `UserAccountFacade` を注入し `this.userAccount.get()` を購読するだけ。
+
+### 7.3 HTTP リクエストに自動で付くもの(バックエンドが前提にできること)
+
+`OccEndpointsService.buildUrl` で作った URL(= OCC の baseUrl 配下)に対してのみ、インターセプタが次を付与する。手組みの URL には付かない。
+
+| 付与されるもの | 根拠 |
+|---|---|
+| クエリ `lang`, `curr` | `core-libs/core/src/occ/adapters/site-context/site-context.interceptor.ts:54-68` |
+| `Authorization: Bearer <token>`(ログイン時。`basesites` は除外) | `core-libs/core/src/auth/user-auth/services/auth-http-header.service.ts:179-207, 220-226` |
+| 401 時のトークン更新とリトライ | `auth.interceptor.ts:54-73` |
+| `userId` の値は `'current'`(ログイン中)か `'anonymous'` | `core-libs/core/src/occ/utils/occ-user-ids.ts:7-8` |
+
+エラー応答は OCC 標準の `{ "errors": [ { "type", "message", "reason", "subject", "subjectType" } ] }` が期待されている(`core-libs/core/src/util/try-normalize-http-error.ts:36-50` が `error.error.errors` 配列を `HttpErrorModel.details` に写す。DTO 型は `occ.models.ts:104-125` の `Occ.ErrorModel`)。
+
+### 7.4 カスタム機能で追加するファイル一覧(雛形)
+
+```
+my-promo/
+  root/
+    feature-name.ts            export const MY_PROMO_FEATURE = 'myPromo';
+    facade/my-promo.facade.ts  abstract class MyPromoFacade (facadeFactory)
+    model/my-promo.model.ts    interface MyPromo { id; title; discountRate; ... }
+    my-promo-root.module.ts    provideDefaultConfig({ featureModules: { myPromo: { cmsComponents: ['MyPromoBannerComponent'] } } })
+  core/
+    connectors/my-promo.adapter.ts     abstract class MyPromoAdapter { abstract load(userId, promoId): Observable<MyPromo> }
+    connectors/my-promo.connector.ts   @Injectable() class MyPromoConnector
+    connectors/converters.ts           export const MY_PROMO_NORMALIZER = new InjectionToken<Converter<Occ.MyPromo, MyPromo>>('MyPromoNormalizer')
+    facade/my-promo.service.ts         QueryService で MyPromoFacade を実装
+    my-promo-core.module.ts
+  occ/
+    model/occ-my-promo.models.ts       Occ 側 DTO 型 + declare module '@spartacus/core' { interface OccEndpoints { myPromo?: string } }
+    adapters/default-occ-my-promo-config.ts   endpoints: { myPromo: 'users/${userId}/my-promos/${promoId}?fields=DEFAULT' }
+    adapters/occ-my-promo.adapter.ts   buildUrl + http.get + tryNormalizeHttpError + converter.pipeable(MY_PROMO_NORMALIZER)
+    converters/occ-my-promo-normalizer.ts
+    my-promo-occ.module.ts
+  components/
+    my-promo-banner/my-promo-banner.component.ts   inject(CmsComponentData) で promoId を読み、inject(MyPromoFacade).get(promoId)
+    my-promo-components.module.ts      provideDefaultConfig({ cmsComponents: { MyPromoBannerComponent: { component: MyPromoBannerComponent } } })
+  my-promo.module.ts                   imports: [Core, Occ, Components]
+アプリ側: provideConfig({ featureModules: { myPromo: { module: () => import('./my-promo.module').then(m => m.MyPromoModule) } } })
+```
+
+コンポーネント内の典型的な結線(CMS 属性 → 業務データ):
+```ts
+export class MyPromoBannerComponent {
+  protected cms = inject<CmsComponentData<CmsMyPromoBannerComponent>>(CmsComponentData);
+  protected promo = inject(MyPromoFacade);
+  promo$ = this.cms.data$.pipe(
+    map((d) => d.promoId),
+    filter(Boolean),
+    distinctUntilChanged(),
+    switchMap((id) => this.promo.get(id))
+  );
+}
+```
+これは `ProductCarouselComponent` が `productCodes` を読んで `ProductSearchByCodeService.get` を呼ぶのと同じ形(5.6)。
+
+---
+
+## 8. バックエンド(Java)側: 何を、どの単位で返すか
+
+> **根拠の範囲について**: SAP Commerce Cloud 本体(Java)は公開リポジトリが無いためクローンできない。本章のうち Java の API 名は SAP Help の公開ドキュメント([DataMapper](https://help.sap.com/doc/9fef7037b3304324b8891e84f19f2bf3/2211/en-US/de/hybris/platform/webservicescommons/mapping/DataMapper.html)、[Data Mapping Mechanism](https://help.sap.com/docs/SAP_COMMERCE/9d346683b0084da2938be8a285c0c27a/e571a0e6f7524d4ab62e29cc2b387aeb.html)、[KBA 2693560 field level configuration](https://userapps.support.sap.com/sap/support/knowledge/en/2693560))に基づく。**フロントが何を期待するか**は 7.3 のとおり Spartacus ソースで裏付けている。デモ OCC の実レスポンス(5.2、付録 B)も根拠に含む。
+
+### 8.1 結論: 「コンポーネント単位」ではなく「リソース単位」
+
+`@RestController`(SAP Commerce の OCC では `@Controller` + `@RequestMapping` + `@ResponseBody`)を**CMS コンポーネントごとに作ってはいけない**。判断は次の順(図「04 バックエンド判断フロー」):
+
+| 問い | YES の場合 | 作るもの |
+|---|---|---|
+| ① CMS 管理者がバックオフィスで編集する内容か | ItemType の属性にする | **コントローラ不要**。`cms/pages` / `cms/components` が属性を自動で返す |
+| ② 既存 OCC API(products, categories, carts, orders, users …)で取れるか | CMS 属性には code / ID だけ持たせ、FE が既存 Facade で取得 | **コントローラ不要**(例: `ProductCarouselComponent.productCodes`) |
+| ③ 既存リソースに属性を足せば足りるか | 既存 WsDTO と Populator を拡張し、`fields` レベルに追加 | **DTO 拡張のみ**。FE は Occ モデル拡張 + Normalizer(`normalizers.md:17-26`) |
+| ④ 上記で足りない | **新しいリソース**としてエンドポイントを設計 | 新コントローラ + WsDTO。FE は 7.4 の一式 |
+
+「単位」の答え: **URL はドメインのリソース(名詞)で切る**。CMS コンポーネントは「どのリソースを、どう見せるか」の設定(参照 ID と表示オプション)だけを持つ。こうすると同じ API を複数コンポーネント・複数画面で再利用でき、FE 側のキャッシュ(Query / Entity Loader)とバッチ化(`bufferDebounceTime`)が効く。
+
+### 8.2 ① CMS 属性で返す場合(コントローラ不要)
+
+デモの実レスポンス(5.2)から読み取れる OCC CMS の出力規則:
+
+| 観測事実 | 含意 |
+|---|---|
+| `"container": "false"`, `"external": "false"` | 真偽値も **文字列**。FE モデルは `string` で受け、`=== 'true'` で判定(`banner.component.ts:133-135` は `'true'` と `true` 両対応) |
+| `"productCodes": "300938 358639 ..."` | 複数値は **スペース区切りの 1 文字列**。FE で `split(' ')`(`product-carousel.component.ts:74`) |
+| `"media": { "desktop": {url, altText, mime, code}, "tablet": …, "mobile": …, "widescreen": … }` | メディアコンテナは breakpoint ごとのオブジェクト(`cms.model.ts:99-117`) |
+| `"content": "<div class=...>…</div>"` | リッチテキストは HTML 文字列のまま |
+| `uid`, `uuid`, `typeCode`, `modifiedtime`, `name`, `synchronizationBlocked` | 全コンポーネント共通の自動属性 |
+| 言語依存属性 | `?lang=en` で解決済みの 1 値が返る(ローカライズは OCC 側で解決) |
+
+バックエンド作業は `*-items.xml` に ItemType と属性を定義してバックオフィスで値を入れるだけ。依頼書には「属性名・型(文字列化後の表現)・例」を書く。**既存 typeCode のインスタンスを増やすだけならフロント作業ゼロ**(5.1)。
+
+### 8.3 ③④ 新しいリソースを返す場合の設計ルール
+
+フロント(7.3)と OCC の慣習から導かれるチェックリスト:
+
+1. **URL**: `/{baseSiteId}/...` 配下。利用者固有なら `/{baseSiteId}/users/{userId}/my-promos/{promoId}`。`userId` には `current` / `anonymous` が来る前提で解決する(`occ-user-ids.ts:7-8`)。Spartacus 側の endpoints 設定は `'users/${userId}/my-promos/${promoId}'` と 1 対 1 になる。
+2. **単件と一括の両方**: `GET /my-promos/{id}` と `GET /my-promos?ids=a,b,c`(または `filters=`)。FE は同一ティックの要求をまとめて 1 本にする設計なので(4.2 (d)(h))、一括エンドポイントが無いとコンポーネント数だけ API が飛ぶ。
+3. **`fields` パラメータ**: `BASIC` / `DEFAULT` / `FULL` のレベルを `dto-level-mappings` に定義し、`DataMapper.map(data, XxxWsDTO.class, fields)` で返す。Spartacus の endpoints 設定は `?fields=DEFAULT` や `?fields=code,name,price(formattedValue)` を URL テンプレートに持つのが慣習(`default-occ-product-config.ts:14-27`、`default-occ-store-finder-config.ts:12-17`)。
+4. **`lang` / `curr`**: 必ずクエリで来る(7.3)。ローカライズ属性と価格はこれで解決して返す。
+5. **認証**: `users/{userId}` 配下はログイン時に Bearer トークンが付く。匿名可否はサーバ側で判断。
+6. **エラー形式**: `ErrorListWsDTO`(`{ errors: [{ type, message, reason, subject, subjectType }] }`)で返す。FE はこれを `HttpErrorModel.details` に写して表示する(`try-normalize-http-error.ts:44-50`)。
+7. **DTO の形**: フラットで、ネストはリソース参照(`product: { code, name }`)程度に抑える。FE の Normalizer は `{ ...source }` から始めて差分だけ変換するのが定石(`occ-order-approval-normalizer.ts:20-26`)なので、JSON のキー名がそのまま FE モデルのプロパティ名になる。キー名は camelCase。
+8. **命名**: URL はコンポーネント名(`/myPromoBannerComponentData`)ではなくリソース名(`/my-promos`)。コンポーネントが変わっても API は残る。
+
+### 8.4 Java 側の最小構成(参考・SAP Help の公開情報に基づく一般形)
+
+```java
+// OCC 拡張 (yocc テンプレートから生成した *occ 拡張) の web/src 配下
+@Controller
+@RequestMapping(value = "/{baseSiteId}/users/{userId}/my-promos")
+public class MyPromosController extends BaseController {
+
+  @Resource private MyPromoFacade myPromoFacade;   // facades 層: MyPromoData を返す
+  @Resource private DataMapper dataMapper;          // webservicescommons の DataMapper
+
+  @GetMapping(value = "/{promoId}")
+  @ResponseBody
+  public MyPromoWsDTO getPromo(
+      @PathVariable String promoId,
+      @RequestParam(defaultValue = DEFAULT_FIELD_SET) String fields) {
+    MyPromoData data = myPromoFacade.getPromo(promoId);     // Service → DAO
+    return dataMapper.map(data, MyPromoWsDTO.class, fields); // fields = BASIC/DEFAULT/FULL or 明示列挙
+  }
+
+  @GetMapping
+  @ResponseBody
+  public MyPromoListWsDTO getPromos(
+      @RequestParam List<String> ids,
+      @RequestParam(defaultValue = DEFAULT_FIELD_SET) String fields) {
+    MyPromoListData data = myPromoFacade.getPromos(ids);     // 一括取得
+    return dataMapper.map(data, MyPromoListWsDTO.class, fields);
+  }
+}
+```
+- `MyPromoWsDTO` は `*-beans.xml` で定義し、`dto-level-mappings` で `BASIC` / `DEFAULT` / `FULL` に含めるフィールドを宣言する(KBA 2693560)。
+- `MyPromoData`(facades の Data オブジェクト)と `WsDTO` の名前を揃えると DataMapper の自動マッピングで済む。
+- Spartacus 側の設定は `myPromo: 'users/${userId}/my-promos/${promoId}?fields=DEFAULT'`, `myPromos: 'users/${userId}/my-promos?fields=DEFAULT'` の 2 行。
+
+### 8.5 依頼書に追加する項目(業務データがある場合)
+
+5.8 の 8 項目に加えて:
+
+9. **リソース名と URL**(単件 / 一括)、パス・クエリパラメータ
+10. **WsDTO の JSON サンプル**(`fields=DEFAULT` と `FULL` の両方)
+11. **`fields` レベルに含まれる属性一覧**
+12. **認証要否**(匿名可 / ログイン必須)、`userId` の扱い
+13. **エラー応答の `type` / `reason` 一覧**(FE でメッセージ表示に使う)
+14. **CMS 属性との対応**: どの CMS 属性(例 `promoId`)がこの API の引数になるか
 
 ---
 
