@@ -18,7 +18,7 @@
 | 03 カスタムコンポーネントのデータ経路 | 経路 A(CMS 属性)と経路 B(業務データ: Facade〜Java Controller) | [page3.png](diagrams/page3.png) |
 | 04 バックエンド判断フロー | 何を・どの単位で返すかの判断木 | [page4.png](diagrams/page4.png) |
 | 05 JSP→ヘッドレス 責務の移行 | JSP コンポーネントコントローラの各責務がどこへ移るか(9 章) | [page5.png](diagrams/page5.png) |
-| 06 Angular アプリの骨格と設定 DI | main.ts → AppModule → SpartacusModule と provideConfig の合成(1 章) | [page6.png](diagrams/page6.png) |
+| 06 Angular アプリの骨格と設定 DI | main.ts → bootstrapApplication → AppModule → SpartacusModule の骨格と provideConfig の合成(1 章) | [page6.png](diagrams/page6.png) |
 | 07 API 呼び出しを減らす仕組み | HTTP が飛ぶ前に通る 16 個の止め弁(4 章) | [page7.png](diagrams/page7.png) |
 
 ![全体フロー](diagrams/page1.png)
