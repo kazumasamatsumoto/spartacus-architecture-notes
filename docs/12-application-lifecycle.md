@@ -80,7 +80,7 @@ getStable('context')
 
 ここからは 3 章の 10 ステップそのもの。要点のみ:
 
-- `'**'` ルートの `CmsPageGuard` が `CmsService.getPage()` を呼び、ストアに無ければ `cms/pages` を 1 本取得(4 章の止め弁①〜③)。
+- `'**'` ルートの `CmsPageGuard` が `CmsService.getPage()` を呼び、`cms/pages` を 1 本取得(既定の `loadStrategy: ALWAYS` では再訪でも取得する。13 章)。同一ページの重複要求は 4 章の止め弁②③で 1 本にまとまる。
 - `PageLayoutComponent` → `LayoutConfig.layoutSlots` → `<cx-page-slot>` → `ComponentWrapperDirective`(フェーズ 5)。
 - `NavigationEnd` 後: `OnNavigateService` がスクロール位置を復元(`on-navigate.service.ts:71-109`)、`SeoMetaService` が `<title>` / `<meta>` を更新、`NavigationEvent` / `PageEvent` が発火(`core-libs/storefront/events/`)。
 - 起動時に無条件で飛ぶ OCC 呼び出しは、`languages` / `currencies` / `basesites`(context 初期化)、`cms/pages`、不足分の `cms/components`、復元したカート ID があれば `carts/{cartId}`、トークンがあれば `users/current` 系。デモ(CSR, 匿名)での実測は 4.1 のとおり 10 本。
@@ -102,7 +102,7 @@ CMS コンポーネント 1 個の一生(`spartacus/core-libs/storefront/cms-str
 
 | イベント | 発火源 | 連鎖して起きること | OCC |
 |---|---|---|---|
-| **ページ遷移** | `RoutingService.go()` / リンク / ブラウザ戻る | `NavigationStart`(サイトコンテキスト再確認)→ `CmsPageGuard` → ストアに無ければ `cms/pages` → 旧コンポーネント破棄・新コンポーネント生成 → `NavigationEnd` → スクロール復元・SEO・`PageEvent` | `cms/pages`(未取得時のみ)。4.1 の実測: PDP への SPA 遷移で 6 本 |
+| **ページ遷移** | `RoutingService.go()` / リンク / ブラウザ戻る | `NavigationStart`(サイトコンテキスト再確認)→ `CmsPageGuard` → `cms/pages`(既定 `loadStrategy: ALWAYS` のため再訪でも取得。`ONCE` なら初回のみ。13 章)→ 旧コンポーネント破棄・新コンポーネント生成 → `NavigationEnd` → スクロール復元・SEO・`PageEvent` | `cms/pages`(毎回)。コンポーネント・業務データはストア済みなら無し。13.2 の実測: PDP 初回 6 本、ホーム再訪 1 本 |
 | **言語変更** | `LanguageService.setActive()`(`language.service.ts:59-65`) | `SET_ACTIVE_LANGUAGE` → `activateLanguage$` が前回値と比較して `LANGUAGE_CHANGE` を dispatch(`languages.effect.ts:56-67`、初期設定時は発火しない)→ **CMS ストア全破棄**(`cms/store/reducers/index.ts:75-90`)と**商品ストア全破棄**(`product/store/reducers/index.ts:46-56`)→ `LanguageSetEvent`(Query の `reloadOn`)→ `SiteContextRoutesHandler.subscribeChanges` が URL を `replaceState`(`site-context-routes-handler.ts:111-124`)→ `i18next.changeLanguage` → 表示中のコンポーネントが再要求。フィーチャートグル `reloadOnLanguageChange` が有効なら `location.reload()`(`languages.effect.ts:73-86`) | `cms/pages` ほか全部を `lang=xx` で再取得 |
 | **通貨変更** | `CurrencyService.setActive()` | 同様に `CURRENCY_CHANGE` → 商品ストア破棄(CMS は破棄しない)→ `CurrencySetEvent` | 商品系を `curr=XXX` で再取得 |
 | **ログイン** | `AuthService.loginWithCredentials()`(`auth.service.ts:132-150`) | OAuth password flow でトークン取得 → `userIdService.setUserId('current')` → `AuthActions.Login` → `LoginEvent` → **CMS ストア破棄**(`LOGIN` もメタリデューサの対象)→ `ActiveCartService.detectUserChange` が `loadOrMerge`(匿名カートをユーザーカートへ併合、`active-cart.service.ts:139-168, 281-310`)→ Query の `resetOn: [LoginEvent]` → `AuthRedirectService.redirect()` | `POST .../oauth/token`、`users/current/carts`(併合)、`users/current` 系、`cms/pages` 再取得 |
@@ -140,9 +140,9 @@ SPA なので「終了処理」はなく、タブを閉じれば終わる。代�
 - **起動時に必ず呼ばれる API** は `languages` / `currencies` / `basesites` / `cms/pages`(+ 不足分の `cms/components`)。これらが遅いと初回描画がその分遅れる(SSR では 3 秒でタイムアウトして CSR に落ちる)。
 - **`userId` は起動時に一度だけ決まる**(`anonymous` か `current`)。ログイン・ログアウトで切り替わり、そのたびに CMS ストアが捨てられて `cms/pages` が取り直される。ユーザー別に出し分けたい CMS コンポーネントは、この再取得に乗せればよい。
 - **言語変更で CMS と商品のキャッシュは全部捨てられる**が、ユーザー配下・カートは捨てられない。多言語の属性をカートや注文に足す場合は `lang` 依存で返しても、フロントが自動再取得しない点に注意(11 章の `reloadOn` を依頼する)。
-- **バックエンド側でデータを変えても、フロントのストアに残っている間は反映されない**。反映されるタイミングは「ページ遷移(ストアに無いページのみ)」「言語変更」「ログイン / ログアウト」「リロード」。即時反映が要るなら、更新 API の成功イベントで `reloadOn` させる設計(11.5)にする。
+- **バックエンド側でデータを変えても、フロントのストアに残っている間は反映されない**。反映されるタイミングは、CMS の構造・属性なら「次のページ遷移」(`cms/pages` は毎回)、業務データなら「言語・通貨変更」「ログイン / ログアウト」「リロード」(13 章)。即時反映が要るなら、更新 API の成功イベントで `reloadOn` させる設計(11.5)にする。
 - **フェーズ 3 のゲートがあるため、トークンの検証や OAuth コールバックの処理は描画前に終わっている**。保護ページ(`routing.protected`)の判定もここに乗る。
 
 ---
 
-[目次](README.md) | ← [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md) | [付録](appendix.md) →
+[目次](README.md) | ← [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md) | [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md) →

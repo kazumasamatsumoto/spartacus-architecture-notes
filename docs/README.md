@@ -43,4 +43,5 @@
 - [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md)
 - [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md)
 - [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md)
+- [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md)
 - [付録](appendix.md)

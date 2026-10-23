@@ -3,13 +3,13 @@
 1. **Spartacus は Angular アプリ**である。SAP が提供するのは Angular ライブラリ群(`@spartacus/core`, `@spartacus/storefront`, 機能ライブラリ)で、利用者は Angular CLI プロジェクトにそれらを組み込む。
 2. **描画の主導権は CMS バックエンドにある**。ルーティングは `**`(ワイルドカード)で全 URL を受け、OCC の `cms/pages` からページ構造(テンプレート → スロット → コンポーネント)を取得して描画する。Angular のルート定義にページを書くのではない。
 3. **バックエンドの `typeCode`(CMSFlexComponent なら `flexType`)が、フロントの Angular コンポーネントを選ぶキー**になる。フロント側の作業は原則「`provideConfig({ cmsComponents: { <typeCode>: { component: XxxComponent } } })` を 1 つ追加し、`CmsComponentData<T>` を注入して `data$` を描く」だけ。
-4. **API が少ないのは設計どおり**。`cms/pages` のレスポンスに全コンポーネントのデータが同梱され、NgRx ストアに入る。足りない分だけ `cms/components?componentIds=...` でまとめて取り、取得済みは再取得しない。商品カルーセルも `products/search?filters=code:...` で一括取得する。
+4. **API が少ないのは設計どおり**。`cms/pages` のレスポンスに全コンポーネントのデータが同梱され、NgRx ストアに入る。足りない分だけ `cms/components?componentIds=...` でまとめて取り、取得済みは再取得しない(`cms/pages` 自体は既定で遷移のたびに取得する。13 章)。商品カルーセルも `products/search?filters=code:...` で一括取得する。
 5. デモサイトは **CSR 配信(SSR なし)**。それでもホーム初回表示の OCC GET は 9 本程度、商品詳細への SPA 遷移は 6 本だった。SSR を有効にすると TransferState でさらに減る。
 6. **動的な業務データ**を表示するコンポーネントは、フロントに Facade / Connector / Adapter / Normalizer を追加し(7 章)、バックエンドは**コンポーネント単位ではなくリソース単位**(画面部品ごとではなく、商品・注文・店舗といった業務アイテムの型ごと。「リソース」は REST 用語で、8.1 冒頭で Backoffice の語彙に対応づけている)の OCC エンドポイントを用意する(8 章)。
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(9 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(10 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -22,6 +22,7 @@
 | 07 API 呼び出しを減らす仕組み | HTTP が飛ぶ前に通る 16 個の止め弁(4 章) | [page7.png](diagrams/page7.png) |
 | 08 リソースごとの呼び出し方法の違い | 通信層は共通、状態層は 2 方式、リソースごとの文脈・捨てる条件・バッチの比較表(11 章) | [page8.png](diagrams/page8.png) |
 | 09 アプリケーションのライフサイクル | index.html 取得 → 起動 → APP_INITIALIZER → ゲート → 描画 → 実行中イベント → SSR → 永続化の 9 フェーズ(12 章) | [page9.png](diagrams/page9.png) |
+| 10 呼び出しの 4 階層と毎回・初回 | セッション / ページ / コンポーネント / アクションの 4 階層と、再訪時に何が飛ぶかの実測(13 章) | [page10.png](diagrams/page10.png) |
 
 ![全体フロー](diagrams/page1.png)
 

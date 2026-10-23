@@ -304,7 +304,7 @@ rows=[
   ("トークンがあれば\n以降の users/current/... が有効", GREY)),
  ("4. ルーティング → 描画\n(3 章)", 110, BLUE,
   [("NavigationStart → SiteContextRoutesHandler が URL(/electronics-spa/en/USD/...)から site / lang / curr を確定", 300, BLUE),
-   ("CmsPageGuard → CmsService.getPage → cms/pages(未取得なら)→ PageLayoutComponent → LayoutConfig.layoutSlots → <cx-page-slot> × N", 330, BLUE),
+   ("CmsPageGuard → CmsService.getPage → cms/pages(既定で毎回。loadStrategy=ONCE なら初回のみ)→ PageLayoutComponent → LayoutConfig.layoutSlots → <cx-page-slot> × N", 330, BLUE),
    ("NavigationEnd → OnNavigateService(スクロール復元)\nSeoMetaService(title / meta)\nNavigationEvent / PageEvent 発火", 290, GREEN)],
   ("GET users/{anonymous|current}/cms/pages?...\nGET cms/components?componentIds=...(不足分)\nカート ID が復元されていれば GET users/{id}/carts/{cartId}", ORANGE)),
  ("5. コンポーネントの\nライフサイクル", 130, GREEN,
@@ -314,12 +314,12 @@ rows=[
    ("ngOnDestroy → ComponentDestroyEvent\n(遷移で前ページのコンポーネントは破棄)", 210, GREY)],
   ("業務データは Facade 経由\nGET products/{code}, products/search 等\n(11 章の文脈 / 捨てる条件に従う)", ORANGE)),
  ("6. 実行中のイベント", 220, PURP,
-  [("ページ遷移\nRoutingService.go → 4 へ戻る\nCMS ストアにあれば HTTP なし", 180, BLUE),
+  [("ページ遷移\nRoutingService.go → 4 へ戻る\ncms/pages は既定で毎回、それ以外はストア済みなら HTTP なし", 180, BLUE),
    ("言語 / 通貨変更\nSET_ACTIVE → LANGUAGE_CHANGE\n→ CMS / 商品ストア全破棄\n→ LanguageSetEvent(Query 再読込)\n→ URL を replaceState\n(トグルで location.reload)", 190, YEL),
    ("ログイン\nOAuth password flow →\nuserId = current → AuthActions.Login\n→ LoginEvent: CMS 破棄 /\nカート loadOrMerge(匿名カート併合)\n/ Query resetOn → redirect", 200, GREEN),
    ("ログアウト\ncxRoute logout → coreLogout:\nuserId = anonymous → トークン失効\n→ AuthActions.Logout → LogoutEvent:\nCMS / ユーザーストア破棄、カート index リセット", 200, RED),
    ("401 / HTTP エラー\nAuthHttpHeaderService: refresh または logout\nHttpErrorInterceptor → 状態別ハンドラ\n→ GlobalMessage", 170, GREY)],
-  ("遷移: cms/pages(未取得のみ)\n言語変更: cms/pages 再取得 + lang=xx\nログイン: POST authorizationserver/oauth/token、\n  carts 併合、users/current\nログアウト: POST revoke", ORANGE)),
+  ("遷移: cms/pages(既定で毎回)、コンポーネント・商品はストア済みなら無し\n言語変更: cms/pages 再取得 + lang=xx\nログイン: POST authorizationserver/oauth/token、\n  carts 併合、users/current\nログアウト: POST revoke", ORANGE)),
  ("7. SSR の場合\n(デモは CSR)", 110, GREY,
   [("server.ts: NgExpressEngineDecorator(OptimizedSsrEngine)\ntimeout 3 秒で CSR シェルにフォールバック / concurrency 10 / cache 既定 off / reuseCurrentRendering", 470, GREY),
    ("サーバで 1〜5 を実行(OAuth コールバックは skip)→ HTML + TransferState(cms / product / siteContext / siteTheme)\n→ ブラウザは 1〜3 を再実行、ストアは転送状態で初期化され再取得なし、hydration(event replay)", 470, GREY)],
@@ -338,6 +338,50 @@ for label,h,lc,items,(occ,oc) in rows:
     y+=h+16
 d9.text("ゲートの意味: フェーズ 3 を通るまで Router は動かないので、フェーズ 4 以降のコードは「Config は確定済み、userId は確定済み、サイトコンテキストは URL から確定済み」を前提にできる。", 60, y, 1540, 30, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+'</mxfile>'
+
+# ---------- 10. four tiers + measured timeline ----------
+d10=D("10 呼び出しの 4 階層と毎回・初回")
+d10.text("OCC 呼び出しの 4 階層(左)と、デモサイトで実測した「毎回」と「初回」の違い(右)。13 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
+gL=d10.group("A. 呼び出しの 4 階層: いつ飛ぶか / いつまで使い回すか", 40, 70, 640, 760, "#f5f5f5", "#666666")
+tiers=[
+ ("1. セッション単位\nbasesites / languages / currencies\nトークンがあれば users/current、カート ID があれば carts/{id}", "アプリ起動時に 1 回(12 章フェーズ 2〜4)\nタブを閉じるまで使い回す。ログイン / ログアウトでユーザーとカートだけ取り直し", GREY),
+ ("2. ページ単位\ncms/pages(ページ構造 + 同梱コンポーネント)\n+ 同梱されなかった分の cms/components", "cms/pages は既定で毎回(routing.loadStrategy = ALWAYS)\ncms/components は初回のみ(同梱 or ストア済みなら飛ばない)\n言語変更 / ログイン / ログアウトで全部捨てる", BLUE),
+ ("3. コンポーネント単位(追加リソース)\nページに置かれたコンポーネントの型で決まる\n商品カルーセル → products/search、商品詳細 → products/{code}", "コンポーネント生成時(ビューポート外なら遅延)\n初回のみ。捨てる条件はリソースごと(11 章): 商品は言語・通貨変更まで\n例外: コンポーネントが自分で捨てる設計(商品参照は毎回)", GREEN),
+ ("4. アクション単位\nカート追加 POST carts/{id}/entries、配送先設定、注文確定、ログイン", "ユーザー操作のたび(更新系なので使い回しは無い)\n代わりに「成功後に何を取り直すか」が決まっている\n(カートは全体を再取得、チェックアウトは単一 Query を再読込)", ORANGE),
+]
+y=110
+for a,b,c in tiers:
+    d10.box(a, 60, y, 290, 160, *c, 11, "fontStyle=1;"); d10.box(b, 360, y, 300, 160, *YEL, 11); y+=180
+gR=d10.group("B. 実測(2026-10-23, CSR, 匿名): 同じ画面に戻ったとき何が飛ぶか  GET/HEAD のみ(OPTIONS 除く)", 720, 70, 900, 760, "#fff7e6", "#d79b00")
+cols=["リソース","① ホーム初回\n(ブラウザ起動)","② 商品詳細へ\nSPA 遷移(初回)","③ 戻るで\nホーム(再訪)","④ 進むで\n商品詳細(再訪)","階層"]
+ws=[250,120,120,120,120,110]
+x=740
+xs=[]
+for n,w in zip(cols,ws):
+    xs.append((x,w)); d10.box(n, x, 110, w, 44, "#666666", "#666666", 11, "fontColor=#ffffff;fontStyle=1;"); x+=w+6
+HIT=("GET",ORANGE); NO=("— ストア",GREY); NA=("",("#ffffff","#cccccc"))
+rowsT=[
+ ("basesites / languages / currencies", [("GET ×3",ORANGE), NA, NA, NA], "1"),
+ ("carts/{cartId}(localStorage から復元)", [HIT, NA, NA, NA], "1"),
+ ("consenttemplates(HEAD)", [("HEAD",ORANGE), NA, NA, NA], "1"),
+ ("cms/pages(ホーム)", [HIT, NA, ("GET 再取得",RED), NA], "2"),
+ ("cms/pages(ProductPage, code=300938)", [NA, HIT, NA, ("GET 再取得",RED)], "2"),
+ ("cms/components(同梱されなかった分)", [("GET ×2",ORANGE), HIT, NO, NO], "2"),
+ ("products/search?filters=code:…(カルーセル 17 件)", [HIT, NA, NO, NA], "3"),
+ ("products/300938(details / classifications)", [NA, ("GET ×2",ORANGE), NA, NO], "3"),
+ ("products/300938/reviews", [NA, HIT, NA, NO], "3"),
+ ("products/300938/references", [NA, HIT, NA, ("GET 再取得",RED)], "3 例外"),
+ ("合計(GET + HEAD)", [("9",ORANGE), ("6",ORANGE), ("1",RED), ("2",RED)], ""),
+]
+y=160
+for name,cells,tier in rowsT:
+    d10.box(name, xs[0][0], y, xs[0][1], 44, *GREY, 11)
+    for (t,c),(cx,cw) in zip(cells, xs[1:5]):
+        d10.box(t, cx, y, cw, 44, *c, 11)
+    d10.box(tier, xs[5][0], y, xs[5][1], 44, *GREY, 11)
+    y+=48
+d10.text("読み方: 橙 = HTTP が飛んだ、灰 = ストアにあるので飛ばない、赤 = 再訪でも飛ぶ(cms/pages は loadStrategy の既定 ALWAYS、references はコンポーネントが初期化時に cleanReferences() する設計)。\n「毎回」なのは cms/pages だけで、同梱されたコンポーネントデータも一緒に毎回届く。業務データは初回のみ。", 740, y+6, 860, 60, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

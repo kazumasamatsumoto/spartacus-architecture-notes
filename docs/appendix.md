@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md)
+[目次](README.md) | ← [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md)
