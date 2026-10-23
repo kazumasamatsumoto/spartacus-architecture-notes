@@ -9,6 +9,19 @@
 
 ### 8.1 結論: 「コンポーネント単位」ではなく「リソース単位」
 
+> **用語「リソース」について**: これは REST(Web API の設計様式)の用語で、SAP Commerce や Backoffice の画面には出てこない。REST では **URL が指し示す「もの」(名詞)** をリソースと呼び、返ってくる JSON はその「表現」と呼ぶ。SAP Commerce の語彙に置き換えると次のとおり。
+>
+> | REST の言い方 | SAP Commerce / Backoffice での実体 | 例 |
+> |---|---|---|
+> | リソース | **ItemType のアイテム**(Backoffice で開く 1 件のデータ) | 商品 `300938`、カート、注文、店舗(PointOfService) |
+> | リソースの集合 | その型の検索結果 | 商品検索、注文一覧 |
+> | 表現(JSON) | OCC の WsDTO(`ProductWsDTO` など) | `{"code":"300938","name":...}` |
+> | URL | 型名の複数形 + 識別子 | `products/{productCode}`、`users/{userId}/orders/{orderId}` |
+>
+> OCC の既定 URL が実際にこの形になっていることは Spartacus 側のエンドポイント設定で確認できる(`spartacus/core-libs/core/src/occ/adapters/product/default-occ-product-config.ts:16-36` の `products/${productCode}`、`products/${productCode}/reviews`、`spartacus/feature-libs/order/occ/config/default-occ-order-config.ts:14` の `users/${userId}/orders/${orderId}`)。
+>
+> したがって本章の「コンポーネント単位ではなくリソース単位」は、Backoffice の言葉で言えば **「CMS コンポーネントの型ごとに API を作るのではなく、そのコンポーネントが参照している業務アイテムの型(商品・プロモーション・店舗など)ごとに API を作る」** という意味である。
+
 `@RestController`(SAP Commerce の OCC では `@Controller` + `@RequestMapping` + `@ResponseBody`)を**CMS コンポーネントごとに作ってはいけない**。判断は次の順(図「04 バックエンド判断フロー」):
 
 | 問い | YES の場合 | 作るもの |

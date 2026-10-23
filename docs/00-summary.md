@@ -5,7 +5,7 @@
 3. **バックエンドの `typeCode`(CMSFlexComponent なら `flexType`)が、フロントの Angular コンポーネントを選ぶキー**になる。フロント側の作業は原則「`provideConfig({ cmsComponents: { <typeCode>: { component: XxxComponent } } })` を 1 つ追加し、`CmsComponentData<T>` を注入して `data$` を描く」だけ。
 4. **API が少ないのは設計どおり**。`cms/pages` のレスポンスに全コンポーネントのデータが同梱され、NgRx ストアに入る。足りない分だけ `cms/components?componentIds=...` でまとめて取り、取得済みは再取得しない。商品カルーセルも `products/search?filters=code:...` で一括取得する。
 5. デモサイトは **CSR 配信(SSR なし)**。それでもホーム初回表示の OCC GET は 9 本程度、商品詳細への SPA 遷移は 6 本だった。SSR を有効にすると TransferState でさらに減る。
-6. **動的な業務データ**を表示するコンポーネントは、フロントに Facade / Connector / Adapter / Normalizer を追加し(7 章)、バックエンドは**コンポーネント単位ではなくリソース単位**の OCC エンドポイントを用意する(8 章)。
+6. **動的な業務データ**を表示するコンポーネントは、フロントに Facade / Connector / Adapter / Normalizer を追加し(7 章)、バックエンドは**コンポーネント単位ではなくリソース単位**(画面部品ごとではなく、商品・注文・店舗といった業務アイテムの型ごと。「リソース」は REST 用語で、8.1 冒頭で Backoffice の語彙に対応づけている)の OCC エンドポイントを用意する(8 章)。
 
 ### 図(draw.io)
 
