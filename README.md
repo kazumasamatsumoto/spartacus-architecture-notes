@@ -4,7 +4,7 @@ SAP Composable Storefront (Spartacus) のアーキテクチャを、ソースコ
 バックエンド(SAP Commerce Cloud)でカスタム CMS コンポーネントを作る担当者が、フロントエンド側へ何を依頼すればよいかを理解することを目的にしています。
 
 - [docs/spartacus-architecture.md](docs/spartacus-architecture.md) — 本文(Angular 基盤、CMS 描画フロー、API 削減の仕組み、カスタムコンポーネントの依頼仕様、Facade/Connector/Adapter、バックエンドの返し方)
-- [docs/diagrams/spartacus-architecture.drawio](docs/diagrams/spartacus-architecture.drawio) — draw.io 図(4 ページ)。PNG / SVG も同じフォルダ
+- [docs/diagrams/spartacus-architecture.drawio](docs/diagrams/spartacus-architecture.drawio) — draw.io 図(5 ページ)。PNG / SVG も同じフォルダ
 
 ![全体フロー](docs/diagrams/page1.png)
 
