@@ -1,8 +1,8 @@
 # 11. フロント側の呼び出し方法はリソースごとに違うのか
 
-> **図**: 03 カスタムコンポーネントのデータ経路(`diagrams/spartacus-architecture.drawio`)。右の経路 B(Facade → 状態層 → Connector → Adapter → OCC)のうち、**Connector から下は全リソース共通、Facade と状態層がリソースごとに違う**。本章はその違いを分析する
+> **図**: 08 リソースごとの呼び出し方法の違い(`diagrams/spartacus-architecture.drawio`)。A: 通信層は全リソース共通、B: 状態層は NgRx と Query / Command の 2 方式、C: リソースごとの文脈(色 = 灰: サイト共通 / 青: ユーザー固有 / 橙: カート配下)・捨てる条件・バッチの比較表
 
-![03 カスタムコンポーネントのデータ経路](diagrams/page3.png)
+![08 リソースごとの呼び出し方法の違い](diagrams/page8.png)
 
 ## 11.1 結論
 
@@ -46,6 +46,42 @@ SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/referenc
 **同じリソースでも世代が混在する**例:
 - 注文: 履歴・詳細は NgRx(`order-history.service.ts:42-65`、`takeUserId` → `dispatch(LoadOrderDetails)`)、注文確定は Command(`order.service.ts:26-52`、成功時に `OrderPlacedEvent` を発火)。
 - カート: 本体は NgRx(`multi-cart.service.ts:183, 388`)、検証・アクセスコード・ゲストは Query / Command(`cart-validation.service.ts` 等)。
+
+### 11.3.1 10 章のリソース一覧に対応させた方式一覧
+
+「どのリソースで方式の違いが起きているか」を、10 章の分類(A / B / C-1〜C-6)に合わせて Facade の実装ファイルで確認した結果。判定基準は SAP ガイドと同じ(`store.dispatch` / `select` を使えば NgRx、`queryService.create` / `commandService.create` を使えば Query / Command)。
+
+| 10 章の分類 | リソース | 方式 | Facade 実装(`spartacus/` 配下) |
+|---|---|---|---|
+| A. サイト設定 | basesites / languages / currencies | NgRx | `core-libs/core/src/site-context/facade/base-site.service.ts`, `language.service.ts`, `currency.service.ts` |
+| B. CMS | cms/pages, cms/components | NgRx | `core-libs/core/src/cms/facade/cms.service.ts` |
+| C-1 商品 | products/{code}(スコープ別)、search、suggestions、categories/{code}/products | NgRx | `core-libs/core/src/product/facade/product.service.ts`, `product-search.service.ts`, `product-search-by-code.service.ts`, `product-search-by-category.service.ts` |
+| C-1 商品 | products/{code}/reviews, /references | NgRx | `core-libs/core/src/product/facade/product-review.service.ts`, `product-reference.service.ts` |
+| C-1 商品 | products/{code}/stock(在庫) | **Query** | `core-libs/core/src/product/facade/product-availability.service.ts` |
+| C-1 商品 | 店舗受取(pickup-in-store の在庫・受取場所) | NgRx | `feature-libs/pickup-in-store/core/facade/pickup-locations-search.service.ts`, `pickup-option.service.ts`, `intended-pickup-location.service.ts` |
+| C-2 ユーザー | users/{userId}(本体) | **Query / Command** | `feature-libs/user/account/core/facade/user-account.service.ts` |
+| C-2 ユーザー | プロフィール更新・メール・パスワード・登録 | **Command**(+ 言語依存の Query) | `feature-libs/user/profile/core/facade/user-profile.service.ts`, `user-email.service.ts`, `user-password.service.ts`, `user-register.service.ts` |
+| C-2 ユーザー | addresses, paymentdetails, consents, customercoupons, notificationpreferences, productinterests | NgRx | `core-libs/core/src/user/facade/user-address.service.ts`, `user-payment.service.ts`, `user-consent.service.ts`, `customer-coupon.service.ts`, `user-notification-preference.service.ts`, `user-interests.service.ts` |
+| C-2 ユーザー | wishlists | NgRx | `feature-libs/cart/wish-list/core/facade/wish-list.service.ts` |
+| C-2 ユーザー | tickets(問い合わせ) | **Query / Command** | `feature-libs/customer-ticketing/core/facade/customer-ticketing.service.ts` |
+| C-3 カート | carts/{cartId}, entries, vouchers(本体) | NgRx | `feature-libs/cart/base/core/facade/multi-cart.service.ts`, `active-cart.service.ts`, `cart-voucher.service.ts` |
+| C-3 カート | 保存カート | NgRx | `feature-libs/cart/saved-cart/core/facade/saved-cart.service.ts` |
+| C-3 カート | validate, accessCode, guestuser | **Query / Command** | `feature-libs/cart/base/core/facade/cart-validation.service.ts`, `cart-access-code.service.ts`, `cart-guest-user.service.ts` |
+| C-3 チェックアウト | addresses/delivery・billing, deliverymodes, paymentdetails, costcenter, paymenttype | **Query / Command** | `feature-libs/checkout/base/core/facade/checkout-query.service.ts`, `checkout-delivery-address.service.ts`, `checkout-delivery-modes.service.ts`, `checkout-payment.service.ts`, `checkout-billing-address.service.ts`, `feature-libs/checkout/b2b/core/facade/*` |
+| C-4 注文 | orders(履歴・詳細・キャンセル・追跡)、orderReturns、replenishmentOrders(履歴) | NgRx | `feature-libs/order/core/facade/order-history.service.ts`, `order-return-request.service.ts`, `replenishment-order-history.service.ts` |
+| C-4 注文 | 注文確定、再注文、定期注文の確定 | **Command** | `feature-libs/order/core/facade/order.service.ts`, `reorder-order.service.ts`, `scheduled-replenishment-order.service.ts` |
+| C-5 店舗 | stores(検索・1 件) | NgRx | `feature-libs/storefinder/core/facade/store-finder.service.ts` |
+| C-6 B2B 組織 | orgUnits, orgCustomers, budgets, costcenters, 承認, ユーザーグループ | NgRx | `feature-libs/organization/administration/core/services/b2b-user.service.ts`, `budget.service.ts` ほか |
+| C-6 B2B 組織 | quotes(見積) | **Query / Command** | `feature-libs/quote/core/facade/quote.service.ts` |
+| C-6 B2B 組織 | orgUsers(B2B ユーザー登録) | **Command** | `feature-libs/organization/user-registration/core/facade/user-registration.service.ts` |
+| D. 別 Web サービス | ASM | NgRx(+ 一部 Query / Command) | `feature-libs/asm/core/facade/asm.service.ts`, `asm-bind-cart.service.ts`, `asm-create-customer.service.ts` |
+| D. 別 Web サービス | subscriptions, OPF, Digital Payments, S4 Service, Punchout | **Query / Command** | `feature-libs/subscription-billing/core/facade/*`, `integration-libs/opf/**/core/facade/*`, `integration-libs/digital-payments/src/checkout/facade/*`, `integration-libs/s4-service/**/core/facade/*`, `integration-libs/punchout/core/facade/punchout.service.ts` |
+
+読み方:
+
+- **境界は「リソース」ではなく「機能ライブラリが書かれた時期」**。`@spartacus/core` と初期の機能ライブラリ(cart base、order history、storefinder、organization)は NgRx、2021 年以降に追加・再設計された機能(user account / profile、checkout、quote、customer ticketing、OPF 等)は Query / Command になっている。
+- そのため**同じリソースの「読む側」と「更新する側」で方式が分かれる**: カート本体(NgRx)と検証(Query)、注文履歴(NgRx)と注文確定(Command)、商品本体(NgRx)と在庫(Query)。
+- バックエンド担当者にとっての意味: **既存リソースの DTO 拡張(8.1 ③)なら、フロントは上の表の方式のまま Normalizer とモデルを足すだけ**。新リソース(8.1 ④)なら Query / Command で書く(11.5)。
 
 ## 11.4 リソースごとに違う点
 

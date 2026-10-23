@@ -230,6 +230,53 @@ r8=d7.box("弁⑯  SSR 時: cms / product / siteContext / siteTheme を\nTransfe
 d7.edge(r1,r2); d7.edge(r2,r3,"いいえ"); d7.edge(r3,r4); d7.edge(r4,r5); d7.edge(r5,r6)
 d7.text("実測(2026-10-23 デモ, CSR): ホーム = cms/pages 1 + cms/components 2 + products/search 1 + サイト情報 4 + cart 1。PDP への SPA 遷移 = 6 本、サイト情報/カートは再取得なし。", 40, 905, 1460, 30, 12)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+'</mxfile>'
+
+# ---------- 8. per-resource call patterns ----------
+d8=D("08 リソースごとの呼び出し方法の違い")
+d8.text("フロント側の呼び出し: 通信層は共通、状態層は 2 方式、リソース固有なのは「文脈」と「捨てる条件」(11 章)", 40, 20, 1400, 30, 16, "fontStyle=1;")
+gT=d8.group("A. 通信層: 全リソース共通(Connector から下はコードの形が同じ。違うのは設定値だけ)", 40, 70, 1580, 140, "#f5f5f5", "#666666")
+t1=d8.box("Angular コンポーネント\nfacade.get() | async", 60, 110, 230, 70, *BLUE)
+t2=d8.box("Facade\n★ 中身の方式はリソースで異なる(B)\n文脈・捨てる条件もここで決まる(C)", 320, 110, 230, 70, *YEL)
+t3=d8.box("Connector\n抽象 Adapter に委譲", 580, 110, 230, 70, *GREEN)
+t4=d8.box("OccAdapter\nOccEndpointsService.buildUrl(key, params)\n+ ConverterService.pipeable(NORMALIZER)", 840, 110, 230, 70, *GREEN)
+t5=d8.box("HTTP インターセプタ\nlang / curr 自動付与(SiteContextInterceptor)\nBearer 自動付与・401 で更新", 1100, 110, 230, 70, *GREEN)
+t6=d8.box("OCC\n{baseUrl}/occ/v2/{site}/...", 1360, 110, 230, 70, *ORANGE)
+for a,b in [(t1,t2),(t2,t3),(t3,t4),(t4,t5),(t5,t6)]: d8.edge(a,b)
+gS=d8.group("B. 状態層: 2 方式(機能ライブラリごとに固定。SAP ガイド state-management.md「既存に合わせよ、第 3 の方式を持ち込むな」)", 40, 240, 1580, 250, "#f5f5f5", "#666666")
+s1=d8.box("NgRx(古い機能)  Action → Effect → Reducer → Selector / Entity Loader\n\nCMS / 商品(詳細・検索・レビュー・参照)/ サイトコンテキスト(言語・通貨・サイト)/ 認証\nカート本体(MultiCart / ActiveCart)/ 保存カート / ウィッシュリスト / 店舗検索 / 店舗受取\n注文履歴・返品・定期注文履歴 / ユーザー配下(住所・支払・同意・クーポン・通知・関心商品)\nB2B 組織管理(ユニット・ユーザー・予算・コストセンタ・承認)/ ASM\n\n読み込み状態 = LoaderState { loading, success, error, value }", 60, 280, 760, 160, *PURP)
+s2=d8.box("Query / Command(新しい機能)  query.create(loader, {reloadOn, resetOn}) / command.create(fn, {strategy})\n\nユーザー本体・プロフィール・登録・パスワード / チェックアウト全般(配送先・配送方法・支払・請求先・B2B)\n注文確定・再注文・定期注文の確定 / 見積(Quote)/ 問い合わせチケット / B2B ユーザー登録\nカートの検証・アクセスコード・ゲスト / 商品在庫(ProductAvailability)/ サブスクリプション課金\nOPF / Digital Payments / S4 Service / Punchout\n\n読み込み状態 = QueryState { loading, error, data }", 840, 280, 760, 160, *GREEN)
+d8.text("同じリソース内で混在する例: 注文(履歴・返品 = NgRx / 確定・再注文 = Command)、カート(本体 = NgRx / 検証・アクセスコード・ゲスト = Query・Command)、商品(本体 = NgRx / 在庫 = Query)", 60, 452, 1540, 30, 11)
+gR=d8.group("C. リソースごとに違う点: 文脈(必要な ID)/ 捨てる条件 / バッチ", 40, 520, 1580, 610, "#fff7e6", "#d79b00")
+cols=[("リソース",190),("方式",170),("文脈(必要な ID・前提)",380),("キャッシュを捨てる・再読込する条件",520),("バッチ / 最適化",250)]
+x0=60; y0=560
+xs=[]; x=x0
+for name,w in cols:
+    xs.append((x,w)); d8.box(name, x, y0, w, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;"); x+=w+10
+NG=("NgRx",PURP); QC=("Query / Command",GREEN); MIX=lambda t:(t,YEL)
+NONE=GREY; USER=BLUE; CART=ORANGE
+rows=[
+ ("CMS(pages / components)", NG, ("PageContext {type,id} + userId(anonymous / current)",USER), "言語変更・ログイン・ログアウトで CMS ストア全体を破棄", "componentIds を 50 件ずつ / uid × context をメモ化"),
+ ("商品", MIX("NgRx(在庫のみ Query)"), ("productCode + scope(details / list / price …)",NONE), "言語・通貨変更で商品ストア全体を破棄。scope ごとに maxAge / reloadOn 設定可", "コード検索 100 件 / 同一 URL の fields 結合 / scope include 展開"),
+ ("サイトコンテキスト", NG, ("なし(起動時)",NONE), "なし(起動時 1 回)", "SSR なら TransferState"),
+ ("店舗(検索・受取)", NG, ("検索条件 / storeId",NONE), "検索ごとに上書き", "なし"),
+ ("カート", MIX("NgRx(検証・ゲストは Query・Command)"), ("userId + cartId(未確定なら current)+ 安定待ち(processesCount)",CART), "ログイン時に匿名カートを loadOrMerge。更新 1 回ごとにカート全体を再取得。ID は localStorage", "なし"),
+ ("チェックアウト", QC, ("userId + cartId + 前提条件(匿名ならゲストカート)",CART), "更新 Command の成功イベント → CheckoutQueryReloadEvent / ResetEvent で単一 Query を更新", "なし(1 Query に集約)"),
+ ("注文", MIX("混在(履歴・返品 NgRx / 確定 Command)"), ("userId(履歴は loggedIn = true)",USER), "履歴・詳細は明示 Clear。確定は CancelPrevious + OrderPlacedEvent", "なし"),
+ ("ユーザー本体・プロフィール", QC, ("userId(loggedIn = true、匿名なら例外)",USER), "UserAccountChangedEvent で再読込 / LoginEvent・LogoutEvent で破棄 / 言語依存は LanguageSetEvent", "なし"),
+ ("ユーザー配下(住所・支払・同意・クーポン・保存カート)", NG, ("userId",USER), "ログアウトでユーザーストアを破棄。更新アクション後に再読込", "なし"),
+ ("問い合わせチケット / 見積", QC, ("userId + ticketId / quoteCode(ルートから)",USER), "専用の Reload / Reset イベント(1 件・一覧・カテゴリで別 Query)", "なし"),
+ ("B2B 組織", NG, ("userId + 各 ID(orgUnitId, budgetCode …)",USER), "更新アクションで該当エンティティを再読込", "なし"),
+]
+y=y0+40
+for name,(mode,mc),(ctx,cc),inval,batch in rows:
+    d8.box(name, xs[0][0], y, xs[0][1], 44, *GREY, 11)
+    d8.box(mode, xs[1][0], y, xs[1][1], 44, *mc, 11)
+    d8.box(ctx, xs[2][0], y, xs[2][1], 44, *cc, 11)
+    d8.box(inval, xs[3][0], y, xs[3][1], 44, *YEL, 11)
+    d8.box(batch, xs[4][0], y, xs[4][1], 44, *(ORANGE if batch!="なし" else GREY), 11)
+    y+=48
+d8.text("文脈の色: 灰 = サイト共通(lang / curr のみ)、青 = ユーザー固有(users/{userId})、橙 = カート配下(+ cartId)。URL の階層がそのままフロントで必要な ID の数になる(10.4)。", 60, y+6, 1540, 30, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

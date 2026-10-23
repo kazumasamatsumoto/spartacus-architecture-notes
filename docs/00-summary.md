@@ -9,7 +9,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(7 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(8 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -20,6 +20,7 @@
 | 05 JSP→ヘッドレス 責務の移行 | JSP コンポーネントコントローラの各責務がどこへ移るか(9 章) | [page5.png](diagrams/page5.png) |
 | 06 Angular アプリの骨格と設定 DI | main.ts → bootstrapApplication → AppModule → SpartacusModule の骨格と provideConfig の合成(1 章) | [page6.png](diagrams/page6.png) |
 | 07 API 呼び出しを減らす仕組み | HTTP が飛ぶ前に通る 16 個の止め弁(4 章) | [page7.png](diagrams/page7.png) |
+| 08 リソースごとの呼び出し方法の違い | 通信層は共通、状態層は 2 方式、リソースごとの文脈・捨てる条件・バッチの比較表(11 章) | [page8.png](diagrams/page8.png) |
 
 ![全体フロー](diagrams/page1.png)
 
