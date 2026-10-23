@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [9. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか](09-jsp-to-headless.md)
+[目次](README.md) | ← [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md)

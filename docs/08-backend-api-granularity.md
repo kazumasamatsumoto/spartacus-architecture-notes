@@ -20,6 +20,8 @@
 >
 > OCC の既定 URL が実際にこの形になっていることは Spartacus 側のエンドポイント設定で確認できる(`spartacus/core-libs/core/src/occ/adapters/product/default-occ-product-config.ts:16-36` の `products/${productCode}`、`products/${productCode}/reviews`、`spartacus/feature-libs/order/occ/config/default-occ-order-config.ts:14` の `users/${userId}/orders/${orderId}`)。
 >
+> 既存リソースの一覧(サイト設定 / CMS / 業務データの 3 層、45 設定ファイル分)と「どのリソースの中でカスタムを考えるか」の決め方は [10 章](10-occ-resource-catalog.md) にまとめた。
+>
 > したがって本章の「コンポーネント単位ではなくリソース単位」は、Backoffice の言葉で言えば **「CMS コンポーネントの型ごとに API を作るのではなく、そのコンポーネントが参照している業務アイテムの型(商品・プロモーション・店舗など)ごとに API を作る」** という意味である。
 
 `@RestController`(SAP Commerce の OCC では `@Controller` + `@RequestMapping` + `@ResponseBody`)を**CMS コンポーネントごとに作ってはいけない**。判断は次の順(図「04 バックエンド判断フロー」):

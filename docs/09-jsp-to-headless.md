@@ -151,4 +151,4 @@ export class StoreEventComponent {
 
 ---
 
-[目次](README.md) | ← [8. バックエンド(Java)側: 何を、どの単位で返すか](08-backend-api-granularity.md) | [付録](appendix.md) →
+[目次](README.md) | ← [8. バックエンド(Java)側: 何を、どの単位で返すか](08-backend-api-granularity.md) | [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md) →
