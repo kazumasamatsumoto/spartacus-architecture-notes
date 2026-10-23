@@ -277,6 +277,67 @@ for name,(mode,mc),(ctx,cc),inval,batch in rows:
     y+=48
 d8.text("文脈の色: 灰 = サイト共通(lang / curr のみ)、青 = ユーザー固有(users/{userId})、橙 = カート配下(+ cartId)。URL の階層がそのままフロントで必要な ID の数になる(10.4)。", 60, y+6, 1540, 30, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+'</mxfile>'
+
+# ---------- 9. application lifecycle ----------
+d9=D("09 アプリケーションのライフサイクル")
+d9.text("Spartacus アプリのライフサイクル: index.html 取得 → 起動 → 初期化 → 初回ナビゲーション → 描画 → 実行中イベント → 永続化(12 章)。右列はその段階で飛ぶ OCC 呼び出し", 40, 20, 1500, 30, 16, "fontStyle=1;")
+d9.box("フェーズ", 60, 70, 170, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
+d9.box("ブラウザ / Angular / Spartacus で起きること(左→右の順)", 250, 70, 950, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
+d9.box("OCC 呼び出し / 永続化", 1220, 70, 380, 30, "#666666", "#666666", 12, "fontColor=#ffffff;fontStyle=1;")
+rows=[
+ ("0. HTML 取得", 70, GREY,
+  [("index.html: <app-root>Loading...</app-root> と meta occ-backend-base-url / media-backend-base-url\n(CSR なら中身は空。SSR なら描画済み HTML + <script id=cx-state>)", 950, GREY)],
+  ("なし", GREY)),
+ ("1. 起動と DI 構築\nmain.ts:17", 90, BLUE,
+  [("bootstrapApplication(AppComponent, appConfig)\nappConfig = provideHttpClient / provideClientHydration / importProvidersFrom(AppModule)", 460, BLUE),
+   ("DI グラフ構築: provideConfig / provideDefaultConfig の配列 → deepMerge → Config(1.4)\nイベントビルダー(NavigationEvent, LoginEvent/LogoutEvent, LanguageSetEvent)が登録される", 470, PURP)],
+  ("なし", GREY)),
+ ("2. APP_INITIALIZER\n(23 個、並列。多くは\nconfigInit.getStable() を待つ)", 150, YEL,
+  [("ConfigInitializer\nCONFIG_INITIALIZER の\nscope が全部解決 → stable", 180, ORANGE),
+   ("サイトコンテキスト\nlanguage / currency / baseSite:\nURL セグメント > localStorage > config 既定", 230, YEL),
+   ("ルーティング\nConfigurableRoutes 初期化、外部ルート、\n'**' ルート追加(CmsPageGuard)", 220, YEL),
+   ("i18next 初期化\nfallbackLang / backend(chunk ロード)\n言語変更に追従", 160, YEL),
+   ("その他\nテーマ / アウトレット登録 / SEO / スキップリンク\nMODULE_INITIALIZER(カート ID 復元など)/ ASM", 150, GREY)],
+  ("GET languages\nGET currencies\nGET basesites\n(context が stable になった後)", ORANGE)),
+ ("3. 初回ナビゲーション前の\nゲート(LOCATION_INITIALIZED)", 110, RED,
+  [("locationInitializedFactory = Promise.all(LOCATION_INITIALIZED_MULTI)\n① Config が stable  ② 認証: AuthStatePersistence.initSync(localStorage のトークン復元)→ checkOAuthParamsInUrl(OAuth コールバック / 保存トークン)\n→ userId = current(トークンあり)または anonymous  ③ 通過後に Router の初回ナビゲーション(initialNavigation: enabledBlocking)", 950, RED)],
+  ("トークンがあれば\n以降の users/current/... が有効", GREY)),
+ ("4. ルーティング → 描画\n(3 章)", 110, BLUE,
+  [("NavigationStart → SiteContextRoutesHandler が URL(/electronics-spa/en/USD/...)から site / lang / curr を確定", 300, BLUE),
+   ("CmsPageGuard → CmsService.getPage → cms/pages(未取得なら)→ PageLayoutComponent → LayoutConfig.layoutSlots → <cx-page-slot> × N", 330, BLUE),
+   ("NavigationEnd → OnNavigateService(スクロール復元)\nSeoMetaService(title / meta)\nNavigationEvent / PageEvent 発火", 290, GREEN)],
+  ("GET users/{anonymous|current}/cms/pages?...\nGET cms/components?componentIds=...(不足分)\nカート ID が復元されていれば GET users/{id}/carts/{cartId}", ORANGE)),
+ ("5. コンポーネントの\nライフサイクル", 130, GREEN,
+  [("ComponentWrapperDirective.ngOnInit\n→ determineMappings(flexType)\n→ featureModules に属すなら遅延ロード", 230, GREEN),
+   ("ComponentHandler → createComponent\n(Injector に CmsComponentData{uid, data$})\n→ ComponentCreateEvent", 230, GREEN),
+   ("Angular フック: constructor → ngOnInit\n→ data$ | async(OnPush)→ ngOnDestroy\ncxOutletDefer: ビューポート外は生成を遅延", 240, GREEN),
+   ("ngOnDestroy → ComponentDestroyEvent\n(遷移で前ページのコンポーネントは破棄)", 210, GREY)],
+  ("業務データは Facade 経由\nGET products/{code}, products/search 等\n(11 章の文脈 / 捨てる条件に従う)", ORANGE)),
+ ("6. 実行中のイベント", 220, PURP,
+  [("ページ遷移\nRoutingService.go → 4 へ戻る\nCMS ストアにあれば HTTP なし", 180, BLUE),
+   ("言語 / 通貨変更\nSET_ACTIVE → LANGUAGE_CHANGE\n→ CMS / 商品ストア全破棄\n→ LanguageSetEvent(Query 再読込)\n→ URL を replaceState\n(トグルで location.reload)", 190, YEL),
+   ("ログイン\nOAuth password flow →\nuserId = current → AuthActions.Login\n→ LoginEvent: CMS 破棄 /\nカート loadOrMerge(匿名カート併合)\n/ Query resetOn → redirect", 200, GREEN),
+   ("ログアウト\ncxRoute logout → coreLogout:\nuserId = anonymous → トークン失効\n→ AuthActions.Logout → LogoutEvent:\nCMS / ユーザーストア破棄、カート index リセット", 200, RED),
+   ("401 / HTTP エラー\nAuthHttpHeaderService: refresh または logout\nHttpErrorInterceptor → 状態別ハンドラ\n→ GlobalMessage", 170, GREY)],
+  ("遷移: cms/pages(未取得のみ)\n言語変更: cms/pages 再取得 + lang=xx\nログイン: POST authorizationserver/oauth/token、\n  carts 併合、users/current\nログアウト: POST revoke", ORANGE)),
+ ("7. SSR の場合\n(デモは CSR)", 110, GREY,
+  [("server.ts: NgExpressEngineDecorator(OptimizedSsrEngine)\ntimeout 3 秒で CSR シェルにフォールバック / concurrency 10 / cache 既定 off / reuseCurrentRendering", 470, GREY),
+   ("サーバで 1〜5 を実行(OAuth コールバックは skip)→ HTML + TransferState(cms / product / siteContext / siteTheme)\n→ ブラウザは 1〜3 を再実行、ストアは転送状態で初期化され再取得なし、hydration(event replay)", 470, GREY)],
+  ("サーバ側で同じ OCC 呼び出し\nブラウザ側はゼロで開始", ORANGE)),
+ ("8. 永続化と終了", 80, GREY,
+  [("SPA なので明示的な終了処理はない(タブを閉じる)。StatePersistenceService.syncWithStorage が実行中ずっと localStorage に書く\n→ 次回起動の 2〜3 で復元: 認証トークン / カート ID / 言語 / 通貨 / 匿名同意 / ASM / テーマ", 950, GREY)],
+  ("localStorage キー: spartacus + 区切り文字 + {site} + 区切り文字 + auth / cart / language / currency …\n(state-persistence.service.ts:128-130)", GREY)),
+]
+y=110
+for label,h,lc,items,(occ,oc) in rows:
+    d9.box(label, 60, y, 170, h, *lc, 12, "fontStyle=1;")
+    x=250
+    for text,w,c in items:
+        d9.box(text, x, y, w, h, *c, 11); x+=w+10
+    d9.box(occ, 1220, y, 380, h, *oc, 11)
+    y+=h+16
+d9.text("ゲートの意味: フェーズ 3 を通るまで Router は動かないので、フェーズ 4 以降のコードは「Config は確定済み、userId は確定済み、サイトコンテキストは URL から確定済み」を前提にできる。", 60, y, 1540, 30, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

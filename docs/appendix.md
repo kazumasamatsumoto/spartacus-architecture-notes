@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md)
+[目次](README.md) | ← [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md)

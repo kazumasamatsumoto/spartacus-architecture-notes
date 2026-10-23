@@ -176,4 +176,4 @@ Connector / Adapter / Normalizer / endpoints 設定は 7.4 の雛形をそのま
 
 ---
 
-[目次](README.md) | ← [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md) | [付録](appendix.md) →
+[目次](README.md) | ← [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md) | [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md) →
