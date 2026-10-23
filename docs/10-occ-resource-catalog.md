@@ -137,4 +137,4 @@ URL の先頭には共通で `{baseUrl}/occ/v2/{baseSiteId}/` が付く(`spartac
 
 ---
 
-[目次](README.md) | ← [9. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか](09-jsp-to-headless.md) | [付録](appendix.md) →
+[目次](README.md) | ← [9. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか](09-jsp-to-headless.md) | [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md) →

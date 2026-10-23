@@ -41,4 +41,5 @@
 - [8. バックエンド(Java)側: 何を、どの単位で返すか](08-backend-api-granularity.md)
 - [9. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか](09-jsp-to-headless.md)
 - [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md)
+- [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md)
 - [付録](appendix.md)

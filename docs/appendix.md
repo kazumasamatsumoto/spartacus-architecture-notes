@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md)
+[目次](README.md) | ← [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md)
