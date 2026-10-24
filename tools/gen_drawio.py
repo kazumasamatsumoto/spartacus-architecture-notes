@@ -383,6 +383,36 @@ for name,cells,tier in rowsT:
     y+=48
 d10.text("読み方: 橙 = HTTP が飛んだ、灰 = ストアにあるので飛ばない、赤 = 再訪でも飛ぶ(cms/pages は loadStrategy の既定 ALWAYS、references はコンポーネントが初期化時に cleanReferences() する設計)。\n「毎回」なのは cms/pages だけで、同梱されたコンポーネントデータも一緒に毎回届く。業務データは初回のみ。", 740, y+6, 860, 60, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+'</mxfile>'
+d12=D("12 cms/pages 応答 → async パイプまでの 8 段階")
+d12.text("cms/pages の応答が届いてから、コンポーネントの data$ | async が値を出すまでの 8 段階(左)と、段階ごとに何が起きるか・失敗したときの範囲(右)。14 章", 40, 20, 1700, 30, 16, "fontStyle=1;")
+gL=d12.group("A. 8 段階: 何をするか(上から順に実行される)", 40, 70, 680, 1010, "#f5f5f5", "#666666")
+steps=[
+ ("1. 正規化\nOccCmsPageNormalizer", BLUE, "1 つの JSON から 2 つの形を作る\n・page.slots[位置].components = {uid, typeCode, flexType, properties}\n・components = コンポーネント本体(properties は捨てる)\nflexType = typeCode(CMSFlexComponent だけ flexType 属性)"),
+ ("2. ストア格納\nPageEffects → reducer", BLUE, "CmsGetComponentFromPage(同梱全件)と LoadCmsPageDataSuccess を一度に dispatch\ncomponents[uid].pageContext['ContentPage'] = success\nページ index[pageId] = success → ガードが待っていた hasPage が通る"),
+ ("3. ガード(まだ描画しない)\nCmsPageGuardService.canActivatePage", PURP, "ページ内の flexType 集合 → determineMappings(遅延モジュールの import())\n→ guards 実行 → i18n チャンク読込 → childRoutes があれば再ナビゲーション\n→ true で Router が PageLayoutComponent を生成、ROUTER_NAVIGATED"),
+ ("4. レイアウト → スロット\nPageLayoutComponent / PageSlotComponent", GREEN, "LayoutConfig.layoutSlots[template].slots ∩ 応答の slots → <cx-page-slot> を並べる\n各スロットが getContentSlot(position) で components 配列を取る\npending = 件数 → cx-pending クラス"),
+ ("5. 遅延判定とアウトレット\nOutletDirective + DeferLoaderService", GREEN, "cxOutletDefer: INSTANT なら即、DEFER なら IntersectionObserver で画面に入るまで\nラッパーすら作らない(既定は INSTANT)\ncxOutlet=flexType に差し替えテンプレートがあればそちらを描く(1.7)"),
+ ("6. ラッパーが createComponent\nComponentWrapperDirective", GREEN, "getMapping(flexType) → 無ければ何もしない(dev 警告のみ)\n子 Injector に CmsComponentData{uid, data$} と mapping.providers を provide\n→ ViewContainerRef.createComponent → constructor で注入 → ComponentCreateEvent"),
+ ("7. data$ を購読(ここで初めて動く)\nCmsService.getComponentData", ORANGE, "ストアに uid × context があれば同期で値 → HTTP なし\n無ければ LoadCmsComponent → 同一マクロタスク分をまとめて\nGET cms/components?componentIds=…(50 件/回、商品ページなら productCode=)\nナビゲーションの子項目も同じ getList を通る(別エフェクト)"),
+ ("8. async パイプ → 変更検知 → 描画\nAngular AsyncPipe(pure: false)", GREY, "最初の transform で subscribe(= 7 が動く)。同期で来ればその場で値\n値が来るたび markForCheck → OnPush を次の変更検知で再描画\n無い間は null → *ngIf が描かない。(loaded) で pending-- → cx-pending 解除"),
+]
+paired(d12, 60, 164, steps, 250, 390, 96, 10)
+gR=d12.group("B. 段階ごとに何が起きるか: 通信 / ストア / DOM / 失敗の範囲", 760, 70, 1070, 1010, "#fff7e6", "#d79b00")
+cols=[("段階",110),("OCC への通信",160),("静的ファイル",120),("NgRx ストア",200),("DOM / 変更検知",190),("失敗したときの範囲",200)]
+NONE=("なし",GREY); DASH=("—",GREY)
+rows=[
+ [("1 正規化",GREY), NONE, NONE, ("まだ触らない",GREY), NONE, ("応答が壊れていれば\nLoadCmsPageDataFail → 404 ページ",RED)],
+ [("2 ストア格納",GREY), NONE, NONE, ("components[uid] と page.index に\nsuccess を書く",BLUE), NONE, DASH],
+ [("3 ガード",GREY), ("なし\n(guards の実装次第)",GREY), ("遅延モジュールの JS\n翻訳 JSON",ORANGE), ("読むだけ\n(flexType の集合)",BLUE), ("なし\n(ルート設定の差し替えあり)",GREY), ("ページ全体: 遷移中止\n(guards false / import 失敗)",RED)],
+ [("4 レイアウト→スロット",GREY), NONE, NONE, ("読むだけ\n(page.template, slots)",BLUE), ("<cx-page-slot> が並ぶ\ncx-pending 付き",GREEN), ("LayoutConfig に無いスロットは\n描かれない(dev 警告)",RED)],
+ [("5 遅延判定",GREY), NONE, NONE, NONE, ("IntersectionObserver 登録\n画面内なら即ビルド",GREEN), DASH],
+ [("6 createComponent",GREY), NONE, NONE, ("なし(data$ は未購読)",GREY), ("コンポーネントの DOM が生まれる\nComponentCreateEvent",GREEN), ("mapping 無し: そのコンポーネント\nだけ描かれない(本番は無言)",RED)],
+ [("7 data$ 購読",GREY), ("同梱済みなら なし\n不足分だけ cms/components",ORANGE), NONE, ("loaderState を見て dispatch 判定\n応答を components[uid] に格納",BLUE), NONE, ("uid が無い: null → そのコンポーネント\nだけ空。言語変更/ログインで要求破棄",RED)],
+ [("8 async → 描画",GREY), NONE, NONE, ("select で現在値を読む",BLUE), ("markForCheck → 次の変更検知で描画\npending-- → cx-pending 解除",GREEN), DASH],
+]
+grid(d12, 780, 110, cols, rows, 96, 10, 44)
+d12.text("読み方: 橙 = 通信が起きる(OCC か静的ファイル)、青 = NgRx ストアを書く/読む、緑 = DOM が変わる、赤 = 失敗したときに影響する範囲。\ncms/pages の応答から最初の描画まで OCC への通信は 0 本。cms/components が飛ぶのは「購読した時点でストアに無い uid」とナビゲーションの子項目だけ。", 780, 1024, 1030, 44, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

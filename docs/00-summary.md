@@ -9,7 +9,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(11 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(12 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -24,6 +24,7 @@
 | 09 アプリケーションのライフサイクル | index.html 取得 → 起動 → APP_INITIALIZER → ゲート → 描画 → 実行中イベント → SSR → 永続化の 9 フェーズ(12 章) | [page9.png](diagrams/page9.png) |
 | 10 呼び出しの 4 階層と毎回・初回 | セッション / ページ / コンポーネント / アクションの 4 階層と、再訪時に何が飛ぶかの実測(13 章) | [page10.png](diagrams/page10.png) |
 | 11 OCC リソースの 3 層とカスタムの置き場所 | サイト設定 / CMS / 業務データの 3 層、決め方の順序、業務データ層の主なリソース一覧(10 章) | [page11.png](diagrams/page11.png) |
+| 12 cms/pages 応答 → async パイプまでの 8 段階 | 正規化 → ストア格納 → ガード → レイアウト → 遅延判定 → createComponent → data$ 購読 → async パイプ。段階ごとの通信・ストア・DOM・失敗範囲(14 章) | [page12.png](diagrams/page12.png) |
 
 ![全体フロー](diagrams/page1.png)
 

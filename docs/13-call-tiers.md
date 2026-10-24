@@ -77,4 +77,4 @@ OCC 呼び出しは「いつ飛ぶか」と「いつまで使い回すか」で 
 
 ---
 
-[目次](README.md) | ← [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md) | [付録](appendix.md) →
+[目次](README.md) | ← [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md) | [14. cms/pages 応答からコンポーネント描画まで](14-page-to-component.md) →

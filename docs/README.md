@@ -9,7 +9,7 @@
 | 問い | 一言の答え | 詳しく |
 |---|---|---|
 | **① どこから来るか**(データの出所) | 画面の構造は `cms/pages` 1 本から、コンポーネントの中身は同じ応答に同梱されて、業務データ(商品・カート・注文…)は「リソース」ごとの OCC API から来る。バックエンドの `typeCode` がフロントの Angular コンポーネントを選ぶ | [3 章](03-rendering-flow.md), [10 章](10-occ-resource-catalog.md), [5 章](05-custom-cms-component-spec.md) |
-| **② いつ取りに行くか**(タイミング) | 起動時に 1 回(セッション)、ページ遷移のたび(`cms/pages`)、コンポーネントが初めて生成されたとき(業務データ)、ユーザー操作のたび(更新系)。取得済みはストアに残り、言語変更・ログイン・ログアウトで捨てられる | [12 章](12-application-lifecycle.md), [13 章](13-call-tiers.md), [4 章](04-why-few-api-calls.md) |
+| **② いつ取りに行くか**(タイミング) | 起動時に 1 回(セッション)、ページ遷移のたび(`cms/pages`)、コンポーネントが初めて生成されたとき(業務データ)、ユーザー操作のたび(更新系)。取得済みはストアに残り、言語変更・ログイン・ログアウトで捨てられる | [12 章](12-application-lifecycle.md), [13 章](13-call-tiers.md), [14 章](14-page-to-component.md), [4 章](04-why-few-api-calls.md) |
 | **③ 何を変えるとどう反映されるか**(変更の影響範囲) | CMS の配置・属性は次の遷移で反映。業務データの変更はリロードか言語変更まで反映されない。フロントの呼び出し方は通信層が共通で、状態層が 2 方式、リソースごとに「必要な ID」と「捨てる条件」が違う | [11 章](11-frontend-call-patterns.md), [13 章](13-call-tiers.md), [8 章](08-backend-api-granularity.md) |
 
 この 3 問に答えられれば、「このカスタムコンポーネントはどのリソースを参照し、フロントは何を・いつ呼び、更新後に何を取り直すか」が自分で導けるようになる。それが依頼書([5.8](05-custom-cms-component-spec.md), [8.5](08-backend-api-granularity.md), [11.6](11-frontend-call-patterns.md))の中身である。
@@ -23,27 +23,28 @@
 1. [12. アプリケーションのライフサイクル](12-application-lifecycle.md) — 起動から永続化までの 9 フェーズ。どの段階で何が呼ばれ、何が捨てられるか
 2. [3. URL からコンポーネント描画まで](03-rendering-flow.md) — ページ遷移 1 回の中で起きる 10 ステップ
 3. [13. 呼び出しの 4 階層と「毎回」「初回」](13-call-tiers.md) — セッション / ページ / コンポーネント / アクション。実測付き
-4. [4. なぜ API 呼び出しが少ないのか](04-why-few-api-calls.md) — HTTP が飛ぶ前に通る 16 個の止め弁
+4. [14. cms/pages 応答からコンポーネント描画まで](14-page-to-component.md) — 応答が届いてから `cms/components` が飛ぶ(飛ばない)まで、`data$ | async` が値を出すまでの 8 段階
+5. [4. なぜ API 呼び出しが少ないのか](04-why-few-api-calls.md) — HTTP が飛ぶ前に通る 16 個の止め弁
 
 ### 第 II 部 境界: バックエンドとフロントの契約
 
-5. [10. OCC リソース一覧](10-occ-resource-catalog.md) — サイト設定 / CMS / 業務データの 3 層。カスタムをどのリソースの中で考えるか
-6. [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md) — 通信層は共通、状態層は 2 方式、リソースごとの文脈と捨てる条件
-7. [5. カスタム CMS コンポーネントの依頼仕様](05-custom-cms-component-spec.md) — `typeCode` / `flexType` / `uid`、OCC JSON、Angular 側の雛形
-8. [8. 何を、どの単位で返すか](08-backend-api-granularity.md) — 判断の順序 ①〜④、DTO と `fields`、Java サンプル
-9. [9. JSP からヘッドレスへ](09-jsp-to-headless.md) — JSP が持っていた責務をどこへ移すか
-10. [6. バックエンド側のチェックリスト](06-backend-checklist.md)
+6. [10. OCC リソース一覧](10-occ-resource-catalog.md) — サイト設定 / CMS / 業務データの 3 層。カスタムをどのリソースの中で考えるか
+7. [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md) — 通信層は共通、状態層は 2 方式、リソースごとの文脈と捨てる条件
+8. [5. カスタム CMS コンポーネントの依頼仕様](05-custom-cms-component-spec.md) — `typeCode` / `flexType` / `uid`、OCC JSON、Angular 側の雛形
+9. [8. 何を、どの単位で返すか](08-backend-api-granularity.md) — 判断の順序 ①〜④、DTO と `fields`、Java サンプル
+10. [9. JSP からヘッドレスへ](09-jsp-to-headless.md) — JSP が持っていた責務をどこへ移すか
+11. [6. バックエンド側のチェックリスト](06-backend-checklist.md)
 
 ### 第 III 部 作る: フロント側の実装
 
-11. [7. Facade / Connector / Adapter の作り方](07-facade-connector-adapter.md) — 業務データを扱うコンポーネントの 4 層と雛形一式
+12. [7. Facade / Connector / Adapter の作り方](07-facade-connector-adapter.md) — 業務データを扱うコンポーネントの 4 層と雛形一式
 
 ### 第 IV 部 前提知識: 必要になったら戻る
 
-12. [1. Angular 入門(バックエンド担当者向け)](01-angular-basics.md) — 9 ページ。特に [1.3 骨格](01-3-app-skeleton.md)・[1.4 設定の仕組み](01-4-config-di.md)・[1.9 書き方](01-9-component-style.md)
-13. [2. Spartacus のパッケージ構成](02-package-layers.md)
-14. [0. 要約](00-summary.md) — 結論 8 行と図の一覧
-15. [付録](appendix.md)
+13. [1. Angular 入門(バックエンド担当者向け)](01-angular-basics.md) — 9 ページ。特に [1.3 骨格](01-3-app-skeleton.md)・[1.4 設定の仕組み](01-4-config-di.md)・[1.9 書き方](01-9-component-style.md)
+14. [2. Spartacus のパッケージ構成](02-package-layers.md)
+15. [0. 要約](00-summary.md) — 結論 8 行と図の一覧
+16. [付録](appendix.md)
 
 ## 質問と、それに答えた章の対応
 
@@ -61,6 +62,7 @@
 | フロントの呼び出し方は全リソース共通か、リソースごとに違うか | 11 |
 | イニシャライズからのライフサイクル全部 | 12 |
 | 必ず呼ぶリソースと追加リソース、アクションごとのリソースという理解で合っているか。毎回と初回の違い | 13(実測付き) |
+| `cms/pages` からコンポーネントの API を呼ぶまでの間、`async` パイプ実行までの間に何が行われているか | 14 |
 
 ## 調査対象
 
@@ -77,7 +79,7 @@
 
 ## 章の一覧(番号順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 11 ページ + PNG / SVG)。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 12 ページ + PNG / SVG)。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -94,4 +96,5 @@
 - [11. フロント側の呼び出し方法はリソースごとに違うのか](11-frontend-call-patterns.md)
 - [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md)
 - [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md)
+- [14. cms/pages 応答からコンポーネント描画まで: async パイプが値を出すまでに何が起きているか](14-page-to-component.md)
 - [付録](appendix.md)
