@@ -1,12 +1,14 @@
-# 11. フロント側の呼び出し方法はリソースごとに違うのか
+# 10. フロント側の呼び出し方法はリソースごとに違うのか
 
 > **図**: 08 リソースごとの呼び出し方法の違い(`diagrams/spartacus-architecture.drawio`)。左: 通信層 / 状態層 / 文脈と捨てる条件 / コンポーネントから見た形の 4 段で「何が共通で何が違うか」。右: リソースごとの方式・文脈(色 = 灰: サイト共通 / 青: ユーザー固有 / 橙: カート配下)・捨てる条件・バッチの比較表
 
 ![08 リソースごとの呼び出し方法の違い](diagrams/page8.png)
 
 > **この章が答える問い**: フロントの呼び出し方は全リソース共通か。リソースごとに何が違うか(③)
+>
+> **位置づけ**: 9 章のリソースそれぞれを、フロントがどう呼ぶか。15 章の実装の前提
 
-## 11.1 結論
+## 10.1 結論
 
 呼び出しの流れを 3 層に分けると、答えは「**通信層は完全に共通、状態層は 2 方式、リソース固有なのは『文脈』と『キャッシュの捨て方』**」になる。
 
@@ -16,23 +18,23 @@
 | **状態層**(Facade の中身) | **2 方式のどちらか** | 古い機能は NgRx(Action / Effect / Reducer / Selector)、新しい機能は Query / Command。機能ライブラリごとに固定で、SAP は「既存に合わせよ」と明記 |
 | **文脈とキャッシュ無効化** | **リソースごとに違う** | 必要な ID(`userId` / `cartId` / `PageContext` / `scope`)、前提条件、再読込・破棄のきっかけ、バッチ化の有無 |
 
-コンポーネントから見ると、どのリソースでも「Facade のメソッドを呼ぶと `Observable<T>` が返る」点は同じである。違いは Facade の内側にあり、**カスタムリソースをフロントに足すときに決めなければならないのはこの「文脈」と「無効化条件」**である(11.5)。
+コンポーネントから見ると、どのリソースでも「Facade のメソッドを呼ぶと `Observable<T>` が返る」点は同じである。違いは Facade の内側にあり、**カスタムリソースをフロントに足すときに決めなければならないのはこの「文脈」と「無効化条件」**である(10.5)。
 
-## 11.2 共通部分(どのリソースでも同じ)
+## 10.2 共通部分(どのリソースでも同じ)
 
 | 仕組み | 根拠 | 補足 |
 |---|---|---|
-| URL は設定から `OccEndpointsService.buildUrl(key, {urlParams, queryParams})` で組み立てる | OCC アダプタ 75 ファイルが使用(`grep buildUrl`)。使っていないのは CDS の通知アダプタ 1 件のみ | 7.2 |
-| レスポンス変換は `ConverterService.pipeable(NORMALIZER_TOKEN)` | アダプタ 59 ファイルが使用 | 7.2 |
-| `lang` / `curr` クエリは `SiteContextInterceptor` が OCC baseUrl 宛の全リクエストに自動付与 | `spartacus/core-libs/core/src/occ/adapters/site-context/site-context.interceptor.ts:58-63` | 7.3 |
-| `Authorization: Bearer` は `AuthHttpHeaderService` が自動付与、401 時にトークン更新 | 7.3 | |
+| URL は設定から `OccEndpointsService.buildUrl(key, {urlParams, queryParams})` で組み立てる | OCC アダプタ 75 ファイルが使用(`grep buildUrl`)。使っていないのは CDS の通知アダプタ 1 件のみ | 15.2 |
+| レスポンス変換は `ConverterService.pipeable(NORMALIZER_TOKEN)` | アダプタ 59 ファイルが使用 | 15.2 |
+| `lang` / `curr` クエリは `SiteContextInterceptor` が OCC baseUrl 宛の全リクエストに自動付与 | `spartacus/core-libs/core/src/occ/adapters/site-context/site-context.interceptor.ts:58-63` | 15.3 |
+| `Authorization: Bearer` は `AuthHttpHeaderService` が自動付与、401 時にトークン更新 | 15.3 | |
 | `userId` は `UserIdService.takeUserId(loggedIn?)` で取り、`current` / `anonymous` を返す。`loggedIn = true` なら匿名時に例外 | `spartacus/core-libs/core/src/auth/user-auth/facade/user-id.service.ts:53-61` | 57 の Facade / Service が使用 |
-| Facade は root 層の抽象クラス + `facadeFactory` で遅延ロード対応 | root 層に 51 箇所 | 7.2 |
+| Facade は root 層の抽象クラス + `facadeFactory` で遅延ロード対応 | root 層に 51 箇所 | 15.2 |
 | 禁止事項: コンポーネントやサービスで `HttpClient` を直接使わない、NgRx `Store` を直接参照しない | `spartacus/core-libs/skills/skills/spartacus-developer/references/backend-communication.md:5-16`、`facades-not-store.md:1-5` | SAP 公式の開発者ガイド |
 
-つまり「新しいリソースを 1 つ足す」ときに書く通信層のコード(endpoints 設定、Adapter、Normalizer)は、どのリソースでも同じ形になる(7.4 の雛形)。
+つまり「新しいリソースを 1 つ足す」ときに書く通信層のコード(endpoints 設定、Adapter、Normalizer)は、どのリソースでも同じ形になる(15.4 の雛形)。
 
-## 11.3 状態層は 2 方式(機能ライブラリごとに固定)
+## 10.3 状態層は 2 方式(機能ライブラリごとに固定)
 
 SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/references/state-management.md:1-16` は、2 方式の存在と「カスタマイズ時は既存機能の方式に合わせ、第 3 の方式(素の `BehaviorSubject` など)を持ち込むな」と定めている。
 
@@ -49,11 +51,11 @@ SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/referenc
 - 注文: 履歴・詳細は NgRx(`order-history.service.ts:42-65`、`takeUserId` → `dispatch(LoadOrderDetails)`)、注文確定は Command(`order.service.ts:26-52`、成功時に `OrderPlacedEvent` を発火)。
 - カート: 本体は NgRx(`multi-cart.service.ts:183, 388`)、検証・アクセスコード・ゲストは Query / Command(`cart-validation.service.ts` 等)。
 
-### 11.3.1 10 章のリソース一覧に対応させた方式一覧
+### 11.3.1 9 章のリソース一覧に対応させた方式一覧
 
-「どのリソースで方式の違いが起きているか」を、10 章の分類(A / B / C-1〜C-6)に合わせて Facade の実装ファイルで確認した結果。判定基準は SAP ガイドと同じ(`store.dispatch` / `select` を使えば NgRx、`queryService.create` / `commandService.create` を使えば Query / Command)。
+「どのリソースで方式の違いが起きているか」を、9 章の分類(A / B / C-1〜C-6)に合わせて Facade の実装ファイルで確認した結果。判定基準は SAP ガイドと同じ(`store.dispatch` / `select` を使えば NgRx、`queryService.create` / `commandService.create` を使えば Query / Command)。
 
-| 10 章の分類 | リソース | 方式 | Facade 実装(`spartacus/` 配下) |
+| 9 章の分類 | リソース | 方式 | Facade 実装(`spartacus/` 配下) |
 |---|---|---|---|
 | A. サイト設定 | basesites / languages / currencies | NgRx | `core-libs/core/src/site-context/facade/base-site.service.ts`, `language.service.ts`, `currency.service.ts` |
 | B. CMS | cms/pages, cms/components | NgRx | `core-libs/core/src/cms/facade/cms.service.ts` |
@@ -83,13 +85,13 @@ SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/referenc
 
 - **境界は「リソース」ではなく「機能ライブラリが書かれた時期」**。`@spartacus/core` と初期の機能ライブラリ(cart base、order history、storefinder、organization)は NgRx、2021 年以降に追加・再設計された機能(user account / profile、checkout、quote、customer ticketing、OPF 等)は Query / Command になっている。
 - そのため**同じリソースの「読む側」と「更新する側」で方式が分かれる**: カート本体(NgRx)と検証(Query)、注文履歴(NgRx)と注文確定(Command)、商品本体(NgRx)と在庫(Query)。
-- バックエンド担当者にとっての意味: **既存リソースの DTO 拡張(8.1 ③)なら、フロントは上の表の方式のまま Normalizer とモデルを足すだけ**。新リソース(8.1 ④)なら Query / Command で書く(11.5)。
+- バックエンド担当者にとっての意味: **既存リソースの DTO 拡張(12.1 ③)なら、フロントは上の表の方式のまま Normalizer とモデルを足すだけ**。新リソース(12.1 ④)なら Query / Command で書く(10.5)。
 
-## 11.4 リソースごとに違う点
+## 10.4 リソースごとに違う点
 
 | リソース | 必要な文脈(ID) | 取得の単位 | キャッシュを捨てる条件 | バッチ / 最適化 | 根拠 |
 |---|---|---|---|---|---|
-| **CMS**(pages / components) | `PageContext {type, id}` + `userId`(`anonymous` / `current`) | ページ 1 件、コンポーネント `uid` 単位(`uid × context` の Observable をメモ化) | 言語変更・ログイン・ログアウトで **CMS ストア全体を破棄**(メタリデューサ) | 同一ティックの `uid` を `componentIds` にまとめ 50 件ずつ。遷移先ページ応答に含まれる見込みなら要求しない | `cms.service.ts:82-95, 113`、`cms/store/reducers/index.ts:75-90`(4 章) |
+| **CMS**(pages / components) | `PageContext {type, id}` + `userId`(`anonymous` / `current`) | ページ 1 件、コンポーネント `uid` 単位(`uid × context` の Observable をメモ化) | 言語変更・ログイン・ログアウトで **CMS ストア全体を破棄**(メタリデューサ) | 同一ティックの `uid` を `componentIds` にまとめ 50 件ずつ。遷移先ページ応答に含まれる見込みなら要求しない | `cms.service.ts:82-95, 113`、`cms/store/reducers/index.ts:75-90`(8 章) |
 | **商品** | `productCode` + **`scope`**(`details` / `list` / `price` / `stock` …) | コード × スコープ。複数スコープは `uniteLatest` で合成 | 言語・**通貨**変更で商品ストア全体を破棄。スコープごとに `maxAge` と `reloadOn` イベントを設定可能 | スコープの `include` 展開(`details` ⊃ `list`, `variants`)、同一 URL の `fields` 結合、コード検索は 100 件バッチ | `product.service.ts:39-44`、`product-loading.service.ts:49-55, 146-191`、`product/store/reducers/index.ts:46-56`、`default-occ-product-config.ts:52-58`、`loading-scopes.service.ts:56-76` |
 | **カート** | `userId` + `cartId`(未確定なら `current`) | 常にカート全体を再取得(`fields` に明細・プロモーションを含む) | ログイン時に匿名カートを `loadOrMerge`。更新系は `processesCount` で「安定」を管理し、安定するまで次の操作・ID 取得を待たせる。`localStorage` に ID を永続化 | なし(更新 1 回 = PATCH/POST 1 回 + 再取得) | `active-cart.service.ts:60-67, 100-121, 153-168, 197-215`、`multi-cart-state-persistence.service.ts:24-28` |
 | **チェックアウト** | `userId` + `cartId` + **前提条件**(匿名ならゲストカートであること) | `carts/{cartId}?fields=deliveryAddress,deliveryMode,paymentInfo` を **1 つの Query** にまとめる | 各 Command が成功時に専用イベントを発火し、リスナーが `CheckoutQueryReloadEvent` / `CheckoutQueryResetEvent` を発火して Query を更新 | なし | `checkout-query.service.ts:32-52, 66-80`、`checkout-delivery-address.service.ts:34-110, 135-136`、`checkout-payment.service.ts:119` |
@@ -103,13 +105,13 @@ SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/referenc
 
 **違いが生まれる理由**は、リソースの性質に対応している。
 
-- **誰のものか**(文脈): サイト共通(CMS、商品、店舗)は `lang` / `curr` だけ。ユーザー固有(`users/{userId}/...`)は `userId`。カート配下はさらに `cartId` と「安定待ち」。チェックアウトは前提条件まで必要。URL の階層(10.4 のルール 2・3)がそのままフロントの文脈の数になる。
+- **誰のものか**(文脈): サイト共通(CMS、商品、店舗)は `lang` / `curr` だけ。ユーザー固有(`users/{userId}/...`)は `userId`。カート配下はさらに `cartId` と「安定待ち」。チェックアウトは前提条件まで必要。URL の階層(9.4 のルール 2・3)がそのままフロントの文脈の数になる。
 - **何で古くなるか**(無効化): 言語に依存するもの(CMS、商品)は言語変更で全破棄。通貨に依存するもの(商品)は通貨変更でも破棄。ユーザーに依存するものはログイン / ログアウトで破棄。更新系があるもの(カート、チェックアウト、チケット)は、更新の成功イベントで再読込。
 - **何件まとめて要るか**(バッチ): 1 画面に多数現れるもの(CMS コンポーネント、商品カード)だけがバッチ化される。
 
-## 11.5 カスタムリソースをフロントに足すときの決め方
+## 10.5 カスタムリソースをフロントに足すときの決め方
 
-10 章で「どのリソースか」を決めたら、フロントは次の 4 問に答えて Facade を設計する。通信層(7.4)は共通なので、ここで決めるのは状態層だけである。
+9 章で「どのリソースか」を決めたら、フロントは次の 4 問に答えて Facade を設計する。通信層(15.4)は共通なので、ここで決めるのは状態層だけである。
 
 | 問い | 答えで決まるもの | 選択肢 |
 |---|---|---|
@@ -118,7 +120,7 @@ SAP のガイド `spartacus/core-libs/skills/skills/spartacus-developer/referenc
 | **③ いつ古くなるか** | `reloadOn` / `resetOn` | 言語依存 → `reloadOn: [LanguageSetEvent]`(実例 `user-profile.service.ts:65`)。通貨依存 → `CurrencySetEvent`。ユーザー依存 → `resetOn: [LoginEvent, LogoutEvent]`。自分の更新で変わる → 自作イベントを `reloadOn` に |
 | **④ 更新系があるか** | Command と strategy | 二重送信を防ぐ → `Queue` または `CancelPrevious`。成功時に `eventService.dispatch(..., MyChangedEvent)` して ③ の Query を再読込 |
 
-**雛形**(10.3 の「キャンペーン応募状況」を例に。SAP ガイド `state-management.md:20-39` と同じ形)
+**雛形**(9.3 の「キャンペーン応募状況」を例に。SAP ガイド `state-management.md:20-39` と同じ形)
 
 ```ts
 // my-campaign/core/facade/campaign-entry.service.ts
@@ -167,9 +169,9 @@ export class CampaignEntryService implements CampaignEntryFacade {
 }
 ```
 
-Connector / Adapter / Normalizer / endpoints 設定は 7.4 の雛形をそのまま使う。コンポーネント側は `facade.getEntries() | async` で描く(1.9 と同じ)。
+Connector / Adapter / Normalizer / endpoints 設定は 15.4 の雛形をそのまま使う。コンポーネント側は `facade.getEntries() | async` で描く(1.9 と同じ)。
 
-## 11.6 依頼書に追加する項目(8.5 の続き)
+## 10.6 依頼書に追加する項目(12.5 の続き)
 
 15. **文脈**: この API は `users/{userId}` 配下か(匿名ユーザーも呼べるか / ログイン必須か)。カート ID を取るか。
 16. **言語・通貨依存**: レスポンスが `lang` / `curr` で変わるか(変わるならフロントは言語・通貨変更時に再取得する)。
@@ -178,4 +180,4 @@ Connector / Adapter / Normalizer / endpoints 設定は 7.4 の雛形をそのま
 
 ---
 
-[目次](README.md) | ← [10. OCC リソース一覧: カスタムをどのリソースの中で考えるか](10-occ-resource-catalog.md) | [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md) →
+[目次](README.md) | ← [9. OCC リソース一覧: カスタムをどのリソースの中で考えるか](09-occ-resource-catalog.md) | [11. バックエンドでカスタム CMS コンポーネントを作るとき、フロントへ渡す仕様](11-custom-cms-component-spec.md) →

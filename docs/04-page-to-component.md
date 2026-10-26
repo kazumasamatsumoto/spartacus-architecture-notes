@@ -1,12 +1,14 @@
-# 14. `cms/pages` 応答からコンポーネント描画まで: `async` パイプが値を出すまでに何が起きているか
+# 4. `cms/pages` 応答からコンポーネント描画まで: `async` パイプが値を出すまでに何が起きているか
 
 > **図**: 12 cms/pages 応答 → async パイプまでの 8 段階(`diagrams/spartacus-architecture.drawio`)。左: 8 段階それぞれで「何をするか」。右: 段階ごとに OCC 通信 / 静的ファイル / NgRx ストア / DOM・変更検知 / 失敗したときの範囲を色分け
 
 ![12 cms/pages 応答 → async パイプまでの 8 段階](diagrams/page12.png)
 
 > **この章が答える問い**: `cms/pages` の応答が届いてから `cms/components` が飛ぶ(または飛ばない)までの間、そしてコンポーネントの `data$ | async` が値を出すまでの間に、何が・どの順で・どこで起きているか(①②)
+>
+> **位置づけ**: 3 章のステップ 5〜10(`cms/pages` 応答 → 描画)の拡大。Redux DevTools で見える形もここ
 
-3 章は URL から描画までを 10 ステップで俯瞰し、13 章は「何が毎回で何が初回か」を実測した。この章はその間を埋める。`cms/pages` の HTTP 応答が JavaScript に渡った瞬間から、`ParagraphComponent` のテンプレートにある `data$ | async` が文字列を返す瞬間までを、ソースの実行順にたどる。
+3 章は URL から描画までを 10 ステップで俯瞰し、7 章は「何が毎回で何が初回か」を実測した。この章はその間を埋める。`cms/pages` の HTTP 応答が JavaScript に渡った瞬間から、`ParagraphComponent` のテンプレートにある `data$ | async` が文字列を返す瞬間までを、ソースの実行順にたどる。
 
 結論を先に書くと次の 3 点である。
 
@@ -14,7 +16,7 @@
 - **`cms/components` は「誰かが `data$` を購読した時点でストアに無かった uid」についてだけ飛ぶ**(7)。`cms/pages` に同梱されたコンポーネントは段階 2 で `success` になっているので、購読した瞬間に同期で値が返り、HTTP は飛ばない。購読が起きるのは `async` パイプの最初の `transform` である(8)。
 - **ナビゲーションの子項目は別経路で同じ `cms/components` を呼ぶ**。`CmsComponentConnector.getList` の呼び元は 2 箇所しかなく、デモのホームで観測した 2 本はこちらである。
 
-## 14.1 全体の 8 段階
+## 4.1 全体の 8 段階
 
 | 段階 | 何が起きる | 主なファイル | HTTP |
 |---|---|---|---|
@@ -29,7 +31,7 @@
 
 以下、段階ごとにソースで追う。引用はすべて `spartacus/core-libs/...`(コミット `b7b028f`)。
 
-## 14.2 段階 1: 正規化。1 つの JSON から 2 つの形を作る
+## 4.2 段階 1: 正規化。1 つの JSON から 2 つの形を作る
 
 `OccCmsPageAdapter.load` が `GET .../cms/pages?pageType=...&pageLabelOrId=...` を投げ、応答を `CMS_PAGE_NORMALIZER` に通す(`core/src/occ/adapters/cms/occ-cms-page.adapter.ts:48-66`)。ホームだけは `pageLabelOrId` 無しで投げる(`:86-89`)。
 
@@ -40,11 +42,11 @@
 | `page.slots[position].components[]` | `{ uid, typeCode, flexType, properties }` だけの軽い配置情報 | `:110-139` |
 | `components[]` | コンポーネント本体(OCC の JSON そのまま)。ただし `properties` は捨てる | `:166-193`(`:183-186` で `properties = undefined`) |
 
-`flexType` の決め方はここで固定される(`:151-158`)。`CMSFlexComponent` なら `flexType` 属性、`JspIncludeComponent` なら `uid`、それ以外は `typeCode`。**Angular 側のマッピング表のキーになるのはこの `flexType`** であり、5 章で「`typeCode` が Angular コンポーネントを選ぶ」と書いたのは、この変換を経た値である。
+`flexType` の決め方はここで固定される(`:151-158`)。`CMSFlexComponent` なら `flexType` 属性、`JspIncludeComponent` なら `uid`、それ以外は `typeCode`。**Angular 側のマッピング表のキーになるのはこの `flexType`** であり、11 章で「`typeCode` が Angular コンポーネントを選ぶ」と書いたのは、この変換を経た値である。
 
 `properties` が捨てられる点はバックエンド担当者にとって重要である。SmartEdit 用の `properties`(`smartedit.componentId` など)はスロット側の配置情報にだけ残り(`:124`)、コンポーネント本体には入らない。つまり **`properties` に業務値を入れても `data$` には届かない**。
 
-## 14.3 段階 2: ストア格納。同梱コンポーネント全件が `success` になる
+## 4.3 段階 2: ストア格納。同梱コンポーネント全件が `success` になる
 
 `PageEffects.loadPageData$` が正規化結果を受け取り、1 回の応答から 2〜3 個のアクションを**まとめて** dispatch する(`core/src/cms/store/effects/page.effect.ts:58-108`)。
 
@@ -68,7 +70,7 @@ cms.components.entities[uid] = {
 キーの `"ContentPage"` は `serializePageContext(pageContext, true)` の結果である(`core/src/cms/utils/cms-utils.ts:21-34`)。**コンテンツページでは id を無視して型名だけ**、商品ページなどでは `"ProductPage-300938"` のように id 付きになる。従って
 
 - 同じ uid のコンポーネント(ヘッダ、フッタ、共通バナー)は、**どのコンテンツページで取れたものでも全コンテンツページで共有**される。
-- 商品ページのコンポーネントは**商品コードごとに別エントリ**になる。これが `cms/components?productCode=...` という問い合わせ(14.8)の理由であり、商品ごとに中身が変わりうるコンポーネント(制限付きバナー、商品参照)を正しく扱うための設計である。
+- 商品ページのコンポーネントは**商品コードごとに別エントリ**になる。これが `cms/components?productCode=...` という問い合わせ(4.8)の理由であり、商品ごとに中身が変わりうるコンポーネント(制限付きバナー、商品参照)を正しく扱うための設計である。
 
 ページ側は `page.index.content[pageId]` に `success` が立ち(`core/src/cms/store/reducers/index.ts:35-55`)、ガードが待っていた `hasPage` の `filter` が通る(`core/src/cms/facade/cms.service.ts:258-265`)。
 
@@ -86,7 +88,7 @@ cms
 ├ components.entities[uid]           ← コンポーネント本体。cms/pages 同梱分も cms/components 取得分もここ
 │ ├ component: { uid, typeCode, name, content, ... }
 │ └ pageContext: { "ContentPage": {loading,error,success,value} , "ProductPage-300938": {...} }
-└ navigation.entities[navigationUid] ← ナビゲーションの子項目(14.8 の 7-d)
+└ navigation.entities[navigationUid] ← ナビゲーションの子項目(4.8 の 7-d)
 ```
 
 つまり **`cms/pages` で取れたコンポーネントは `page` ではなく `components` に入る**。ページ側には「どのスロットに何の uid があるか」だけが残り、本体は uid をキーにした別テーブルに移る。描画側(段階 7)は常に `components.entities[uid]` を見るので、本体がページ同梱で来たか `cms/components` で来たかを区別しない。
@@ -108,9 +110,9 @@ cms
 
 > 注: `cms-state.ts` のコメントには `ContentPage-homepage` という例が書かれているが、reducer は `serializePageContext(ctx, true)` を使うので実際のキーは `ContentPage` になる。DevTools で確認できるのは後者である。
 
-## 14.4 段階 3: ガード。描画の前にマッピング・guards・i18n・childRoutes を片付ける
+## 4.4 段階 3: ガード。描画の前にマッピング・guards・i18n・childRoutes を片付ける
 
-`CmsPageGuard.canActivate` は `getNextPageContext()` で**遷移先**のコンテキストを取り、`cmsService.getPage(pageContext, shouldReload())` が値を返すのを待っていた(`storefront/cms-structure/guards/cms-page.guard.ts:51-84`)。`shouldReload()` は `loadStrategy` が `ONCE` でない限り true で(`:89-91`)、これが 13 章の「`cms/pages` は毎回」の根拠である。
+`CmsPageGuard.canActivate` は `getNextPageContext()` で**遷移先**のコンテキストを取り、`cmsService.getPage(pageContext, shouldReload())` が値を返すのを待っていた(`storefront/cms-structure/guards/cms-page.guard.ts:51-84`)。`shouldReload()` は `loadStrategy` が `ONCE` でない限り true で(`:89-91`)、これが 7 章の「`cms/pages` は毎回」の根拠である。
 
 ページが取れると `CmsPageGuardService.canActivatePage` に進む(`storefront/cms-structure/guards/cms-page-guard.service.ts:65-99`)。ここで 5 つのことが順に起きる。
 
@@ -130,7 +132,7 @@ cms
 
 **ここまでの失敗はページ全体に効く**。guards が false / UrlTree を返せば遷移中止、`import()` が失敗すればマッピングが確定せず遷移が進まない。段階 7 以降のコンポーネント単位の失敗とは影響範囲が違う。
 
-## 14.5 段階 4: レイアウト → スロット。DOM の器ができる
+## 4.5 段階 4: レイアウト → スロット。DOM の器ができる
 
 `PageLayoutComponent` は `templateName$`(= 応答の `page.template`)と `slots$` を持つ(`storefront/cms-structure/page/page-layout/page-layout.component.ts:36-45`)。`slots$` は `LayoutConfig.layoutSlots[template].slots` を**応答に実在するスロット名で filter** した配列である(`storefront/cms-structure/page/page-layout/page-layout.service.ts:106-127`)。`LayoutConfig` に無いテンプレートなら応答のスロットをそのまま全部並べ、dev モードで警告を出す(`:120-122, 251-273`)。ブレークポイントごとの設定と `PAGE_LAYOUT_HANDLER` もここで効く(`:54-80`)。
 
@@ -138,7 +140,7 @@ cms
 
 `PageSlotComponent` は `position` を受け取ると `cmsService.getContentSlot(position)` を購読する(`storefront/cms-structure/page/slot/page-slot.component.ts:97-106`)。これは `getPageContext()` → `getCurrentSlotSelectorFactory(pageContext, position)` で、ストアの `page.slots[position]` を返す(`cms.service.ts:152-165`, `page.selectors.ts:105-114`)。得た `components` 配列を保持し(`page-slot.component.ts:124-131`)、`decorate` で **`pending` = コンポーネント数** とし、ホスト要素に `cx-pending` クラスを付ける(`:133-173`)。`isDistinct` は uid の並びが同じなら再描画しない(`:201-213`)。これが「同じページに戻っても、スロットの中身が同じならコンポーネントは作り直されない」理由の 1 つである。
 
-## 14.6 段階 5: 遅延判定とアウトレット。ラッパーを「いつ」作るか
+## 4.6 段階 5: 遅延判定とアウトレット。ラッパーを「いつ」作るか
 
 スロットのテンプレートは、コンポーネント 1 件につき次の 3 つを重ねる(`page-slot.component.html:6-15`)。
 
@@ -166,7 +168,7 @@ cms
 
 `build()` は `OutletService` に `flexType` 名の差し替えテンプレートがあればそれを、無ければ自分の `<ng-template>` を描く(`outlet.directive.ts:121-139`)。1.7 章の「マッピングを変えずに差し込む」はここで効く。既定では自分のテンプレート、つまり `cxComponentWrapper` が生成される(`:175-186`)。
 
-## 14.7 段階 6: ラッパーが `createComponent` する。`CmsComponentData` が生まれる
+## 4.7 段階 6: ラッパーが `createComponent` する。`CmsComponentData` が生まれる
 
 `ComponentWrapperDirective.ngOnInit` は `determineMappings([flexType])` を購読する(`storefront/cms-structure/page/component/component-wrapper.directive.ts:67-79`)。段階 3 で確定済みの型なら同期で返る。`shouldRender`(SSR で `disableSSR` の型を除外。`cms-components.service.ts:187-190`)を通れば `launchComponent` に進む(`:81-117`)。
 
@@ -180,7 +182,7 @@ cms
 
 この時点で **`data$` はまだ誰も購読していない**。`ComponentDataProvider.get` は `defer` で包まれていて、購読されるまで中身を作らない(`storefront/cms-structure/page/component/services/component-data.provider.ts:35-59`)。
 
-## 14.8 段階 7: `data$` を購読する。ストアにあれば同期、無ければ `cms/components`
+## 4.8 段階 7: `data$` を購読する。ストアにあれば同期、無ければ `cms/components`
 
 ### 7-a 購読で何が組み立てられるか
 
@@ -219,19 +221,19 @@ return using(() => loading$.subscribe(), () => component$).pipe(shareReplay({buf
 1. `groupBy(serializePageContext(pageContext))` でページコンテキストごとに分ける(`:49-51`)。
 2. `bufferDebounceTime(0)` で、**同じマクロタスク内に dispatch された uid を 1 つの配列にまとめる**(`:54`, `core/src/util/rxjs/buffer-debounce-time.ts:10-24`)。1 回の変更検知で 10 個のラッパーが購読すれば、10 uid が 1 配列になる。
 3. `CmsComponentConnector.getList(uids, pageContext)`(`core/src/cms/connectors/component/cms-component.connector.ts:41-86`)。まず静的 `CmsStructureConfig` にある uid を除外し(`:42-54`, `core/src/cms/services/cms-structure-config.service.ts:75-78`)、残りを `componentsLoading.pageSize`(既定 50。`core/src/cms/config/default-cms-config.ts:21-23`)ずつに切って `findComponentsByIds` を並列に呼び、`zip` で結合する(`:55-80`)。
-4. `OccCmsComponentAdapter.findComponentsByIds` が `GET .../cms/components?fields=DEFAULT&currentPage=0&pageSize=N&componentIds=a,b,c` を組み立てる(`core/src/occ/adapters/cms/occ-cms-component.adapter.ts:51-78`)。`pageContext` が商品ページなら `productCode=`、カテゴリなら `categoryCode=`、カタログなら `catalogCode=` が付く(`:132-152`)。これが 13 章で観測した `cms/components?productCode=300938` の形である。
+4. `OccCmsComponentAdapter.findComponentsByIds` が `GET .../cms/components?fields=DEFAULT&currentPage=0&pageSize=N&componentIds=a,b,c` を組み立てる(`core/src/occ/adapters/cms/occ-cms-component.adapter.ts:51-78`)。`pageContext` が商品ページなら `productCode=`、カテゴリなら `categoryCode=`、カタログなら `catalogCode=` が付く(`:132-152`)。これが 7 章で観測した `cms/components?productCode=300938` の形である。
 5. 応答の `component[]` を 1 件ずつ `LoadCmsComponentSuccess` にし、**要求したのに返ってこなかった uid は `LoadCmsComponentFail`** にする(`components.effect.ts:80-103`)。reducer が `component` を書き、`pageContext[context]` を `success` / `error` にする(`components.reducer.ts:56-70, 41-55`)。
 6. セレクタが本体(または `null`)を流し、`data$` が値を出す。
 
-`withdrawOn(contextChange$)` が付いているので(`:63`)、応答待ちの間に言語変更・ログイン・ログアウトが起きると**その要求は捨てられる**(`:33-39`)。12 章のメタリデューサがストアも消すので、新しい言語で `cms/pages` からやり直しになる。
+`withdrawOn(contextChange$)` が付いているので(`:63`)、応答待ちの間に言語変更・ログイン・ログアウトが起きると**その要求は捨てられる**(`:33-39`)。6 章のメタリデューサがストアも消すので、新しい言語で `cms/pages` からやり直しになる。
 
 ### 7-d もう 1 本の経路: ナビゲーションの子項目
 
 `getList` を呼ぶのは `ComponentsEffects` と `NavigationEntryItemEffects` の 2 箇所だけである(`grep "\.getList(" core-libs/core/src/cms`)。後者は `NavigationComponent` が `data$`(`CMSNavigationComponent` 本体)を購読したあと、`navigationNode.entries[].itemId` のうち `itemSuperType === 'AbstractCMSComponent'` のものを集めて `cmsService.loadNavigationItems` を呼ぶことで始まる(`storefront/cms-components/navigation/navigation/navigation.component.ts:24-26`, `navigation.service.ts:45-87, 95-118`)。エフェクトは**ナビゲーションノード 1 本につき 1 回** `getList` を呼ぶ(`core/src/cms/store/effects/navigation-entry-item.effect.ts:35-63, 83-102`)。
 
-13 章のデモ実測でホーム初回に `cms/components` が 2 本(26 件 + 8 件)飛んだのはこの経路である。ホームの 33 コンポーネントは全件同梱されていて 7-c は起きない。2 本はそれぞれ 1 つのナビゲーションコンポーネント(ヘッダのカテゴリナビ、フッタのナビ)が持つリンク項目の取得で、要求されているのは `CMSLinkComponent` の uid 群である。**つまりバックエンドで「ナビゲーションノードに大量のリンクを足す」と、ページ応答は変わらず `cms/components` の `componentIds` が増える**。
+7 章のデモ実測でホーム初回に `cms/components` が 2 本(26 件 + 8 件)飛んだのはこの経路である。ホームの 33 コンポーネントは全件同梱されていて 7-c は起きない。2 本はそれぞれ 1 つのナビゲーションコンポーネント(ヘッダのカテゴリナビ、フッタのナビ)が持つリンク項目の取得で、要求されているのは `CMSLinkComponent` の uid 群である。**つまりバックエンドで「ナビゲーションノードに大量のリンクを足す」と、ページ応答は変わらず `cms/components` の `componentIds` が増える**。
 
-## 14.9 段階 8: `async` パイプが購読し、変更検知が描く
+## 4.9 段階 8: `async` パイプが購読し、変更検知が描く
 
 `ParagraphComponent` のテンプレートは次の形である(`storefront/cms-components/content/paragraph/paragraph.component.html:1-4`)。
 
@@ -256,9 +258,9 @@ return using(() => loading$.subscribe(), () => component$).pipe(shareReplay({buf
 
 最後に `cxOutletDefer` の `(loaded)` が `PageSlotComponent.isLoaded(true)` を呼び、`pending` を 1 減らす(`page-slot.component.html:12`, `page-slot.component.ts:183-188`)。0 になると `cx-pending` が外れる。注意点として、`loaded` は `OutletDirective` が `build()` した時点、つまり**ラッパー生成時に emit される**(`outlet.directive.ts:111-114`)。`data$` の到着ではない。「`cx-pending` が外れた = データが来た」ではない。
 
-## 14.10 時間軸でまとめる
+## 4.10 時間軸でまとめる
 
-デモのホーム初回(CSR、13 章の①)を、この章の段階に当てはめると次のようになる。
+デモのホーム初回(CSR、7 章の①)を、この章の段階に当てはめると次のようになる。
 
 ```
 t0   GET cms/pages 応答(73KB、33 コンポーネント同梱)
@@ -269,24 +271,24 @@ t0+  段階 1 正規化 → 段階 2 ストア格納(33 件 success)            
      段階 7-b: 33 件とも data$ が同期で値 → 段階 8: 同じ変更検知で描画           HTTP なし
 t1   段階 7-d: NavigationComponent ×2 が子項目を要求 → GET cms/components ×2(26 件 + 8 件)
 t1+  段階 3(コンポーネント単位): ProductCarouselComponent の data$ から productCodes
-     → ProductService → GET products/search?filters=code:...(13 章の階層 3)
+     → ProductService → GET products/search?filters=code:...(7 章の階層 3)
 ```
 
 `cms/pages` の応答から最初の描画まで OCC への通信は 1 本も無い。`cms/components` が飛ぶのは、同梱されなかった uid を誰かが購読したときと、ナビゲーションの子項目だけである。
 
-## 14.11 バックエンド担当者にとっての意味
+## 4.11 バックエンド担当者にとっての意味
 
 | 観点 | この章からわかること | 根拠 |
 |---|---|---|
-| 追加 API は要るか | カスタムコンポーネントを普通にスロットへ置けば `cms/pages` に同梱され、`cms/components` も追加の API も要らない。描画は同期 | 14.3, 14.8 7-b |
-| `flexType` の意味 | マッピング表のキーは `typeCode`(`CMSFlexComponent` だけ `flexType` 属性)。フロントに `provideConfig` が無い型は、本番では黙って空になる | 14.2, 14.7 |
-| `properties` | SmartEdit 用。`data$` には入らないので業務値を入れても届かない | 14.2 |
-| コンテキスト共有 | コンテンツページ間では同じ uid の本体が共有される。商品ページは商品コードごと。商品に依存する内容を持つコンポーネントは商品ページに置くこと | 14.3, 14.8 7-c |
-| ナビゲーション | ナビゲーションノードのリンクは `cms/pages` ではなく `cms/components?componentIds=` で来る。リンク数がそのまま `componentIds` の長さになる | 14.8 7-d |
-| 失敗の範囲 | guards / 遅延モジュール / 翻訳の失敗はページ全体(遷移中止)。コンポーネントデータの欠落はそのコンポーネントだけ空 | 14.4, 14.9 |
-| 遅延描画 | 既定では遅延しない。`deferLoading: DEFER` を設定した型だけ画面に入るまでラッパーも作られず、`data$` の購読も起きない。業務データの API もそれまで飛ばない | 14.6 |
-| 言語変更中 | 応答待ちの `cms/components` は捨てられ、ストアごと消えて `cms/pages` からやり直す | 14.8 7-c, 12 章 |
+| 追加 API は要るか | カスタムコンポーネントを普通にスロットへ置けば `cms/pages` に同梱され、`cms/components` も追加の API も要らない。描画は同期 | 4.3, 4.8 7-b |
+| `flexType` の意味 | マッピング表のキーは `typeCode`(`CMSFlexComponent` だけ `flexType` 属性)。フロントに `provideConfig` が無い型は、本番では黙って空になる | 4.2, 4.7 |
+| `properties` | SmartEdit 用。`data$` には入らないので業務値を入れても届かない | 4.2 |
+| コンテキスト共有 | コンテンツページ間では同じ uid の本体が共有される。商品ページは商品コードごと。商品に依存する内容を持つコンポーネントは商品ページに置くこと | 4.3, 4.8 7-c |
+| ナビゲーション | ナビゲーションノードのリンクは `cms/pages` ではなく `cms/components?componentIds=` で来る。リンク数がそのまま `componentIds` の長さになる | 4.8 7-d |
+| 失敗の範囲 | guards / 遅延モジュール / 翻訳の失敗はページ全体(遷移中止)。コンポーネントデータの欠落はそのコンポーネントだけ空 | 4.4, 4.9 |
+| 遅延描画 | 既定では遅延しない。`deferLoading: DEFER` を設定した型だけ画面に入るまでラッパーも作られず、`data$` の購読も起きない。業務データの API もそれまで飛ばない | 4.6 |
+| 言語変更中 | 応答待ちの `cms/components` は捨てられ、ストアごと消えて `cms/pages` からやり直す | 4.8 7-c, 6 章 |
 
 ---
 
-[目次](README.md) | ← [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md) | [15. API の形と State の形はなぜ違うのか](15-api-to-state.md) →
+[目次](README.md) | ← [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) | [5. API の形と State の形はなぜ違うのか: Normalizer / Effect / Reducer の 3 層による作り変え](05-api-to-state.md) →

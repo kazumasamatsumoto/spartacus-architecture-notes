@@ -1,13 +1,15 @@
-# 4. なぜデモサイトの API 呼び出しが少ないのか
+# 8. なぜデモサイトの API 呼び出しが少ないのか
 
 > **図**: 07 API 呼び出しを減らす仕組み(`diagrams/spartacus-architecture.drawio`)。ページ取得 / コンポーネントデータ / 業務データの 3 系統で、HTTP が飛ぶ前に通る 16 個の「止め弁」
 
 ![07 API 呼び出しを減らす仕組み](diagrams/page7.png)
 
 > **この章が答える問い**: なぜデモサイトの API 呼び出しが少ないのか。HTTP が飛ぶ前にどこで止まるか(②)
+>
+> **位置づけ**: 3〜7 章のまとめ。HTTP が飛ぶ前にどこで止まるかを 16 個の止め弁として一覧にする
 
 
-### 4.1 実測(Chrome, 2026-10-23, OPTIONS プリフライト除外)
+### 8.1 実測(Chrome, 2026-10-23, OPTIONS プリフライト除外)
 
 **ホーム初回ロード** `/electronics-spa/en/USD/`
 
@@ -40,7 +42,7 @@ basesites / languages / currencies / carts / consenttemplates は**再取得さ�
 
 デモは `<title>Csr</title>` の空シェル HTML(`<app-root>` が空、`cx-state` スクリプトなし)を配信しており、SSR ではない。したがって以下はすべて**クライアント側の設計**による削減である。
 
-### 4.2 削減メカニズム(ソース根拠)
+### 8.2 削減メカニズム(ソース根拠)
 
 | # | メカニズム | 根拠 |
 |---|---|---|
@@ -62,4 +64,4 @@ basesites / languages / currencies / carts / consenttemplates は**再取得さ�
 
 ---
 
-[目次](README.md) | ← [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) | [5. バックエンドでカスタム CMS コンポーネントを作るとき、フロントへ渡す仕様](05-custom-cms-component-spec.md) →
+[目次](README.md) | ← [7. 呼び出しの 4 階層と「毎回」「初回」の違い](07-call-tiers.md) | [9. OCC リソース一覧: カスタムをどのリソースの中で考えるか](09-occ-resource-catalog.md) →

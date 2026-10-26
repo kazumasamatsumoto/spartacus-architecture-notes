@@ -1,15 +1,17 @@
-# 7. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方
+# 15. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方
 
 > **図**: 03 カスタムコンポーネントのデータ経路(`diagrams/spartacus-architecture.drawio`)。本章が扱うのは右の経路 B(Facade → Query/Store → Connector → Adapter → Normalizer → OCC)
 
 ![03 カスタムコンポーネントのデータ経路](diagrams/page3.png)
 
 > **この章が答える問い**: 業務データを表示するコンポーネントでは、フロントに何を追加で作らせるのか(Facade / Connector / Adapter)
+>
+> **位置づけ**: 第 IV 部。10〜12 章で決めた内容をフロントで実装する雛形一式
 
 
-5 章は「CMS 属性だけで完結するコンポーネント」だった。商品・在庫・会員情報・外部システムのデータなど**バックオフィスで編集しない動的データ**を表示するコンポーネントでは、Spartacus の階層に沿ってフロント側に 5〜6 ファイルを追加する。図は `docs/diagrams/spartacus-architecture.drawio` の「03 カスタムコンポーネントのデータ経路」。
+11 章は「CMS 属性だけで完結するコンポーネント」だった。商品・在庫・会員情報・外部システムのデータなど**バックオフィスで編集しない動的データ**を表示するコンポーネントでは、Spartacus の階層に沿ってフロント側に 5〜6 ファイルを追加する。図は `docs/diagrams/spartacus-architecture.drawio` の「03 カスタムコンポーネントのデータ経路」。
 
-### 7.1 原則(リポジトリ同梱ガイド)
+### 15.1 原則(リポジトリ同梱ガイド)
 
 `spartacus/core-libs/skills/skills/spartacus-developer/references/backend-communication.md:5-16`
 > NEVER inject `HttpClient` in components or services. All backend communication goes through a layered pipeline: `Component → Facade → state layer → Connector → Adapter → Converter`. … Only **Adapters** use `HttpClient`.
@@ -17,7 +19,7 @@
 
 同 `:20`: 「NEVER hardcode endpoint URLs. Configure them via `provideConfig`」。
 
-### 7.2 各層の実物(`feature-libs/user/account` を例に)
+### 15.2 各層の実物(`feature-libs/user/account` を例に)
 
 標準ライブラリは 1 機能を `root` / `core` / `occ` / `components` の 4 エントリポイントに分ける(`spartacus/tsconfig.json:49-64` のパスマッピング、各ディレクトリの `ng-package.json`)。
 
@@ -160,7 +162,7 @@ export class UserAccountOccModule {}
 
 **コンポーネントから使う** `components/login/login.component.ts:34-54` は `UserAccountFacade` を注入し `this.userAccount.get()` を購読するだけ。
 
-### 7.3 HTTP リクエストに自動で付くもの(バックエンドが前提にできること)
+### 15.3 HTTP リクエストに自動で付くもの(バックエンドが前提にできること)
 
 `OccEndpointsService.buildUrl` で作った URL(= OCC の baseUrl 配下)に対してのみ、インターセプタが次を付与する。手組みの URL には付かない。
 
@@ -173,7 +175,7 @@ export class UserAccountOccModule {}
 
 エラー応答は OCC 標準の `{ "errors": [ { "type", "message", "reason", "subject", "subjectType" } ] }` が期待されている(`core-libs/core/src/util/try-normalize-http-error.ts:36-50` が `error.error.errors` 配列を `HttpErrorModel.details` に写す。DTO 型は `occ.models.ts:104-125` の `Occ.ErrorModel`)。
 
-### 7.4 カスタム機能で追加するファイル一覧(雛形)
+### 15.4 カスタム機能で追加するファイル一覧(雛形)
 
 ```
 my-promo/
@@ -214,9 +216,9 @@ export class MyPromoBannerComponent {
   );
 }
 ```
-これは `ProductCarouselComponent` が `productCodes` を読んで `ProductSearchByCodeService.get` を呼ぶのと同じ形(5.6)。
+これは `ProductCarouselComponent` が `productCodes` を読んで `ProductSearchByCodeService.get` を呼ぶのと同じ形(11.6)。
 
 
 ---
 
-[目次](README.md) | ← [6. バックエンド側のチェックリスト](06-backend-checklist.md) | [8. バックエンド(Java)側: 何を、どの単位で返すか](08-backend-api-granularity.md) →
+[目次](README.md) | ← [14. バックエンド側のチェックリスト](14-backend-checklist.md) | [付録](appendix.md) →

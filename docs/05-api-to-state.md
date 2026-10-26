@@ -1,12 +1,14 @@
-# 15. API の形と State の形はなぜ違うのか: Normalizer / Effect / Reducer の 3 層による作り変え
+# 5. API の形と State の形はなぜ違うのか: Normalizer / Effect / Reducer の 3 層による作り変え
 
 > **図**: 13 API の形 → State の形: 3 層の作り変え(`diagrams/spartacus-architecture.drawio`)。左: `cms/pages` の JSON が Normalizer → Effect → Reducer を通って `cms` ステートになるまでの 5 段。右: 「State で見える違い」ごとに API 側の形 / State 側の形 / 作っている場所 / 変えたいときの入口
 
 ![13 API の形 → State の形: 3 層の作り変え](diagrams/page13.png)
 
 > **この章が答える問い**: Redux DevTools で見える `cms` ステートの形(`page` / `components` / `navigation` の 3 テーブル、`entities[uid]` の辞書、`pageContext` のフラグ)は `cms/pages` の JSON と一致しない。この差はどのロジックが、どの順で作っているのか(①③)
+>
+> **位置づけ**: 4 章の段階 1〜2(正規化とストア格納)の拡大。API の JSON が State の形になるまで
 
-14 章で、`cms/pages` に同梱されたコンポーネント本体が `cms.page` ではなく `cms.components` に入ることを見た。この章はその一歩手前、「API の JSON がどこで State の形に作り変えられるか」だけを扱う。結論から書くと、変換は 1 箇所ではなく **3 つの層に分かれており、層ごとに担当する違いが決まっている**。
+4 章で、`cms/pages` に同梱されたコンポーネント本体が `cms.page` ではなく `cms.components` に入ることを見た。この章はその一歩手前、「API の JSON がどこで State の形に作り変えられるか」だけを扱う。結論から書くと、変換は 1 箇所ではなく **3 つの層に分かれており、層ごとに担当する違いが決まっている**。
 
 | 層 | 場所 | 担当する変換 |
 |---|---|---|
@@ -14,7 +16,7 @@
 | 2 Effect | NgRx Effect(`PageEffects`) | 1 つの応答を **2〜3 個のアクションに分割**し、`pageContext` という API に無い情報を添える |
 | 3 Reducer | NgRx Reducer(`entityReducer` + 各 reducer) | 配列を **`entities[id]` の辞書**に。`loading / success / error / value` のフラグを付ける。`navigation` は `uid_AbstractCMSComponent` キーの辞書に畳む |
 
-## 15.1 入力: `cms/pages` の JSON の形
+## 5.1 入力: `cms/pages` の JSON の形
 
 OCC の応答型は `Occ.CMSPage`(`core-libs/core/src/occ/occ-models/occ.models.ts:334-`)。構造は入れ子で、**スロットの中にコンポーネント本体が埋まっている**。
 
@@ -37,7 +39,7 @@ Occ.CMSPage {
 
 バックエンド側の `cmsocc` はページ・スロット・コンポーネントを 1 本の木として返す。Spartacus の State はこの木をそのまま持たない。
 
-## 15.2 層 1: Normalizer。JSON を `{page, components}` に引き剥がす
+## 5.2 層 1: Normalizer。JSON を `{page, components}` に引き剥がす
 
 ### どこで呼ばれるか
 
@@ -61,7 +63,7 @@ Occ.CMSPage {
 
 3 と 4 が同じコンポーネント配列を 2 回なめていることが、State で「配置(`page.slots`)」と「本体(`components`)」が別テーブルになる起点である。ソースコメントにも `we don't put properties into component state`(:184)とあり、`properties` を本体から外すのは意図的である。
 
-## 15.3 層 2: Effect。1 つの応答を複数アクションに割り、`pageContext` を添える
+## 5.3 層 2: Effect。1 つの応答を複数アクションに割り、`pageContext` を添える
 
 `PageEffects.loadPageData$` は `CmsStructureModel` を受け取り、`components` と `page` を**別々のアクション**にして一度に dispatch する(`cms/store/effects/page.effect.ts:62-78`)。
 
@@ -70,9 +72,9 @@ CmsGetComponentFromPage( components.map(c => ({ component: c, pageContext })) ) 
 LoadCmsPageDataSuccess( pageContext, page )                                        // :75-78
 ```
 
-ここで各コンポーネントに `pageContext`(`{type, id}`)が添えられる。これは**API には存在しない情報**で、「このコンポーネントはどのページ種別・ID の問い合わせで取れたか」を State に残すためのものである。14 章の `pageContext["ContentPage"]` キーの材料はここで生まれる。
+ここで各コンポーネントに `pageContext`(`{type, id}`)が添えられる。これは**API には存在しない情報**で、「このコンポーネントはどのページ種別・ID の問い合わせで取れたか」を State に残すためのものである。4 章の `pageContext["ContentPage"]` キーの材料はここで生まれる。
 
-## 15.4 層 3: Reducer。配列を `entities[id]` の辞書にし、フラグを付ける
+## 5.4 層 3: Reducer。配列を `entities[id]` の辞書にし、フラグを付ける
 
 ### 共通部品: `entityReducer` と `loaderReducer`
 
@@ -92,15 +94,15 @@ LoadCmsPageDataSuccess( pageContext, page )                                     
 
 `components.entities[uid].pageContext[key].value` が `true/false` なのは、`componentExistsReducer` が「そのコンテキストでコンポーネントが存在したか」を `LoaderState` の `value` に入れているからである(`components.reducer.ts:18-30`)。
 
-## 15.5 `cms/components` と `cms/navigation` 経路ではどうか
+## 5.5 `cms/components` と `cms/navigation` 経路ではどうか
 
 `cms/components` の応答は `OccCmsComponentAdapter.findComponentsByIds` が `this.converter.pipeableMany(CMS_COMPONENT_NORMALIZER)` を通す(`occ/adapters/cms/occ-cms-component.adapter.ts:75`)。ただし **`CMS_COMPONENT_NORMALIZER` に既定の converter は 1 つも登録されていない**(リポジトリ全体を `provide: CMS_COMPONENT_NORMALIZER` で検索して 0 件)。`pipeable` は converter 無しなら素通しなので、`cms/components` の本体は **API の形のまま**ストアに入る。層 1 が実質無く、層 2(`ComponentsEffects` が uid ごとに `LoadCmsComponentSuccess` に割り、`pageContext` を添える。`components.effect.ts:80-91`)と層 3 だけで形ができる。
 
 `cms/pages` 同梱分との違いはここに出る。同梱分は Normalizer で `properties` を落とされるが、`cms/components` で取った本体は落とされない。State 上で両者の形が揃っているように見えるのは、OCC 側が `cms/components` の既定 `fields=DEFAULT` で `properties` を返さないためであり、Spartacus 側が揃えているわけではない。
 
-ナビゲーションは `NavigationEntryItemEffects` が同じ `getList` を呼び(`navigation-entry-item.effect.ts:35-63`)、結果を `LoadCmsNavigationItemsSuccess({nodeId, components})` に包む。層 3 で `nodeId` キーの下に `uid_AbstractCMSComponent` の辞書ができる(15.4 の表)。
+ナビゲーションは `NavigationEntryItemEffects` が同じ `getList` を呼び(`navigation-entry-item.effect.ts:35-63`)、結果を `LoadCmsNavigationItemsSuccess({nodeId, components})` に包む。層 3 で `nodeId` キーの下に `uid_AbstractCMSComponent` の辞書ができる(5.4 の表)。
 
-## 15.6 対応表: State で見える違いはどの層が作るか
+## 5.6 対応表: State で見える違いはどの層が作るか
 
 | State で見える違い | API 側 | State 側 | 作っている場所 |
 |---|---|---|---|
@@ -117,13 +119,13 @@ LoadCmsPageDataSuccess( pageContext, page )                                     
 | `page.index` のラベル → pageId 索引 | 無い | 有る | 層 3 `page-index.reducer` |
 | `navigation` の `uid_AbstractCMSComponent` キー | 配列 | 辞書 | 層 3 `navigation-entry-item.reducer` |
 
-## 15.7 バックエンド担当者にとっての意味
+## 5.7 バックエンド担当者にとっての意味
 
 - **State の形を前提にした議論は Normalizer の出力を前提にしている**。フロントの担当者が「`data$` に届く形」と言うとき、それは `cms/components` の本体、または `cms/pages` 同梱本体から `properties` を除いたものである。API の JSON をそのまま渡しても一致しない項目(`properties`、入れ子のスロット)がある。
 - **形を変えたいときの入口は `CMS_PAGE_NORMALIZER`**。`provideConfig` ではなく `{ provide: CMS_PAGE_NORMALIZER, useClass: MyNormalizer, multi: true }` を追加すると、既定の `OccCmsPageNormalizer` の後に同じ `target` を受け取って書き足せる(`converter.service.ts:130-136`)。reducer や Effect には手を入れない。`cms/components` 側は `CMS_COMPONENT_NORMALIZER` に登録すれば同様に差し込める(既定は空)。
-- **API に項目を足すときは、層 1 で落とされる場所を避ける**。コンポーネントの `properties` に業務値を入れても State に届かない(14 章 14.11 と同じ結論だが、落としているのがこの関数であると特定できた)。コンポーネントのトップレベル属性なら素通しで `components.entities[uid].component` に入る。
+- **API に項目を足すときは、層 1 で落とされる場所を避ける**。コンポーネントの `properties` に業務値を入れても State に届かない(4 章 4.11 と同じ結論だが、落としているのがこの関数であると特定できた)。コンポーネントのトップレベル属性なら素通しで `components.entities[uid].component` に入る。
 - **DevTools での読み方**。`page.pageData` は Normalizer 出力そのもの、`components` は「本体 + Effect が添えた `pageContext` + Reducer のフラグ」、`page.index` は Reducer が作った索引、と層で分けて読むと API との対応が取れる。
 
 ---
 
-[目次](README.md) | ← [14. cms/pages 応答からコンポーネント描画まで](14-page-to-component.md) | [付録](appendix.md) →
+[目次](README.md) | ← [4. `cms/pages` 応答からコンポーネント描画まで: `async` パイプが値を出すまでに何が起きているか](04-page-to-component.md) | [6. アプリケーションのライフサイクル: index.html 取得から永続化まで](06-application-lifecycle.md) →

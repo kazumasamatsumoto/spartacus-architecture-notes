@@ -1,13 +1,15 @@
-# 5. バックエンドでカスタム CMS コンポーネントを作るとき、フロントへ渡す仕様
+# 11. バックエンドでカスタム CMS コンポーネントを作るとき、フロントへ渡す仕様
 
-> **図**: 03 カスタムコンポーネントのデータ経路(`diagrams/spartacus-architecture.drawio`)。本章が扱うのは左の経路 A(CMS 属性)。経路 B(業務データ)は 7 章
+> **図**: 03 カスタムコンポーネントのデータ経路(`diagrams/spartacus-architecture.drawio`)。本章が扱うのは左の経路 A(CMS 属性)。経路 B(業務データ)は 15 章
 
 ![03 カスタムコンポーネントのデータ経路](diagrams/page3.png)
 
 > **この章が答える問い**: バックエンドでカスタム CMS コンポーネントを作ったとき、フロントに何を渡せば表示されるか(①→依頼書)
+>
+> **位置づけ**: 9〜10 章を踏まえて、CMS コンポーネントを 1 つ作るとき依頼書に何を書くか
 
 
-### 5.1 鍵になる 3 つの値
+### 11.1 鍵になる 3 つの値
 
 | 値 | バックエンドでの定義 | フロントでの使われ方 |
 |---|---|---|
@@ -17,7 +19,7 @@
 
 新しい ItemType を作る(= typeCode が新しい)のであれば、フロントに新しいマッピングが必要。**既存 typeCode のインスタンスを増やすだけなら、フロント作業は不要**(例: `SimpleResponsiveBannerComponent` をもう 1 つ置く)。
 
-### 5.2 OCC が返す JSON の形(デモ実物)
+### 11.2 OCC が返す JSON の形(デモ実物)
 
 `GET .../cms/pages` 内の 1 コンポーネント(`CMSParagraphComponent`):
 ```json
@@ -81,9 +83,9 @@ export interface CmsProductCarouselComponent extends CmsComponent {
   scroll?: string;
 }
 ```
-**注意点**: OCC の CMS コンポーネント DTO は属性を文字列化する(`"container": "false"`、`productCodes` はスペース区切り)。真偽値・複数値・参照(商品コード、メディア)をどう表現するかを依頼書に明記すること。メディアは `media: { desktop:{url,altText,mime,code}, tablet, mobile, widescreen }` 形式(`cms.model.ts:99-117`、5.2 冒頭のバナー JSON 参照)。
+**注意点**: OCC の CMS コンポーネント DTO は属性を文字列化する(`"container": "false"`、`productCodes` はスペース区切り)。真偽値・複数値・参照(商品コード、メディア)をどう表現するかを依頼書に明記すること。メディアは `media: { desktop:{url,altText,mime,code}, tablet, mobile, widescreen }` 形式(`cms.model.ts:99-117`、11.2 冒頭のバナー JSON 参照)。
 
-### 5.3 フロント側の実装雛形(Angular)
+### 11.3 フロント側の実装雛形(Angular)
 
 リポジトリの既存コンポーネントと同じ書き方。例: 段落(`spartacus/core-libs/storefront/cms-components/content/paragraph/`)。
 
@@ -160,7 +162,7 @@ provideConfig(<CmsConfig>{
 ```
 この場合、`cmsComponents` マッピング自体は遅延モジュール側の `providers` に置く(`cms-features.service.ts:188-204` が遅延モジュールの `ConfigChunk` を読む)。ページにその typeCode が現れたときだけチャンクがロードされる(`cms-page-guard.service.ts:71-74` の `determineMappings`)。
 
-### 5.4 マッピングで指定できるオプション
+### 11.4 マッピングで指定できるオプション
 
 `spartacus/core-libs/core/src/cms/config/cms-config.ts:60-93`
 ```ts
@@ -186,7 +188,7 @@ export interface CmsComponentMapping<T = CmsComponent> {
 | `deferLoading` | ビューポート外でも即描画(`INSTANT`) | `anonymous-consent-management.module.ts:31-42` |
 | `i18nKeys` / `disableSSR` | 翻訳チャンク / SSR では描画しない | 型定義のみ。標準ライブラリ内に使用例なし |
 
-### 5.5 新しいスロットやページテンプレートを作る場合
+### 11.5 新しいスロットやページテンプレートを作る場合
 
 バックエンドで**新しいページテンプレートやスロット位置**を定義した場合、フロントの `LayoutConfig.layoutSlots` に追加しないとそのスロットは描画されない(3.5)。依頼書にテンプレート名とスロット位置名、望む描画順を書くこと。
 ```ts
@@ -200,7 +202,7 @@ provideConfig(<LayoutConfig>{
 ```
 型: `spartacus/core-libs/storefront/layout/config/layout-config.ts:36-61, 94-102`。既存テンプレートに既存スロットを使い回すなら設定変更は不要。
 
-### 5.6 コンポーネントが追加データを必要とする場合
+### 11.6 コンポーネントが追加データを必要とする場合
 
 CMS 属性に「商品コード」「カテゴリコード」のような参照だけを持たせ、実体はフロントが Facade 経由で取りに行くのが標準パターン。商品カルーセルの実装(`spartacus/core-libs/storefront/cms-components/product/carousel/product-carousel/product-carousel.component.ts:69-83`):
 ```ts
@@ -220,9 +222,9 @@ CMS 属性に「商品コード」「カテゴリコード」のような参照�
       })
     );
 ```
-`ProductSearchByCodeService.get` はストアに無いときだけロードを dispatch し(`product-search-by-code.service.ts:46-53`)、Effect が同時要求をまとめて `products/search?filters=code:...` 1 本にする(4.2 (h))。**バックエンドが CMS 属性に商品データをコピーして持つ必要はない**。逆に、OCC に無い情報が必要なら「商品 API 側の拡張」か「CMS 属性として持たせる」かを依頼書で決める。
+`ProductSearchByCodeService.get` はストアに無いときだけロードを dispatch し(`product-search-by-code.service.ts:46-53`)、Effect が同時要求をまとめて `products/search?filters=code:...` 1 本にする(8.2 (h))。**バックエンドが CMS 属性に商品データをコピーして持つ必要はない**。逆に、OCC に無い情報が必要なら「商品 API 側の拡張」か「CMS 属性として持たせる」かを依頼書で決める。
 
-### 5.7 既存コンポーネントの差し替え・部分差し替え
+### 11.7 既存コンポーネントの差し替え・部分差し替え
 
 - **同じ typeCode に別コンポーネントを `provideConfig` で上書き**: アプリ側の設定が標準ライブラリの `provideDefaultConfig` より優先される(`cms-components.service.ts:126-133` の `deepMerge(featureMapping, staticConfig)` でアプリ設定が後勝ち)。バックエンド変更は不要。
 - **アウトレット**で既存レイアウトの前後に差し込む(`provideOutlet({ id: 'AddToCart', position: OutletPosition.AFTER, component })`)。スロット内の各コンポーネントは `flexType` 名のアウトレットに包まれている(3.6)。
@@ -230,7 +232,7 @@ CMS 属性に「商品コード」「カテゴリコード」のような参照�
 
 使い分けはリポジトリ同梱の `spartacus/core-libs/skills/skills/spartacus-developer/references/placement-mechanisms.md` にも整理されている。
 
-### 5.8 「FE への依頼書」に書くべき項目
+### 11.8 「FE への依頼書」に書くべき項目
 
 1. **typeCode**(ItemType 名)。`CMSFlexComponent` 流用なら `flexType` の値
 2. **OCC が返す属性の一覧**: 名前 / 型(すべて文字列化される点に注意) / 必須か / 例。真偽値・列挙・複数値・参照・メディア・ローカライズ属性の表現方法
@@ -244,4 +246,4 @@ CMS 属性に「商品コード」「カテゴリコード」のような参照�
 
 ---
 
-[目次](README.md) | ← [4. なぜデモサイトの API 呼び出しが少ないのか](04-why-few-api-calls.md) | [6. バックエンド側のチェックリスト](06-backend-checklist.md) →
+[目次](README.md) | ← [10. フロント側の呼び出し方法はリソースごとに違うのか](10-frontend-call-patterns.md) | [12. バックエンド(Java)側: 何を、どの単位で返すか](12-backend-api-granularity.md) →

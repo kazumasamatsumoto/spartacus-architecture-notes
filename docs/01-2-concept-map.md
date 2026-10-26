@@ -21,7 +21,7 @@
 | **NgRx Store / Action / Effect / Reducer / Selector** | 単一ストア。Action を dispatch → Effect が HTTP → Success Action → Reducer が状態更新 → Selector で読む | `cms-store.module.ts:33-45`(`StoreModule.forFeature('cms')`)、`page.effect.ts`、`components.reducer.ts`、`components.selectors.ts` |
 | **Facade** (Spartacus の慣習) | コンポーネントは Store を直接触らず Service 経由 | `CmsService`(`cms.service.ts:33-46`)、`ProductService`、`ProductSearchByCodeService` |
 | **Router / Route / Guard** | URL → コンポーネント。`canActivate` ガードで遷移前処理 | `'**'` ルート + `CmsPageGuard`(3.1)。`@ngrx/router-store` でルーター状態もストアへ(`routing.module.ts:73-108`) |
-| **Lazy loading `() => import()`** | 必要になった時にチャンクをダウンロード | `featureModules[...].module: () => import(...)`(5.3 (4)) |
+| **Lazy loading `() => import()`** | 必要になった時にチャンクをダウンロード | `featureModules[...].module: () => import(...)`(11.3 (4)) |
 | **APP_INITIALIZER** | 起動時に 1 回走る初期化フック | `'**'` ルート追加(`cms-route.module.ts:10-20`)、設定ルート適用、アウトレット登録 |
 | **SSR / TransferState** | サーバで HTML を描画し、取得済みデータを HTML に埋めてブラウザへ渡す | `core-libs/setup/ssr/`、`transfer-state.reducer.ts:16`(`makeStateKey('cx-state')`) |
 | **Angular CLI / schematics** | `ng add` などのコード生成 | `core-libs/schematics/src/add-spartacus/`(1.3) |

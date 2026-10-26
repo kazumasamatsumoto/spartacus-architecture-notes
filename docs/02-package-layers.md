@@ -5,6 +5,8 @@
 ![02 レイヤ構成](diagrams/page2.png)
 
 > **この章が答える問い**: Spartacus のコードはどのパッケージに分かれ、依存はどちら向きか
+>
+> **位置づけ**: 第 I 部 前提。3 章以降で出てくる `@spartacus/core` / `@spartacus/storefront` / 機能ライブラリの位置関係を先に押さえる
 
 
 | パッケージ(npm 名) | リポジトリ内の場所 | 役割 |
@@ -24,4 +26,4 @@
 
 ---
 
-[目次](README.md) | ← [1.9 コンポーネントの書き方(標準ライブラリの実例)](01-9-component-style.md) | [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) →
+[目次](README.md) | ← [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md) | [3. 全体像: URL からコンポーネント描画まで](03-rendering-flow.md) →

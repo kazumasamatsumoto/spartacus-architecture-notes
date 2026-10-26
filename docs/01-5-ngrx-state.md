@@ -19,7 +19,7 @@ export interface LoaderState<T> {
 }
 ```
 - `entityLoaderReducer`(`entity-loader.reducer.ts:13-25`)が「ID ごとに loading/success/error を持つ」高階リデューサ。CMS の `LoadCmsComponent` は `EntityLoadAction` を継承(`components.action.ts:19, 28`)。
-- Facade はこのフラグを見て、未試行のときだけ dispatch する(`cms.service.ts:112-133`、4.2 (b))。これが Angular/NgRx レベルでの API 削減の実装。
+- Facade はこのフラグを見て、未試行のときだけ dispatch する(`cms.service.ts:112-133`、8.2 (b))。これが Angular/NgRx レベルでの API 削減の実装。
 - 言語変更・ログイン・ログアウト時は CMS スライスを丸ごとクリアして再取得(`cms/store/reducers/index.ts:75-90` の `clearCmsState`、`page.effect.ts:34-52`)。
 
 **SSR 時の状態転送**: サーバ側のメタリデューサが毎アクション後に設定済みスライスを `TransferState` のキー `'cx-state'` に書き(`transfer-state.reducer.ts:16, 51-61`)、ブラウザ側は NgRx `INIT` 時に読み戻して初期状態へ `deepMerge` する(同 `:74-95`、未ログイン時のみ)。転送対象は `cms`, `product`, `siteContext`, `siteTheme` の 4 スライス(各 `*-store.module.ts` の `ssrTransfer.keys`)。デモは CSR なのでこの経路は使われていない。

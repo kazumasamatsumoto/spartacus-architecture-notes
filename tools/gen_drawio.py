@@ -152,7 +152,7 @@ gH=d5.group("ヘッドレス: JSON は cms/pages が一律に返し、描画は 
 h_a=d5.box("自動: ItemType 属性が cms/pages / cms/components の JSON に出る\n(コントローラ不要)", 580, 220, 500, 70, *GREEN)
 h_b1=d5.box("B-1 フロントが資源 API で再計算\n例: productCodes → products/search?filters=code:...", 580, 315, 500, 60, *GREEN)
 h_b2=d5.box("B-2 バックエンドが構造化データを JSON に埋め込む\n例: navigationNode ツリー(葉は itemId の参照)\n→ 構造は埋め込み、実体は参照。全ユーザー共通・小さいものだけ", 1110, 290, 530, 80, *ORANGE)
-h_b3=d5.box("B-3 新しい資源 API(8 章)\nユーザー固有 / 大きい / 他画面でも使う / 高頻度更新", 1110, 390, 530, 60, *ORANGE)
+h_b3=d5.box("B-3 新しい資源 API(12 章)\nユーザー固有 / 大きい / 他画面でも使う / 高頻度更新", 1110, 390, 530, 60, *ORANGE)
 h_c=d5.box("フロントで生成: cxRoute + RoutingConfig、media.baseUrl 前置\nバックエンドは code / label / 相対メディアパスだけ返す", 580, 410, 500, 60, *GREEN)
 h_d=d5.box("Angular コンポーネントのテンプレート\n(リッチテキストだけは HTML 文字列を属性で返し innerHTML 表示)", 580, 505, 500, 60, *GREEN)
 h_e=d5.box("スロット構造 / composition.inner / entries 参照", 580, 600, 500, 60, *GREEN)
@@ -253,13 +253,13 @@ NA=("", ("#ffffff","#cccccc"))
 
 # ---------- 8. per-resource call patterns (ch.11) ----------
 d8=D("08 リソースごとの呼び出し方法の違い")
-d8.text("フロント側の呼び出し: 通信層は共通、状態層は 2 方式、リソース固有なのは「文脈」と「捨てる条件」(11 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
+d8.text("フロント側の呼び出し: 通信層は共通、状態層は 2 方式、リソース固有なのは「文脈」と「捨てる条件」(10 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
 gA=d8.group("A. 3 層に分けると、何が共通で何が違うか", 40, 70, 560, 760, "#f5f5f5", "#666666")
 paired(d8, 60, 110, [
  ("通信層\nConnector → Adapter →\nConverter → HttpClient", GREEN, "全リソース共通。URL は buildUrl(OCC アダプタ 75 中 74)、変換は pipeable(59)、lang / curr と Bearer はインターセプタが自動付与。違うのは設定値(URL テンプレート、Normalizer)だけ"),
  ("状態層\nFacade の中身", PURP, "2 方式のどちらか(機能ライブラリごとに固定)。NgRx: CMS・商品・サイト・カート本体・注文履歴・ユーザー配下・店舗・B2B 組織。Query / Command: ユーザー本体・チェックアウト・注文確定・見積・チケット・カート検証・在庫。SAP ガイド「既存に合わせよ」"),
  ("文脈と捨てる条件\nFacade の設計", BLUE, "リソースごとに違う。必要な ID(userId / cartId / PageContext / scope)、前提条件、再読込・破棄のきっかけ、バッチ化。右の表がその一覧"),
- ("コンポーネントから見た形", GREY, "どのリソースでも facade.get() が Observable<T> を返す。違いは Facade の内側だけ。カスタムリソースで決めるのは「方式」「文脈」「捨てる条件」「更新系」の 4 問(11.5)"),
+ ("コンポーネントから見た形", GREY, "どのリソースでも facade.get() が Observable<T> を返す。違いは Facade の内側だけ。カスタムリソースで決めるのは「方式」「文脈」「捨てる条件」「更新系」の 4 問(10.5)"),
 ], 190, 330, 150)
 d8.text("混在の例: 注文(履歴 = NgRx / 確定 = Command)、カート(本体 = NgRx / 検証 = Query)、商品(本体 = NgRx / 在庫 = Query)。境界はリソースではなく「機能ライブラリが書かれた時期」。", 60, 760, 520, 60, 11)
 gB=d8.group("B. リソースごとの文脈 / 捨てる条件 / バッチ(色: 灰 = サイト共通、青 = ユーザー固有、橙 = カート配下)", 640, 70, 980, 760, "#fff7e6", "#d79b00")
@@ -278,11 +278,11 @@ rows=[
  [("B2B 組織",GREY), NG, ("userId + 各 ID",BLUE), ("更新アクションで該当エンティティ再読込",YEL), ("なし",GREY)],
 ]
 yend=grid(d8, 660, 110, [("リソース",170),("方式",150),("文脈(必要な ID)",190),("捨てる・再読込する条件",270),("バッチ",140)], rows, h=50)
-d8.text("URL の階層(users/{userId}/carts/{cartId}/...)が、そのままフロントで必要な ID の数になる(10.4)。", 660, yend+4, 940, 30, 11)
+d8.text("URL の階層(users/{userId}/carts/{cartId}/...)が、そのままフロントで必要な ID の数になる(9.4)。", 660, yend+4, 940, 30, 11)
 
 # ---------- 9. application lifecycle (ch.12) ----------
 d9=D("09 アプリケーションのライフサイクル")
-d9.text("Spartacus アプリのライフサイクル: index.html 取得 → 起動 → 初期化 → ゲート → 描画 → 実行中イベント → SSR → 永続化(12 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
+d9.text("Spartacus アプリのライフサイクル: index.html 取得 → 起動 → 初期化 → ゲート → 描画 → 実行中イベント → SSR → 永続化(6 章)", 40, 20, 1500, 30, 16, "fontStyle=1;")
 gA=d9.group("A. 9 フェーズ: 何が起きるか", 40, 70, 700, 900, "#f5f5f5", "#666666")
 paired(d9, 60, 110, [
  ("0. HTML 取得", GREY, "index.html は <app-root> だけ(CSR)。meta occ-backend-base-url でビルド後に接続先を差し替え可能"),
@@ -316,15 +316,15 @@ d9.text("ゲート(3)を通るまで Router は動かないので、4 以降は�
 
 # ---------- 11. resource catalog (ch.10) ----------
 d11=D("11 OCC リソースの 3 層とカスタムの置き場所")
-d11.text("OCC リソースの 3 層(左)と、業務データ層の主なリソース・カスタムの置き場所(右)。10 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
+d11.text("OCC リソースの 3 層(左)と、業務データ層の主なリソース・カスタムの置き場所(右)。9 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
 gA=d11.group("A. リソースの 3 層(+ 別 Web サービス)とカスタムの置き場所", 40, 70, 600, 760, "#f5f5f5", "#666666")
 paired(d11, 60, 110, [
  ("A. サイト設定層\nbasesites / languages /\ncurrencies / countries / titles", GREY, "読み取り専用のマスタ。カスタムの対象になることはまれ(サイト固有の値は CMS 属性か別リソースへ)"),
  ("B. CMS 層\ncms/pages →\ncms/components/{uid}", BLUE, "AbstractCMSComponent の全サブタイプを返す汎用リソース。items.xml に型を足せば typeCode と属性が自動で返る。★ カスタム CMS コンポーネントはここに現れる。新しい URL は要らない"),
- ("C. 業務データ層\n商品 / ユーザー / カート /\n注文 / 店舗 / B2B 組織", GREEN, "コンポーネントが参照する「もの」(ItemType)。属性を足す = WsDTO + Populator 拡張 + fields。該当する型が無い概念だけが新リソース(8.3 の設計ルール)"),
+ ("C. 業務データ層\n商品 / ユーザー / カート /\n注文 / 店舗 / B2B 組織", GREEN, "コンポーネントが参照する「もの」(ItemType)。属性を足す = WsDTO + Populator 拡張 + fields。該当する型が無い概念だけが新リソース(12.3 の設計ルール)"),
  ("D. 別 Web サービス\nASM / punchout /\nsubscriptions", ORANGE, "OCC の prefix を持たない絶対パス。OCC とは別の独立 Web アプリを立てる場合の前例"),
 ], 200, 360, 130)
-d11.box("決め方の順序:  ① B 層の属性で済むか(コントローラ不要) → ② C 層の既存リソースに参照 ID で済むか → ③ C 層の DTO 拡張で済むか → ④ C 層に新リソース(8.1 ①〜④)", 60, 680, 560, 60, *RED, 11, "fontStyle=1;")
+d11.box("決め方の順序:  ① B 層の属性で済むか(コントローラ不要) → ② C 層の既存リソースに参照 ID で済むか → ③ C 層の DTO 拡張で済むか → ④ C 層に新リソース(12.1 ①〜④)", 60, 680, 560, 60, *RED, 11, "fontStyle=1;")
 gB=d11.group("B. 業務データ層の主なリソース(URL は {baseUrl}/occ/v2/{site}/ の後ろ)", 680, 70, 940, 760, "#fff7e6", "#d79b00")
 rows=[
  [("商品",GREY), ("products/{code}?fields=... / products/search / .../reviews / .../stock",BLUE), ("Product, CustomerReview, StockLevel",GREY), ("ProductWsDTO 拡張 + fields レベル追加",YEL), ("productCodes(カルーセル)",GREEN)],
@@ -335,19 +335,19 @@ rows=[
  [("注文",GREY), ("users/{userId}/orders/{id} / .../cancellation / orderReturns / replenishmentOrders",BLUE), ("Order, Consignment, ReturnRequest",GREY), ("OrderWsDTO 拡張 + fields",YEL), ("orderCode(注文確認バナー)",GREEN)],
  [("店舗",GREY), ("stores?query=... / stores/{storeId}",BLUE), ("PointOfService",GREY), ("PointOfServiceWsDTO 拡張",YEL), ("storeCode(店舗バナー)",GREEN)],
  [("B2B 組織",GREY), ("users/{userId}/orgUnits / orgCustomers / budgets / costcenters / orderapprovals / quotes",BLUE), ("B2BUnit, B2BCustomer, B2BBudget, B2BCostCenter, Quote",GREY), ("各 WsDTO 拡張",YEL), ("—",GREY)],
- [("新しい概念",GREY), ("users/{userId}/campaignEntries/{code}(例)",RED), ("新 ItemType",RED), ("新コントローラ + WsDTO(8.4)",RED), ("campaignCode",GREEN)],
+ [("新しい概念",GREY), ("users/{userId}/campaignEntries/{code}(例)",RED), ("新 ItemType",RED), ("新コントローラ + WsDTO(12.4)",RED), ("campaignCode",GREEN)],
 ]
 yend=grid(d11, 700, 110, [("分類",100),("URL パターン",280),("ItemType(要確認)",170),("属性を足すなら",170),("CMS 属性に持たせる参照 ID",160)], rows, h=60)
 d11.text("ItemType 名は SAP Commerce 標準型システムの一般知識で、本リポジトリでは検証不能(Backoffice の型検索で確認)。URL パターンは Spartacus の default-occ-*-config.ts 45 ファイルから収集。", 700, yend+4, 900, 40, 11)
 
 # ---------- 10. four tiers + measured timeline ----------
 d10=D("10 呼び出しの 4 階層と毎回・初回")
-d10.text("OCC 呼び出しの 4 階層(左)と、デモサイトで実測した「毎回」と「初回」の違い(右)。13 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
+d10.text("OCC 呼び出しの 4 階層(左)と、デモサイトで実測した「毎回」と「初回」の違い(右)。7 章", 40, 20, 1500, 30, 16, "fontStyle=1;")
 gL=d10.group("A. 呼び出しの 4 階層: いつ飛ぶか / いつまで使い回すか", 40, 70, 640, 760, "#f5f5f5", "#666666")
 tiers=[
- ("1. セッション単位\nbasesites / languages / currencies\nトークンがあれば users/current、カート ID があれば carts/{id}", "アプリ起動時に 1 回(12 章フェーズ 2〜4)\nタブを閉じるまで使い回す。ログイン / ログアウトでユーザーとカートだけ取り直し", GREY),
+ ("1. セッション単位\nbasesites / languages / currencies\nトークンがあれば users/current、カート ID があれば carts/{id}", "アプリ起動時に 1 回(6 章フェーズ 2〜4)\nタブを閉じるまで使い回す。ログイン / ログアウトでユーザーとカートだけ取り直し", GREY),
  ("2. ページ単位\ncms/pages(ページ構造 + 同梱コンポーネント)\n+ 同梱されなかった分の cms/components", "cms/pages は既定で毎回(routing.loadStrategy = ALWAYS)\ncms/components は初回のみ(同梱 or ストア済みなら飛ばない)\n言語変更 / ログイン / ログアウトで全部捨てる", BLUE),
- ("3. コンポーネント単位(追加リソース)\nページに置かれたコンポーネントの型で決まる\n商品カルーセル → products/search、商品詳細 → products/{code}", "コンポーネント生成時(ビューポート外なら遅延)\n初回のみ。捨てる条件はリソースごと(11 章): 商品は言語・通貨変更まで\n例外: コンポーネントが自分で捨てる設計(商品参照は毎回)", GREEN),
+ ("3. コンポーネント単位(追加リソース)\nページに置かれたコンポーネントの型で決まる\n商品カルーセル → products/search、商品詳細 → products/{code}", "コンポーネント生成時(ビューポート外なら遅延)\n初回のみ。捨てる条件はリソースごと(10 章): 商品は言語・通貨変更まで\n例外: コンポーネントが自分で捨てる設計(商品参照は毎回)", GREEN),
  ("4. アクション単位\nカート追加 POST carts/{id}/entries、配送先設定、注文確定、ログイン", "ユーザー操作のたび(更新系なので使い回しは無い)\n代わりに「成功後に何を取り直すか」が決まっている\n(カートは全体を再取得、チェックアウトは単一 Query を再読込)", ORANGE),
 ]
 y=110
@@ -384,7 +384,7 @@ for name,cells,tier in rowsT:
 d10.text("読み方: 橙 = HTTP が飛んだ、灰 = ストアにあるので飛ばない、赤 = 再訪でも飛ぶ(cms/pages は loadStrategy の既定 ALWAYS、references はコンポーネントが初期化時に cleanReferences() する設計)。\n「毎回」なのは cms/pages だけで、同梱されたコンポーネントデータも一緒に毎回届く。業務データは初回のみ。", 740, y+6, 860, 60, 11)
 
 d12=D("12 cms/pages 応答 → async パイプまでの 8 段階")
-d12.text("cms/pages の応答が届いてから、コンポーネントの data$ | async が値を出すまでの 8 段階(左)と、段階ごとに何が起きるか・失敗したときの範囲(右)。14 章", 40, 20, 1700, 30, 16, "fontStyle=1;")
+d12.text("cms/pages の応答が届いてから、コンポーネントの data$ | async が値を出すまでの 8 段階(左)と、段階ごとに何が起きるか・失敗したときの範囲(右)。4 章", 40, 20, 1700, 30, 16, "fontStyle=1;")
 gL=d12.group("A. 8 段階: 何をするか(上から順に実行される)", 40, 70, 680, 1010, "#f5f5f5", "#666666")
 steps=[
  ("1. 正規化\nOccCmsPageNormalizer", BLUE, "1 つの JSON から 2 つの形を作る\n・page.slots[位置].components = {uid, typeCode, flexType, properties}\n・components = コンポーネント本体(properties は捨てる)\nflexType = typeCode(CMSFlexComponent だけ flexType 属性)"),
@@ -414,7 +414,7 @@ grid(d12, 780, 110, cols, rows, 96, 10, 44)
 d12.text("読み方: 橙 = 通信が起きる(OCC か静的ファイル)、青 = NgRx ストアを書く/読む、緑 = DOM が変わる、赤 = 失敗したときに影響する範囲。\ncms/pages の応答から最初の描画まで OCC への通信は 0 本。cms/components が飛ぶのは「購読した時点でストアに無い uid」とナビゲーションの子項目だけ。", 780, 1024, 1030, 44, 11)
 
 d13=D("13 API の形 → State の形: 3 層の作り変え")
-d13.text("cms/pages の JSON(入れ子の木)が Normalizer → Effect → Reducer の 3 層を通って cms ステート(3 テーブル)になるまで(左)と、State で見える違いごとに「どの層が作るか」「変えたいときの入口」(右)。15 章", 40, 20, 1760, 30, 16, "fontStyle=1;")
+d13.text("cms/pages の JSON(入れ子の木)が Normalizer → Effect → Reducer の 3 層を通って cms ステート(3 テーブル)になるまで(左)と、State で見える違いごとに「どの層が作るか」「変えたいときの入口」(右)。5 章", 40, 20, 1760, 30, 16, "fontStyle=1;")
 gL=d13.group("A. 3 層の作り変え(上から順に通る)", 40, 70, 720, 900, "#f5f5f5", "#666666")
 steps=[
  ("入力: cms/pages の JSON\nOcc.CMSPage", GREY, "入れ子の木。スロットの中にコンポーネント本体が埋まっている\n{ uid, typeCode, label, template, ...,\n  contentSlots.contentSlot[ { position, properties,\n    components.component[ { uid, typeCode, name, properties, ...本体 } ] } ] }"),

@@ -5,6 +5,8 @@
 ![01 全体フロー URL→描画](diagrams/page1.png)
 
 > **この章が答える問い**: URL を開いてから画面が出るまでの 1 回の遷移で、何がどの順に起きるか(①)
+>
+> **位置づけ**: 第 II 部の**幹**。ページ遷移 1 回を 10 ステップで通す。4〜8 章はこの章の拡大か前後なので、迷ったらここに戻る
 
 
 ```
@@ -241,4 +243,4 @@ export abstract class CmsComponentData<T extends CmsComponent> {
 
 ---
 
-[目次](README.md) | ← [2. Spartacus のパッケージ構成](02-package-layers.md) | [4. なぜデモサイトの API 呼び出しが少ないのか](04-why-few-api-calls.md) →
+[目次](README.md) | ← [2. Spartacus のパッケージ構成](02-package-layers.md) | [4. `cms/pages` 応答からコンポーネント描画まで: `async` パイプが値を出すまでに何が起きているか](04-page-to-component.md) →
