@@ -43,6 +43,56 @@
 [10] inject(CmsComponentData).data$ → CmsService.getComponentData(uid)  → ストアにあれば即値、無ければ cms/components をバッチ取得
 ```
 
+### 3.0 先に話し言葉で: 普通の Angular と何が違うのか
+
+> **図**: 14 ルーティングと配置: 普通の Angular との違い(`diagrams/spartacus-architecture.drawio`)。左: URL とページの対応表を誰が持つか。右: 配置は「文字列をキーに 4 つの表を引く」の繰り返し
+
+![14 ルーティングと配置: 普通の Angular との違い](diagrams/page14.png)
+
+3.1 以降は実行順に 10 ステップで追うが、その前に「普通の Angular を知っている人が引っかかる 2 点」を話し言葉で押さえておく。**ルーティングを自分で書いていないのに、なぜ URL でページが切り替わるのか**。**どこに何を置くかをテンプレートに書いていないのに、なぜスロット情報だけで配置できるのか**。
+
+**ルーティングの話**
+
+普通の Angular アプリだと、`/products/:id` はこのコンポーネント、`/cart` はこのコンポーネント、と自分で表を書く。Spartacus ではその表を書かない。代わりに起動時にルートを 1 本だけ足している(`core-libs/storefront/cms-structure/routing/cms-route/add-cms-route.ts:12-16`)。
+
+```ts
+{ path: '**', canActivate: [CmsPageGuard], component: PageLayoutComponent }
+```
+
+`**` は「どんな URL でも全部ここ」という意味なので、`/faq` でも `/help/shipping` でも Angular 的には同じ 1 つのルートに当たり、同じ `PageLayoutComponent` が出る。つまり **URL ごとに何を出すかを Angular 側は知らない**。知っているのはバックエンドの CMS で、流れはこうなる。
+
+1. URL が変わると、その URL を「ページの問い合わせキー」に変える。`/faq` なら `{type: ContentPage, id: '/faq'}`、`/product/300938/...` なら `{type: ProductPage, id: '300938'}`。規則は「`productCode` パラメータがあれば商品ページ、`categoryCode` があればカテゴリページ、どれでもなければ URL の残りをそのままページラベルにする」だけである(`core-libs/core/src/routing/store/reducers/router.reducer.ts:169-215`)。
+2. ガード(`CmsPageGuard`)がそのキーで `cms/pages?pageType=ContentPage&pageLabelOrId=/faq` を叩く。
+3. バックエンドが「そのラベルのページはある。テンプレートは `ContentPage1Template`、スロットはこれ」と返せば通し、無ければ 404 ページに流す。
+
+だから Backoffice で新しいコンテンツページを作ってラベルを `/campaign` にすれば、フロントは何も変えずに `/campaign` が開く。**URL の表はフロントの `routes` ではなく、CMS のページラベルが持っている**。
+
+「では商品ページの `/product/:code` というパターンは誰が決めているのか」。これだけは例外で、フロント側に宣言がある(`core-libs/storefront/cms-pages/product-details-page/product-details-page.module.ts:17-23`)。
+
+```ts
+{ path: null, canActivate: [CmsPageGuard], component: PageLayoutComponent, data: { cxRoute: 'product' } }
+```
+
+`path` が `null` で、実際のパスは設定(`cms-structure/routing/default-routing-config.ts:70-73` の `paths: ['product/:productCode/:name', 'product/:productCode']`)から起動時に埋められる(`core-libs/core/src/routing/configurable-routes/configurable-routes.service.ts:48-100`)。ただしここでも**出てくるのは `PageLayoutComponent`** である。商品ページのパターンは「`productCode` を取り出して `cms/pages?pageType=ProductPage&code=300938` を叩く」ための入口でしかなく、画面の中身はやはり CMS が返すスロット構成で決まる。パスのパターンだけフロント、中身はバックエンド、という分担になっている。
+
+**配置の話: スロット情報をもらって、どう並べるのか**
+
+普通は `app.component.html` に `<app-header>` `<app-banner>` `<app-footer>` と自分で並べる。Spartacus では並べる場所を 4 段階で決めていて、どの段階も「文字列をキーにして表を引く」だけである。実装は `*ngFor` が 2 回と動的生成が 1 回で、驚くほど単純である。
+
+- **外枠は固定で書いてある**。`storefront.component.html` にヘッダ枠・`<router-outlet>`・フッタ枠が直書きされていて、ここだけは普通の Angular と同じ。`<router-outlet>` に `PageLayoutComponent` が入る。
+- **表①: `cms/pages` の応答**(CMS が持つ)。`template: "LandingPage2Template"` と `slots: { Section1: {...}, Section2A: {...}, ... }` という辞書。辞書なので順番は無い。
+- **表②: `LayoutConfig.layoutSlots[template].slots`**(フロント設定)。`LandingPage2Template: { slots: ['Section1', 'Section2A', 'Section2B', ...] }`(`core-libs/storefront/recipes/config/layout-config.ts:55-64`)。**縦に並べる順番はここが持っている**。`PageLayoutComponent` は応答の `template` 名でこの表を引き、表②にあって表①にもあるスロットだけを順に `*ngFor` で回す(`page-layout.service.ts:106-127`)。これで `<cx-page-slot position="Section1">` `<cx-page-slot position="Section2A">` ... という**空の箱**が並ぶ。Backoffice でテンプレートにスロットを足しても、表②に無ければ描かれない(開発モードで警告)。「スロットを足したから `LayoutConfig` にも足してほしい」という依頼が要るのはこのため。
+- **表③: 応答の `slots[position].components`**(CMS が持つ)。各 `<cx-page-slot>` が自分の `position` で引く、`{uid, typeCode, flexType, properties}` の配列。並び順は Backoffice でスロットに並べた順。2 回目の `*ngFor` で 1 件ごとに `cxComponentWrapper` を置く(`page-slot.component.html`)。
+- **表④: `CmsConfig.cmsComponents[flexType]`**(フロント設定)。`provideConfig({ cmsComponents: { CMSParagraphComponent: { component: ParagraphComponent } } })`。`cxComponentWrapper` は `flexType`(ほぼ `typeCode`)でこの表を引き、当たったら `ViewContainerRef.createComponent(ParagraphComponent, ...)` で**その場に**インスタンスを生やす(`component-wrapper.directive.ts:81-117`、`default-component.handler.ts:56-70`)。テンプレートに `<cx-paragraph>` と書いてあるのではなく、「今この `ng-container` がいる位置に、このクラスを new して挿す」という命令である。`*ngIf` や `*ngFor` が内部でやっていることと同じ仕組みを、文字列の表を見ながら手で呼んでいるだけ。生やすときに子 Injector へ `CmsComponentData {uid, data$}` を入れておくので、生まれたコンポーネントはコンストラクタで自分の uid とデータの Observable を受け取れる。表に無い `typeCode` なら何も生やさず黙って空になる(開発モードでは警告)。
+
+**まとめ**
+
+- ルーティングは「全部 1 本の `**` ルートで受け、URL をページの問い合わせキーに変えて CMS に聞く」。URL とページの対応表は CMS のページラベルが持つ。商品ページなどのパスのパターンだけフロント設定にある。
+- 配置は「外枠は固定 → テンプレート名でスロットの並び順を表②から引く(`*ngFor` 1 回目)→ スロット名で表③のコンポーネント配列を引く(`*ngFor` 2 回目)→ `typeCode` で表④から Angular クラスを引いて `createComponent` で生やす」。全部「文字列をキーに表を引く」の繰り返しで、CMS が持つ表が ①③、フロント設定が ②④。
+- バックエンドが触るのは `template` 名・スロット名・`typeCode`・並び順。フロントに頼むのは「新しいテンプレートやスロットなら表②に追加」「新しい `typeCode` なら表④に追加」の 2 つだけ。
+
+以下、同じ流れを実行順に 10 ステップで追う。
+
 ### 3.1 [1] すべての URL を CMS ページとして受ける
 
 `spartacus/core-libs/storefront/cms-structure/routing/cms-route/add-cms-route.ts:12-22`

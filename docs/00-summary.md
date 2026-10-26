@@ -9,7 +9,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(13 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(14 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -26,6 +26,7 @@
 | 11 OCC リソースの 3 層とカスタムの置き場所 | サイト設定 / CMS / 業務データの 3 層、決め方の順序、業務データ層の主なリソース一覧(9 章) | [page11.png](diagrams/page11.png) |
 | 12 cms/pages 応答 → async パイプまでの 8 段階 | 正規化 → ストア格納 → ガード → レイアウト → 遅延判定 → createComponent → data$ 購読 → async パイプ。段階ごとの通信・ストア・DOM・失敗範囲(4 章) | [page12.png](diagrams/page12.png) |
 | 13 API の形 → State の形: 3 層の作り変え | cms/pages の JSON が Normalizer → Effect → Reducer を通って cms ステートになるまでと、State で見える違いごとの作り手・変えたいときの入口(5 章) | [page13.png](diagrams/page13.png) |
+| 14 ルーティングと配置: 普通の Angular との違い | URL とページの対応表を誰が持つか(左)、配置は「文字列をキーに 4 つの表を引く」の繰り返し(右)(3 章 3.0) | [page14.png](diagrams/page14.png) |
 
 ![全体フロー](diagrams/page1.png)
 

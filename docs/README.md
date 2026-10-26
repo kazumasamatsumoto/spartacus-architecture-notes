@@ -84,7 +84,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 13 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 14 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)

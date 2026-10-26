@@ -4,7 +4,7 @@ SAP Composable Storefront (Spartacus) のアーキテクチャを、ソースコ
 バックエンド(SAP Commerce Cloud)でカスタム CMS コンポーネントを作る担当者が、フロントエンド側へ何を依頼すればよいかを理解することを目的にしています。
 
 - [docs/README.md](docs/README.md) — 目次。本文は章ごとに 1 ページ(`docs/00-summary.md` 〜 `docs/13-jsp-to-headless.md`, `docs/appendix.md`)
-- [docs/diagrams/spartacus-architecture.drawio](docs/diagrams/spartacus-architecture.drawio) — draw.io 図(13 ページ)。PNG / SVG も同じフォルダ
+- [docs/diagrams/spartacus-architecture.drawio](docs/diagrams/spartacus-architecture.drawio) — draw.io 図(14 ページ)。PNG / SVG も同じフォルダ
 
 ![全体フロー](docs/diagrams/page1.png)
 
@@ -27,5 +27,5 @@ Copyright SAP SE or an SAP affiliate company and Spartacus contributors.
 
 ```bash
 python3 tools/gen_drawio.py                      # → docs/diagrams/spartacus-architecture.drawio
-drawio -x -f png -s 1.5 -p 1 -o docs/diagrams/page1.png docs/diagrams/spartacus-architecture.drawio   # ページ番号は 1〜13
+drawio -x -f png -s 1.5 -p 1 -o docs/diagrams/page1.png docs/diagrams/spartacus-architecture.drawio   # ページ番号は 1〜14
 ```
