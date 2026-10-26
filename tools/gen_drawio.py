@@ -413,6 +413,32 @@ rows=[
 grid(d12, 780, 110, cols, rows, 96, 10, 44)
 d12.text("読み方: 橙 = 通信が起きる(OCC か静的ファイル)、青 = NgRx ストアを書く/読む、緑 = DOM が変わる、赤 = 失敗したときに影響する範囲。\ncms/pages の応答から最初の描画まで OCC への通信は 0 本。cms/components が飛ぶのは「購読した時点でストアに無い uid」とナビゲーションの子項目だけ。", 780, 1024, 1030, 44, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+'</mxfile>'
+d13=D("13 API の形 → State の形: 3 層の作り変え")
+d13.text("cms/pages の JSON(入れ子の木)が Normalizer → Effect → Reducer の 3 層を通って cms ステート(3 テーブル)になるまで(左)と、State で見える違いごとに「どの層が作るか」「変えたいときの入口」(右)。15 章", 40, 20, 1760, 30, 16, "fontStyle=1;")
+gL=d13.group("A. 3 層の作り変え(上から順に通る)", 40, 70, 720, 900, "#f5f5f5", "#666666")
+steps=[
+ ("入力: cms/pages の JSON\nOcc.CMSPage", GREY, "入れ子の木。スロットの中にコンポーネント本体が埋まっている\n{ uid, typeCode, label, template, ...,\n  contentSlots.contentSlot[ { position, properties,\n    components.component[ { uid, typeCode, name, properties, ...本体 } ] } ] }"),
+ ("層 1 Normalizer\nOccCmsPageNormalizer.convert\n(DI: CMS_PAGE_NORMALIZER, multi)", BLUE, "ConverterService.pipeable がアダプタの中で適用。出力は {page, components} の 2 つ\n・normalizePageData: uid→pageId, typeCode→type, robotTag→robots[]\n・normalizePageSlotData: contentSlot[] → slots[position] の辞書\n・normalizePageComponentData: 各本体を {uid,typeCode,flexType,properties} に削って slots に\n・normalizeComponentData: 本体全体を components[] に。properties は undefined に"),
+ ("層 2 Effect\nPageEffects.loadPageData$", PURP, "1 つの応答を 2〜3 個のアクションに分割して一度に dispatch\n・CmsGetComponentFromPage( components.map(c => {component: c, pageContext}) )\n・LoadCmsPageDataSuccess( pageContext, page )\n・(CmsSetPageSuccessIndex: label と id が違うときだけ)\npageContext は API に無い情報。ここで添えられる"),
+ ("層 3 Reducer\nentityReducer / loaderReducer\n+ cms の各 reducer", ORANGE, "・entityReducer: entityId と payload が両方配列なら 1 件ずつ割って entities[id] に\n・loaderReducer: {loading, error, success, value} のフラグを包む\n・components.reducer: {component, pageContext[serializePageContext(ctx,true)]}\n・page-data.reducer: entities[pageId] = page(Normalizer 出力そのまま)\n・page-index.reducer: entities[label|code] = pageId(索引だけ)\n・navigation-entry-item.reducer: { uid + '_AbstractCMSComponent': 本体 } の辞書"),
+ ("出力: cms ステート\n(Redux DevTools で見える形)", GREEN, "cms\n├ page.pageData.entities[pageId]   ← 配置(slots[pos].components = 4 項目)\n├ page.index.{content|product|category|catalog}.entities[id] = pageId\n├ components.entities[uid] = { component, pageContext: {\"ContentPage\": {...}} }\n└ navigation.entities[nodeId] = { uid_AbstractCMSComponent: {...} }"),
+]
+paired(d13, 60, 164, steps, 250, 440, 120, 10)
+gR=d13.group("B. State で見える違い: どの層が作るか / 変えたいときの入口", 800, 70, 1100, 900, "#fff7e6", "#d79b00")
+cols=[("State で見える違い",200),("API 側",160),("State 側",190),("作っている場所",250),("変えたいときの入口",250)]
+rows=[
+ [("ページとコンポーネントが\n別テーブル",GREY), ("スロットの中に本体が入れ子",GREY), ("page.pageData と components",GREEN), ("層 1 normalizePageComponentData\n+ normalizeComponentData",BLUE), ("CMS_PAGE_NORMALIZER に\n自作 converter を multi 追加",BLUE)],
+ [("スロットが辞書 /\n中のコンポーネントが 4 項目",GREY), ("contentSlot[] 配列\n本体の全属性",GREY), ("slots[position]\n{uid,typeCode,flexType,properties}",GREEN), ("層 1 normalizePageSlotData\n:120-125",BLUE), ("同上",BLUE)],
+ [("本体に properties が無い",GREY), ("有る",GREY), ("undefined",GREEN), ("層 1 normalizeComponentData:185\n(意図的: コメントあり)",BLUE), ("同上。ただし既定の後に動くので\n消された後。トップレベル属性を使う",RED)],
+ [("flexType が全件に有る /\npageId・type・robots[] の名前",GREY), ("CMSFlexComponent だけ /\nuid・typeCode・robotTag",GREY), ("全コンポーネント /\npageId・type・robots[]",GREEN), ("層 1 getFlexTypeFromComponent\nnormalizePageData / normalizeRobots",BLUE), ("同上",BLUE)],
+ [("pageContext が付いている",GREY), ("無い",GREY), ("pageContext[\"ContentPage\"]\npageContext[\"ProductPage-<code>\"]",GREEN), ("層 2 PageEffects で添付\n層 3 components.reducer で形に",PURP), ("変えない(キャッシュ共有の鍵)",GREY)],
+ [("loading/success/error/value",GREY), ("無い",GREY), ("有る",GREEN), ("層 3 loaderReducer\n(value = componentExistsReducer)",ORANGE), ("変えない",GREY)],
+ [("entities[uid] / entities[pageId]\nの辞書",GREY), ("配列",GREY), ("辞書",GREEN), ("層 3 entityReducer\n(配列 payload を 1 件ずつ分割)",ORANGE), ("変えない",GREY)],
+ [("cms/components で取った本体",GREY), ("API の形のまま",GREY), ("API の形のまま + pageContext",GREEN), ("層 1 は無し(CMS_COMPONENT_NORMALIZER\nの既定登録 0 件)。層 2 ComponentsEffects",PURP), ("CMS_COMPONENT_NORMALIZER に\nmulti 追加(既定は空)",BLUE)],
+]
+grid(d13, 820, 110, cols, rows, 76, 8, 44)
+d13.text("読み方: 青 = 層 1 Normalizer(アダプタ層、DI の multi provider で差し替え可)、紫 = 層 2 Effect、橙 = 層 3 Reducer、緑 = State 側の形、赤 = 注意点。\nAPI → State の変換はこの 3 層に分散している。State の形を変えたい場合の入口は CMS_PAGE_NORMALIZER / CMS_COMPONENT_NORMALIZER で、Effect と Reducer には手を入れない。", 820, 870, 1060, 44, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

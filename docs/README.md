@@ -10,7 +10,7 @@
 |---|---|---|
 | **① どこから来るか**(データの出所) | 画面の構造は `cms/pages` 1 本から、コンポーネントの中身は同じ応答に同梱されて、業務データ(商品・カート・注文…)は「リソース」ごとの OCC API から来る。バックエンドの `typeCode` がフロントの Angular コンポーネントを選ぶ | [3 章](03-rendering-flow.md), [10 章](10-occ-resource-catalog.md), [5 章](05-custom-cms-component-spec.md) |
 | **② いつ取りに行くか**(タイミング) | 起動時に 1 回(セッション)、ページ遷移のたび(`cms/pages`)、コンポーネントが初めて生成されたとき(業務データ)、ユーザー操作のたび(更新系)。取得済みはストアに残り、言語変更・ログイン・ログアウトで捨てられる | [12 章](12-application-lifecycle.md), [13 章](13-call-tiers.md), [14 章](14-page-to-component.md), [4 章](04-why-few-api-calls.md) |
-| **③ 何を変えるとどう反映されるか**(変更の影響範囲) | CMS の配置・属性は次の遷移で反映。業務データの変更はリロードか言語変更まで反映されない。フロントの呼び出し方は通信層が共通で、状態層が 2 方式、リソースごとに「必要な ID」と「捨てる条件」が違う | [11 章](11-frontend-call-patterns.md), [13 章](13-call-tiers.md), [8 章](08-backend-api-granularity.md) |
+| **③ 何を変えるとどう反映されるか**(変更の影響範囲) | CMS の配置・属性は次の遷移で反映。業務データの変更はリロードか言語変更まで反映されない。フロントの呼び出し方は通信層が共通で、状態層が 2 方式、リソースごとに「必要な ID」と「捨てる条件」が違う | [11 章](11-frontend-call-patterns.md), [13 章](13-call-tiers.md), [15 章](15-api-to-state.md), [8 章](08-backend-api-granularity.md) |
 
 この 3 問に答えられれば、「このカスタムコンポーネントはどのリソースを参照し、フロントは何を・いつ呼び、更新後に何を取り直すか」が自分で導けるようになる。それが依頼書([5.8](05-custom-cms-component-spec.md), [8.5](08-backend-api-granularity.md), [11.6](11-frontend-call-patterns.md))の中身である。
 
@@ -24,7 +24,8 @@
 2. [3. URL からコンポーネント描画まで](03-rendering-flow.md) — ページ遷移 1 回の中で起きる 10 ステップ
 3. [13. 呼び出しの 4 階層と「毎回」「初回」](13-call-tiers.md) — セッション / ページ / コンポーネント / アクション。実測付き
 4. [14. cms/pages 応答からコンポーネント描画まで](14-page-to-component.md) — 応答が届いてから `cms/components` が飛ぶ(飛ばない)まで、`data$ | async` が値を出すまでの 8 段階
-5. [4. なぜ API 呼び出しが少ないのか](04-why-few-api-calls.md) — HTTP が飛ぶ前に通る 16 個の止め弁
+5. [15. API の形と State の形はなぜ違うのか](15-api-to-state.md) — `cms/pages` の JSON が Normalizer / Effect / Reducer の 3 層で `cms` ステートの形に作り変えられるまで。DevTools で見える形の由来
+6. [4. なぜ API 呼び出しが少ないのか](04-why-few-api-calls.md) — HTTP が飛ぶ前に通る 16 個の止め弁
 
 ### 第 II 部 境界: バックエンドとフロントの契約
 
@@ -63,6 +64,7 @@
 | イニシャライズからのライフサイクル全部 | 12 |
 | 必ず呼ぶリソースと追加リソース、アクションごとのリソースという理解で合っているか。毎回と初回の違い | 13(実測付き) |
 | `cms/pages` からコンポーネントの API を呼ぶまでの間、`async` パイプ実行までの間に何が行われているか | 14 |
+| Redux DevTools で見える State の形が `cms/pages` の API 構造と一致しない。この違いはどのロジックが作っているか | 15 |
 
 ## 調査対象
 
@@ -79,7 +81,7 @@
 
 ## 章の一覧(番号順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 12 ページ + PNG / SVG)。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 13 ページ + PNG / SVG)。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -97,4 +99,5 @@
 - [12. アプリケーションのライフサイクル: index.html 取得から永続化まで](12-application-lifecycle.md)
 - [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md)
 - [14. cms/pages 応答からコンポーネント描画まで: async パイプが値を出すまでに何が起きているか](14-page-to-component.md)
+- [15. API の形と State の形はなぜ違うのか: Normalizer / Effect / Reducer の 3 層による作り変え](15-api-to-state.md)
 - [付録](appendix.md)

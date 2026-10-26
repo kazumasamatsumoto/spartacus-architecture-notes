@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [14. cms/pages 応答からコンポーネント描画まで](14-page-to-component.md)
+[目次](README.md) | ← [15. API の形と State の形はなぜ違うのか](15-api-to-state.md)

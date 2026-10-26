@@ -289,4 +289,4 @@ t1+  段階 3(コンポーネント単位): ProductCarouselComponent の data$ �
 
 ---
 
-[目次](README.md) | ← [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md) | [付録](appendix.md) →
+[目次](README.md) | ← [13. 呼び出しの 4 階層と「毎回」「初回」の違い](13-call-tiers.md) | [15. API の形と State の形はなぜ違うのか](15-api-to-state.md) →
