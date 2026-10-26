@@ -72,6 +72,42 @@ cms.components.entities[uid] = {
 
 ページ側は `page.index.content[pageId]` に `success` が立ち(`core/src/cms/store/reducers/index.ts:35-55`)、ガードが待っていた `hasPage` の `filter` が通る(`core/src/cms/facade/cms.service.ts:258-265`)。
 
+### 2-a Redux DevTools で見える形
+
+ここまでの結果は Redux DevTools でそのまま確認できる。見るべき場所は 2 つ、**State タブの `cms` 配下**と、**左ペインのアクション列**である。
+
+**State の形**(`core/src/cms/store/cms-state.ts:12,80-84`、reducer の組み立ては `core/src/cms/store/reducers/index.ts:33-63`)
+
+```
+cms
+├ page
+│ ├ pageData.entities[pageId]        ← ページ本体。slots[pos].components は {uid,typeCode,flexType,properties} の配置情報だけ
+│ └ index.{content|product|category|catalog}.entities[id]   ← ラベル/ID → pageId と loading/success
+├ components.entities[uid]           ← コンポーネント本体。cms/pages 同梱分も cms/components 取得分もここ
+│ ├ component: { uid, typeCode, name, content, ... }
+│ └ pageContext: { "ContentPage": {loading,error,success,value} , "ProductPage-300938": {...} }
+└ navigation.entities[navigationUid] ← ナビゲーションの子項目(14.8 の 7-d)
+```
+
+つまり **`cms/pages` で取れたコンポーネントは `page` ではなく `components` に入る**。ページ側には「どのスロットに何の uid があるか」だけが残り、本体は uid をキーにした別テーブルに移る。描画側(段階 7)は常に `components.entities[uid]` を見るので、本体がページ同梱で来たか `cms/components` で来たかを区別しない。
+
+**アクション列**(型名は `core/src/cms/store/actions/page.action.ts:12-16`、`components.action.ts:13-17`)
+
+| 順 | DevTools に出るアクション名 | ストアへの書き込み |
+|---|---|---|
+| 1 | `[Cms] Load Page Data` | `page.index.*[id]` を `loading: true` に |
+| 2 | `[Cms] Get Component from Page` | 同梱全件を配列 1 発で dispatch。`entityReducer` が uid ごとに分割し、`components.entities[uid].component` に本体、`.pageContext["ContentPage"]` に `success: true, value: true` |
+| 3 | `[Cms] Load Page Data Success` | `page.pageData.entities[pageId]` にスロット配置、`page.index.*[id]` を `success: true` に |
+| (4) | `[Cms] Set Page Success Index` | URL 由来の id と応答の `label` が違うときだけ。別名でも同じ pageId を指すよう index に追加 |
+| 後 | `[Cms] Load Component` → `[Cms] Load Component Success` | 段階 7 で足りなかった uid。書き込み先は 2 と同じ `components.entities[uid]`(`components.reducer.ts:56-69`) |
+| 後 | `[Cms] Load NavigationEntry items` → Success | ナビゲーション子項目(7-d)。`navigation.entities[...]` |
+
+2 と「後」の行は同じ reducer のケースに並んで書かれており(`components.reducer.ts:26-28,56-87`)、結果の形も同じである。DevTools 上で「このコンポーネントは同梱だったのか HTTP で取ったのか」を知りたいときは、State ではなく**直前のアクション名**で判断する。
+
+**`pageContext` のキーを見る**。コンテンツページでは `"ContentPage"` の 1 キーだけで、ページ ID を含まない(`core/src/cms/utils/cms-utils.ts:21-34` の `ignoreContentPageId`)。ホームで取れたヘッダの uid は、別のコンテンツページに遷移しても同じキーが `success` のままなので再取得されない。商品ページに遷移すると同じ uid の下に `"ProductPage-300938"` のようなキーが増える。`value: false` のキーがあれば「問い合わせたが、そのコンテキストでは存在しない(制限で弾かれた)」の記録である(`cms-state.ts:25-58` のコメント)。
+
+> 注: `cms-state.ts` のコメントには `ContentPage-homepage` という例が書かれているが、reducer は `serializePageContext(ctx, true)` を使うので実際のキーは `ContentPage` になる。DevTools で確認できるのは後者である。
+
 ## 14.4 段階 3: ガード。描画の前にマッピング・guards・i18n・childRoutes を片付ける
 
 `CmsPageGuard.canActivate` は `getNextPageContext()` で**遷移先**のコンテキストを取り、`cmsService.getPage(pageContext, shouldReload())` が値を返すのを待っていた(`storefront/cms-structure/guards/cms-page.guard.ts:51-84`)。`shouldReload()` は `loadStrategy` が `ONCE` でない限り true で(`:89-91`)、これが 13 章の「`cms/pages` は毎回」の根拠である。
