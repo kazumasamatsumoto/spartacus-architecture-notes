@@ -9,6 +9,12 @@
 > **位置づけ**: 11 章の続き。コンポーネントが業務データを要するとき、Java 側は何をどの単位で返すか
 
 
+### 先に話し言葉で: 「コンポーネント単位の API」は State に入らない
+
+JSP では「コンポーネント 1 つにコントローラ 1 つ」でした。その感覚で `GET /my-component-data?uid=…` のような API を切ると、SPA では 8.0 の規則 1 が効かなくなります。State のテーブルは商品、カート、注文といった「もの」の単位で切られているので、コンポーネント専用の応答はどのテーブルにも入らず、そのコンポーネントが生成されるたびに毎回飛びます。同じ商品を 3 つのコンポーネントが見せていれば、3 回取ります。
+
+だからこの章の結論は「リソース単位で返す」です(12.1)。CMS 属性には参照 ID だけを持たせ、本体は `products/{code}` のような既存リソースから取る。既存リソースに項目が足りなければ DTO を広げる。どのリソースにも属さない概念だけ、新しいリソースを切る。この順で考えると、応答がフロントの State にそのまま収まり、2 回目以降は 0 本になります。
+
 > **根拠の範囲について**: SAP Commerce Cloud 本体(Java)は公開リポジトリが無いためクローンできない。本章のうち Java の API 名は SAP Help の公開ドキュメント([DataMapper](https://help.sap.com/doc/9fef7037b3304324b8891e84f19f2bf3/2211/en-US/de/hybris/platform/webservicescommons/mapping/DataMapper.html)、[Data Mapping Mechanism](https://help.sap.com/docs/SAP_COMMERCE/9d346683b0084da2938be8a285c0c27a/e571a0e6f7524d4ab62e29cc2b387aeb.html)、[KBA 2693560 field level configuration](https://userapps.support.sap.com/sap/support/knowledge/en/2693560))に基づく。**フロントが何を期待するか**は 15.3 のとおり Spartacus ソースで裏付けている。デモ OCC の実レスポンス(11.2、付録 B)も根拠に含む。
 
 ### 12.1 結論: 「コンポーネント単位」ではなく「リソース単位」

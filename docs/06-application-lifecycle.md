@@ -10,6 +10,31 @@
 
 > 根拠は全て `spartacus/`(develop, b7b028f)のソース。参照アプリ `projects/storefrontapp` の起動構成を基準にしている。`ng add @spartacus/schematics` で生成したアプリも同じ構成になる(1.3)。
 
+### 先に話し言葉で: 「購読した瞬間に取りに行く」の実例集
+
+8.0 の規則 3 は「読みの引き金は、State に無いものを誰かが購読した瞬間」でした。バックエンドの感覚だと引き金は「画面が開いたとき」と「ボタンを押したとき」の 2 つに見えますが、実際はもう少し細かく、しかも**購読者は描画用のコンポーネントだけではありません**。9 フェーズを読む前に、代表的な購読者を並べておきます。
+
+| 購読者 | 購読するもの | State に無ければ飛ぶ API | 購読が起きる瞬間 |
+|---|---|---|---|
+| `CmsPageGuard` | ページ本体 | `cms/pages`(既定では State にあっても飛ぶ。8.0 の例外) | ルート遷移の途中。コンポーネントはまだ 1 つも無い |
+| パラグラフやバナーの `data$ \| async` | 自分の uid の本体 | `cms/components`(同梱されていれば飛ばない) | スロットがそのコンポーネントを `createComponent` し、テンプレートが初めて評価された瞬間(4.8) |
+| `NavigationComponent` → `NavigationService` | ナビゲーションの子項目 | `cms/components?componentIds=…`(ホームで見える 2 本) | ナビゲーションが本体を受け取り、子の uid 一覧を読んだ瞬間(4.8) |
+| `ProductSummaryComponent` の `product$ \| async` | 現在の商品 | `products/{code}`(scope ごとに分かれて 2 本以上) | 商品詳細ページのスロットが Summary を生成した瞬間 |
+| `ProductPageMetaResolver`(タイトルと meta タグ) | 現在の商品 | 同じ `products/{code}` | **描画とは無関係**。起動時から `SeoMetaService` が購読し続けていて、商品詳細ページが現在のページになった瞬間 |
+| `ActiveCartService` | 現在のカート | `carts/{id}` | 起動時に `localStorage` のカート ID を復元した瞬間(7.3) |
+
+商品の行を 2 つ並べたのは、「描画 = 引き金」ではないことを見せるためです。
+
+- `ProductSummaryComponent` のテンプレートは先頭が `*ngIf="product$ | async"` で(`spartacus/core-libs/storefront/cms-components/product/product-summary/product-summary.component.html:1`)、`product$` は URL の `productCode` を `ProductService.get()` に流したものです(`core-libs/storefront/cms-components/product/current-product.service.ts:39-57`)。
+- 同じ `ProductService.get(code, DETAILS)` を、`ProductPageMetaResolver` も購読しています(`spartacus/core-libs/core/src/product/services/product-page-meta.resolver.ts:62-69`)。こちらは `APP_INITIALIZER` で起動した `SeoMetaService.init()` が `getMeta()` を購読し続けているので(`core-libs/storefront/cms-structure/seo/seo.module.ts:14-18`、`seo-meta.service.ts:32-36`)、Summary がまだ生成されていなくても `products/{code}` は飛びます。
+- それでも HTTP が 1 本で済むのは、`ProductLoadingService` が「購読されたら取得判定を始める」Observable を `using()` で作り、`shareReplay({ refCount: true })` で購読者全員に共有しているからです(`spartacus/core-libs/core/src/product/services/product-loading.service.ts:139-142`)。取得判定そのものは「State に loading も success も error も無いとき」だけ true になります(`:102-112`)。
+
+つまり規則 3 の「誰か」は、テンプレートの `async` パイプであることが最も多いだけで、Guard でもサービスでも起動時の初期化でも同じです。「コンポーネントの描画タイミング」という言い方は便利ですが、正確には「購読の開始」で、描画はその一形態です。
+
+書きの側(規則 2)は購読ではなくイベントが引き金です。カート追加なら `CartAddEntry` アクションを Effect が受けて `POST carts/{id}/entries` を送り(`spartacus/feature-libs/cart/base/core/store/effects/cart-entry.effect.ts:37-70`)、成功アクションを別の Effect が受けて `LoadCart` を dispatch し、`GET carts/{id}` でカート全体を取り直します(`cart.effect.ts:304-345`)。「書いたら、読み直す」の 2 本が必ずセットになります。
+
+以下、これらの購読者がいつ現れていつ消えるかを、起動から終了までの 9 フェーズで追う。
+
 ## 6.0 全体像: 9 フェーズと 1 つのゲート
 
 | フェーズ | 何が起きるか | 誰が制御するか |

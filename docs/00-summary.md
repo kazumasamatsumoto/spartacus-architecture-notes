@@ -1,5 +1,9 @@
 # 0. 要約
 
+> **まず 4 文で**(詳しくは 8.0): ① 読むときは State を先に見て、無ければ API を叩く。② 書くとき(カート追加、ログイン、注文)は必ず API を叩き、応答で State を更新する。③ 読みの引き金は「State に無いものを誰かが購読した瞬間」で、描画はその最も多い形。ページ本体だけは `CmsPageGuard` が先回りし、既定では遷移のたびに取り直す。④ API は State を埋めるだけで、描画は State を購読している view が勝手に更新する。「この API でどの DOM が描かれるか」ではなく「State のどこが変わり、誰がそれを購読しているか」で考える。
+
+以下、6 点に展開する。
+
 1. **Spartacus は Angular アプリ**である。SAP が提供するのは Angular ライブラリ群(`@spartacus/core`, `@spartacus/storefront`, 機能ライブラリ)で、利用者は Angular CLI プロジェクトにそれらを組み込む。
 2. **描画の主導権は CMS バックエンドにある**。ルーティングは `**`(ワイルドカード)で全 URL を受け、OCC の `cms/pages` からページ構造(テンプレート → スロット → コンポーネント)を取得して描画する。Angular のルート定義にページを書くのではない。
 3. **バックエンドの `typeCode`(CMSFlexComponent なら `flexType`)が、フロントの Angular コンポーネントを選ぶキー**になる。フロント側の作業は原則「`provideConfig({ cmsComponents: { <typeCode>: { component: XxxComponent } } })` を 1 つ追加し、`CmsComponentData<T>` を注入して `data$` を描く」だけ。

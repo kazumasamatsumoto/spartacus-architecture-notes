@@ -9,6 +9,12 @@
 > **位置づけ**: 第 III 部のまとめ。9〜13 章の判断をチェックリストにしたもの
 
 
+### 先に話し言葉で: フロントが詰まるのは 3 つの場面だけ
+
+このチェックリストが防ぎたい事故は 3 つです。① 足した属性が `cms/pages` の JSON に出てこない(OCC の DTO か `fields` の定義漏れ。フロントの `data$` には何も届かない)。② 業務データを見せたいのに、属性に参照 ID が無い(フロントがどのリソースを購読すればよいか決まらない)。③ 返した応答が State に入らない形になっている(ID が無い、ユーザーやカートの文脈に依存しているのに URL に出ていない)。
+
+どれも 8.0 の 4 文のどこかを壊しています。① は「同梱されて届く」が、② は「購読した瞬間」が、③ は「State にあれば叩かない」が成り立たなくなる場面です。チェック項目は、この 3 つを順に潰す形で並べています。
+
 - [ ] `*-items.xml` で `SimpleCMSComponent`(または適切な親)を継承した ItemType を定義し、`typeCode` を決める
 - [ ] OCC で属性が公開されるようにする(`cmsocc` の DTO / Converter / `fields=DEFAULT` のフィールド定義)。開発 OCC で `GET /occ/v2/{baseSite}/users/anonymous/cms/pages?pageType=ContentPage&pageLabelOrId=homepage` を叩いて JSON に出ることを確認
 - [ ] ページテンプレート / コンテンツスロットにコンポーネントを配置し、カタログ同期(Staged → Online)
