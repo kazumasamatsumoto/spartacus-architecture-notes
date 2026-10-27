@@ -26,6 +26,7 @@ Angular 21、zone.js あり(本家と同じ `provideZoneChangeDetection`)。バ�
 | `app.routes.ts` | ルート表。`product/:code` と `**` の 2 本だけ。どちらも `PageLayoutComponent` | `storefront/cms-structure/routing/cms-route/add-cms-route.ts:12-16`、`storefront/cms-pages/product-details-page/product-details-page.module.ts:17-23` |
 | `cms/routing.service.ts` | URL → PageContext の変換規則(クエリは見ない) | `core/src/routing/store/reducers/router.reducer.ts:169-215` |
 | `cms/cms-page.guard.ts` | Guard。PageContext を作り、ページを State に入れてから通す | `storefront/cms-structure/guards/cms-page.guard.ts:51-95` |
+| `cms/routing-config.ts` | `loadStrategy`。既定 ALWAYS = 再訪でも `cms/pages` を取り直す | `core/src/routing/configurable-routes/config/routing-config.ts:11-44`、`routing-config.service.ts:45-47` |
 | `cms/occ-fake-backend.ts` | OCC の代わり。**ここが CMS の管理画面で組んだページ** | `core/src/occ/adapters/cms/occ-cms-page.adapter.ts` |
 | `cms/occ-cms-page.normalizer.ts` | API の形 → State の形(改名、配列→map、本体の分離) | `core/src/occ/adapters/cms/converters/occ-cms-page-normalizer.ts` |
 | `cms/cms.service.ts` | NgRx の cms ストア + Facade を 1 クラスに畳んだもの | `core/src/cms/store/*`、`core/src/cms/facade/cms.service.ts` |
@@ -52,7 +53,8 @@ Angular 21、zone.js あり(本家と同じ `provideZoneChangeDetection`)。バ�
 ### 2. ホーム → 一覧(/search)→ ホーム
 ヘッダーの「商品を探す」→ ロゴ、の順にクリック。
 - /search では `cms/pages?...pageLabelOrId=search` が 1 回。`destroyed Banner/Paragraph`、`created ProductList`。**Logo / SearchBox / FooterNav は destroyed も created も出ない**(uid の並びが同じで PageSlot が流さない)。
-- ホームへ戻ると `hasPage(ContentPage-homepage) = true → HTTP なし`。
+- ホームへ戻ると `hasPage(ContentPage-homepage) = true だが loadStrategy=ALWAYS → cms/pages を取り直す`。**既定では一度見たページでも `cms/pages` は毎回飛ぶ**(本家も同じ。CMS の編集やログイン状態による出し分けを次の遷移で反映するため)。ただし応答の uid の並びは同じなので、Logo / SearchBox / FooterNav / Paragraph は作り直されず、State の中身が同じ値で上書きされるだけ。
+- `cms/routing-config.ts` を `'ONCE'` にすると `hasPage(...) = true → HTTP なし` になり、再訪で飛ばなくなる。
 
 ### 3. ソート(クエリだけ変わる)
 /search で並び替えを変える。
@@ -63,7 +65,7 @@ Angular 21、zone.js あり(本家と同じ `provideZoneChangeDetection`)。バ�
 
 ### 4. 商品 A → 商品 B(同じルート、:code だけ変わる)
 商品ページ下の「他の商品へ」をクリック。
-- `CmsPageGuard` は走る(パラメータが変わったので)。`hasPage(ProductPage-<B>) = false` → **`cms/pages` がもう 1 回呼ばれる**。本家も同じ挙動。
+- `CmsPageGuard` は走る(パラメータが変わったので)。`hasPage(ProductPage-<B>) = false` → **`cms/pages` がもう 1 回呼ばれる**(index のキーが `ProductPage-<code>` なので商品ごとに別扱い。既定の ALWAYS ではどのみち毎回)。本家も同じ挙動。
 - `created PageLayout[main]` は出ない(Angular がルートコンポーネントを再利用)。`created ProductSummary` も出ない。`PageSlot[Summary]` の uid が同じなので作り直されず、`product$` の値だけ変わる。
 - `GET products/<B>`。2 回目以降同じ商品に戻ると `State にある → 呼ばない`。
 
@@ -77,6 +79,7 @@ Angular 21、zone.js あり(本家と同じ `provideZoneChangeDetection`)。バ�
 - homepage に新しいスロット `Section3` を足す → 表②に無いので **出ない**。`layout-config.ts` の `LandingPage2Template` に `'Section3'` を足すと出る。これが「バックエンドが新しいスロットを作ったらフロントに頼むこと」の正体。
 
 ### 7. フロント側だけを変える
+- `cms/routing-config.ts` の `loadStrategy` を `'ONCE'` にする → 一度見たページに戻っても `cms/pages` が飛ばなくなる。代わりに CMS 側の変更はリロードまで反映されない。
 - `layout-config.ts` の `LandingPage2Template` を `['Section2A', 'Section1']` にする → 順番が入れ替わる。
 - `cms-config.ts` の 1 行を消す → その typeCode のコンポーネントが全ページから消える。
 - `paragraph.component.ts` の `OnPush` を外す → ソートのたびに `CD tick` の行に Paragraph が出るようになる(Default は毎回評価される)。

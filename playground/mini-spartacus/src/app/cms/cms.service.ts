@@ -27,17 +27,22 @@ export class CmsService {
   readonly state$ = new BehaviorSubject<CmsState>({ pageIndex: {}, pages: {}, components: {} });
 
   /**
-   * Guard から呼ばれる。index にあれば HTTP なしで返す(= 本家 hasPage → getPageState)。
-   * 無ければ cms/pages を取りに行き、Normalizer を通して State に入れる。
+   * Guard から呼ばれる。index に無ければ cms/pages を取り、Normalizer を通して State に入れる。
+   * index にあっても forceReload(既定の loadStrategy=ALWAYS)なら取り直す(= 本家 hasPage :247-257)。
+   * 取り直しても uid の並びは同じなので、PageSlot は流さず、コンポーネントは作り直されない。
    */
-  getPage(ctx: PageContext): Observable<Page | null> {
+  getPage(ctx: PageContext, forceReload = false): Observable<Page | null> {
     const key = serializePageContext(ctx);
     const s = this.state$.value;
-    if (s.pageIndex[key]) {
+    if (s.pageIndex[key] && !forceReload) {
       this.log.state(`hasPage(${key}) = true → HTTP なし`);
       return of(s.pages[s.pageIndex[key]]);
     }
-    this.log.state(`hasPage(${key}) = false → cms/pages を取得`);
+    if (s.pageIndex[key]) {
+      this.log.state(`hasPage(${key}) = true だが loadStrategy=ALWAYS → cms/pages を取り直す(本家 hasPage の forceReload)`);
+    } else {
+      this.log.state(`hasPage(${key}) = false → cms/pages を取得`);
+    }
     return this.backend.loadPage(ctx).pipe(
       first(),
       map((occ) => {
