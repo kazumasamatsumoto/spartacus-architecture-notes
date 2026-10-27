@@ -42,9 +42,10 @@
 - [13. JSP からヘッドレスへ](13-jsp-to-headless.md) — JSP が持っていた責務をどこへ移すか
 - [14. バックエンド側のチェックリスト](14-backend-checklist.md)
 
-### 第 IV 部 作る: フロント側の実装(15 章)
+### 第 IV 部 作る: フロント側の実装(15〜16 章)
 
 - [15. Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md) — 業務データを扱うコンポーネントの 4 層と雛形一式
+- [16. 変更検知と dirty フラグ](16-change-detection.md) — API の応答が届いたあと、どの view が評価され、どの DOM が触られるか。ヘッダーが残り一覧の行が作り直される理由
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
 ## 質問と、それに答えた章の対応
@@ -84,7 +85,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 14 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 15 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -103,4 +104,5 @@
 - [13. JSP(アクセラレータ)のコンポーネントコントローラをヘッドレスに移すとき、何を返すか](13-jsp-to-headless.md)
 - [14. バックエンド側のチェックリスト](14-backend-checklist.md)
 - [15. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md)
+- [16. 変更検知と dirty フラグ: API の応答が届いたあと、どの view が描き直るのか](16-change-detection.md)
 - [付録](appendix.md)

@@ -221,4 +221,4 @@ export class MyPromoBannerComponent {
 
 ---
 
-[目次](README.md) | ← [14. バックエンド側のチェックリスト](14-backend-checklist.md) | [付録](appendix.md) →
+[目次](README.md) | ← [14. バックエンド側のチェックリスト](14-backend-checklist.md) | [16. 変更検知と dirty フラグ: API の応答が届いたあと、どの view が描き直るのか](16-change-detection.md) →

@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [15. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md)
+[目次](README.md) | ← [16. 変更検知と dirty フラグ: API の応答が届いたあと、どの view が描き直るのか](16-change-detection.md)

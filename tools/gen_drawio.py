@@ -476,6 +476,44 @@ for a,b in [(b0,r1),(r1,r2),(r2,r3),(r3,r4)]: d14.edge(a,b, exit=(0.5,1), entry=
 d14.box("バックエンドが触るもの: template 名・スロット名・typeCode・並び順(表①③)。\nフロントに頼むのは 2 つだけ: 新しいテンプレート / スロット → 表②に追加。新しい typeCode → 表④に追加。\n「配置」は普通の Angular のテンプレートではなく、この 4 つの表の組み合わせで決まる。", 820, Y+4*STEP+30, 940, 80, *YEL, 11)
 d14.text("根拠: storefront.component.html / page-layout.component.html / page-layout.service.ts:106-127 / recipes/config/layout-config.ts:55-64 / page-slot.component.html / component-wrapper.directive.ts:81-117 / default-component.handler.ts:56-70", 820, 920, 940, 40, 10)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+'</mxfile>'
+
+d15=D("15 変更検知の 3 段階と dirty の経路")
+d15.text("API の応答が State に入ったあと、Angular はどの view を評価し、どの DOM を触るのか。左: 3 段階(A いつ / B どの view / C どのバインディング)。右: ソート 1 回とホーム再訪 1 回を view の木で見る。16 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gL=d15.group("A → B → C: 応答が届いてから DOM が変わるまでの 3 段階", 40, 70, 720, 900, "#f5f5f5", "#666666")
+l0=d15.box("きっかけ\nクリック / OCC 応答(XHR 完了) / タイマー完了", 70, 110, 660, 50, *GREY, 11)
+l1=d15.box("A. tick の予約(いつ走るか)\nzone.js がマクロタスクの終わりに ApplicationRef.tick() を予約。eventCoalescing で 1 回にまとめる\nmarkForCheck() 自身も予約する(markViewDirty → changeDetectionScheduler.notify)\n→ OCC 応答のたびに最低 1 回、クリックのたびに 1 回", 70, 185, 660, 90, *BLUE, 11)
+l2=d15.box("B-1. 印を付ける(markViewDirty)\n自分から根元まで親を辿って全部に付ける。兄弟には付けない\n入口 1: AsyncPipe が新しい値を受け取る → markForCheck()   ← API 応答はここから入る\n入口 2: テンプレート内の DOM イベント(wrapListener)\n入口 3: OnPush コンポーネントの @Input が変わった", 70, 300, 660, 104, *ORANGE, 11)
+l3=d15.box("B-2. tick: view ごとに評価するか決める(detectChangesInView)\n評価する: Default(CheckAlways) / dirty / RefreshView / signal が変化\n評価しない: OnPush で印なし。子孫に印があれば「通過」するだけでテンプレートは一切評価しない\nSpartacus: storefront 98 コンポーネント中 67 が OnPush(PageSlot / PageLayout / Banner / Paragraph …)\nDefault は StorefrontComponent と ProductListComponent", 70, 428, 660, 104, *ORANGE, 11)
+l4=d15.box("C の前段: Observable の中で止める\nPageSlot: uid の並びが同じなら流さない(isDistinct) → components 配列が差し替わらず *ngFor が動かない\nPageLayoutService.getSlots: スロット名を 1 つずつ比較 → 同じなら <cx-page-slot> を残す\n→ ヘッダー・フッターのコンポーネントは破棄も生成もされない", 70, 556, 660, 90, *YEL, 11)
+l5=d15.box("C. 評価した view の中で、変わったバインディングだけ DOM に書く\n値: Object.is で比較。innerHTML の文字列が同じなら書かない\n*ngFor(trackBy なし): 新しい配列 → 行を全部破棄して作り直す(商品一覧)\n*ngFor(文字列配列): 値で比較 → 同じ名前なら残す(スロットの並び)", 70, 670, 660, 90, *GREEN, 11)
+for a,b in [(l0,l1),(l1,l2),(l2,l3),(l3,l4),(l4,l5)]: d15.edge(a,b)
+d15.box("結論: どの DOM が変わるかは「誰が何を | async しているか」という購読の配線と、Angular の規則で機械的に決まる。\nフロントが「ヘッダーは除外」と書いているのではない。API の本数と DOM の書き換え量は別の軸。", 70, 790, 660, 70, *RED, 11)
+d15.text("根拠: app.config.ts:30 / @angular/core 21.2.25 _debug_node-chunk.mjs:5900-5915(detectChangesInView), 5967-5977(markViewDirty), 6142-6144(markForCheck), 8225-8232(wrapListener) / @angular/common _common_module-chunk.mjs:2601-2605(AsyncPipe) / page-slot.component.ts:51, 97-101, 124-130, 201-213 / page-layout.service.ts:68-78 / product-list.component.html:54, 64", 70, 870, 660, 80, 10)
+gR=d15.group("view の木で見る 2 つの実例(橙 = 印が付いて評価される、灰 = 印なしで飛ばされる、緑 = Default なので評価されるが DOM は不変、赤枠 = DOM を触る)", 800, 70, 980, 900, "#fff7e6", "#d79b00")
+# ---- tree 1: sort
+d15.text("実例 1 ソート: クリック → products/search 1 本 → 応答 → ProductList の model$ | async が印 → 経路だけ評価。Guard も cms/pages も走らない(3.0, 16.5)", 820, 104, 940, 40, 12, "fontStyle=1;")
+BW=190; BH=56; F=10
+r1=d15.box("App(Default)\n評価、DOM 不変", 1195, 150, BW, BH, *GREEN, F)
+r2=d15.box("StorefrontComponent(Default)\n評価、DOM 不変", 1195, 230, BW, BH, *GREEN, F)
+r3=d15.box("PageLayout[header](OnPush)\n印なし → 飛ばされる", 830, 320, BW+30, BH, *GREY, F)
+r3b=d15.box("header の PageSlot / Logo /\nSearchBox / Navigation\n評価されない", 830, 410, BW+30, BH+8, *GREY, F)
+r4=d15.box("PageLayout[main](OnPush)\n印あり → 評価、DOM 不変", 1195, 320, BW, BH, *ORANGE, F)
+r5=d15.box("PageSlot[ProductListSlot](OnPush)\n印あり → 評価、DOM 不変", 1195, 410, BW+20, BH, *ORANGE, F)
+r6=d15.box("ProductListComponent(Default)\n印の起点: model$ | async が markForCheck\nDOM: 商品行を全部作り直し(trackBy なし)", 1150, 500, BW+110, BH+14, ORANGE[0], "#b85450", F, "strokeWidth=3;")
+r7=d15.box("PageLayout[footer](OnPush)\n印なし → 飛ばされる", 1560, 320, BW+10, BH, *GREY, F)
+for a,b in [(r1,r2),(r2,r3),(r2,r4),(r2,r7),(r3,r3b),(r4,r5),(r5,r6)]: d15.edge(a,b)
+# ---- tree 2: home revisit
+d15.text("実例 2 ホーム再訪(商品詳細 → ホーム): cms/pages 1 本 → State を同じ値で上書き → data$ を持つ全 view に印 → 評価されるが、値が同じなので DOM は 1 箇所も変わらない(16.6)", 820, 600, 940, 40, 12, "fontStyle=1;")
+s1=d15.box("App / StorefrontComponent(Default)\n評価、DOM 不変", 1195, 646, BW+20, BH, *GREEN, F)
+s2=d15.box("PageLayout[header](OnPush)\n子孫に印 → 通過・評価", 830, 730, BW+30, BH, *ORANGE, F)
+s3=d15.box("PageLayout[main](OnPush)\n再利用(同じ ** ルート)、評価", 1195, 730, BW+20, BH, *ORANGE, F)
+s4=d15.box("PageLayout[footer](OnPush)\n子孫に印 → 通過・評価", 1560, 730, BW+10, BH, *ORANGE, F)
+s5=d15.box("各 PageSlot: isDistinct で止まる\n(uid の並びが同じ) → *ngFor 動かず\n破棄も生成も無し", 830, 815, BW+30, BH+14, *YEL, F)
+s6=d15.box("Banner / Paragraph / Logo …\ndata$ が新オブジェクト → 印 → 評価\ninnerHTML の文字列が同じ → DOM 不変", 1130, 815, BW+150, BH+14, *ORANGE, F)
+s7=d15.box("ナビゲーション\n同上。子項目は State 済み\n→ cms/components も飛ばない", 1560, 815, BW+10, BH+14, *ORANGE, F)
+for a,b in [(s1,s2),(s1,s3),(s1,s4),(s2,s5),(s3,s6),(s4,s7)]: d15.edge(a,b)
+d15.text("ソートと再訪の違い: ソートは API 1 本で商品行を全部作り直す。再訪は API 1 本で DOM を 1 箇所も触らない。API の本数と描画コストは別の軸(16.7)。", 820, 905, 940, 40, 11)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))
