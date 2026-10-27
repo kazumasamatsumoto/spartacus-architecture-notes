@@ -3,8 +3,9 @@
 SAP Composable Storefront (Spartacus) のアーキテクチャを、ソースコードを根拠に解説したノートです。
 バックエンド(SAP Commerce Cloud)でカスタム CMS コンポーネントを作る担当者が、フロントエンド側へ何を依頼すればよいかを理解することを目的にしています。
 
-- [docs/README.md](docs/README.md) — 目次。本文は章ごとに 1 ページ(`docs/00-summary.md` 〜 `docs/13-jsp-to-headless.md`, `docs/appendix.md`)
+- [docs/README.md](docs/README.md) — 目次。本文は章ごとに 1 ページ(`docs/00-summary.md` 〜 `docs/15-facade-connector-adapter.md`, `docs/appendix.md`)
 - [docs/diagrams/spartacus-architecture.drawio](docs/diagrams/spartacus-architecture.drawio) — draw.io 図(14 ページ)。PNG / SVG も同じフォルダ
+- [playground/mini-spartacus](playground/mini-spartacus/README.md) — 「CMS がページを組み立てる仕組み」を本家と同じ名前・構造で約 1,200 行に縮めた Angular 21 アプリ。画面下の観測パネルで HTTP / State / 生成破棄 / 変更検知で評価された view を追える。`npm install && npx ng serve`
 
 ![全体フロー](docs/diagrams/page1.png)
 
