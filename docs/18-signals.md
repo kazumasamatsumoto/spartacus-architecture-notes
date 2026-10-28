@@ -263,4 +263,4 @@ export class StoreHoursComponent {
 
 ---
 
-[目次](README.md) | ← [17. zone.js と変更検知の実行モデル: 印が付く瞬間と、印が見つかる瞬間](17-zone-rendering.md) | [付録](appendix.md) →
+[目次](README.md) | ← [17. zone.js と変更検知の実行モデル: 印が付く瞬間と、印が見つかる瞬間](17-zone-rendering.md) | [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md) →

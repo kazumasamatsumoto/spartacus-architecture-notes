@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md)
+[目次](README.md) | ← [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md)

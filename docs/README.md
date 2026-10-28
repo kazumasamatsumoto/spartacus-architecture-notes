@@ -42,12 +42,13 @@
 - [13. JSP からヘッドレスへ](13-jsp-to-headless.md) — JSP が持っていた責務をどこへ移すか
 - [14. バックエンド側のチェックリスト](14-backend-checklist.md)
 
-### 第 IV 部 作る: フロント側の実装(15〜18 章)
+### 第 IV 部 作る: フロント側の実装(15〜19 章)
 
 - [15. Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md) — 業務データを扱うコンポーネントの 4 層と雛形一式
 - [16. 変更検知と dirty フラグ](16-change-detection.md) — API の応答が届いたあと、どの view が評価され、どの DOM が触られるか。ヘッダーが残り一覧の行が作り直される理由
 - [17. zone.js と変更検知の実行モデル](17-zone-rendering.md) — zone.js が何を見張って tick を起こすか。dirty の印が付く時刻と見つかる時刻を 1 本の時間軸で
 - [18. Signal API](18-signals.md) — 印の付け方が view 単位から「読んだ場所」単位に変わる。Observable + async パイプとの対応表、Spartacus 2612 での実態、カスタム実装での使い方
+- [19. Query / Command パターン](19-query-command.md) — ストア無しで「取得済みなら取らない」「更新したら取り直す」をどう作っているか。Query の状態遷移表、Command の 4 strategy、EventService の配線、NgRx との対応表
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
 ## 質問と、それに答えた章の対応
@@ -87,7 +88,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 17 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 18 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -109,4 +110,5 @@
 - [16. 変更検知と dirty フラグ: API の応答が届いたあと、どの view が描き直るのか](16-change-detection.md)
 - [17. zone.js と変更検知の実行モデル: 印が付く瞬間と、印が見つかる瞬間](17-zone-rendering.md)
 - [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md)
+- [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md)
 - [付録](appendix.md)

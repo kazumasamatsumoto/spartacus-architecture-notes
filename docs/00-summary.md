@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(17 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(18 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -34,6 +34,7 @@
 | 15 変更検知の 3 段階と dirty の経路 | A いつ tick / B どの view(dirty 印は自分から根元まで、OnPush で印なしは飛ばす)/ C どのバインディングが DOM を触るか。ソートとホーム再訪を view の木で比較(16 章) | [page15.png](diagrams/page15.png) |
 | 16 zone.js の見張りと dirty の 2 つの時刻 | zone.js がブラウザ API を差し替えてタスクを数え、Angular zone のマイクロタスクが 0 になった瞬間に tick を起こすまで。クリックと OCC 応答を時間軸に並べ、印を付ける時刻と見つける時刻を分ける(17 章) | [page16.png](diagrams/page16.png) |
 | 17 Signal の反応グラフと async パイプとの違い | 値が変わってから DOM が変わるまでを Observable + async と signal で並べる。producer / consumer のリンクと、set() が印を付ける経路(18 章) | [page17.png](diagrams/page17.png) |
+| 18 Query の状態機械と Command の戦略 | QueryService の 1 つの状態 { loading, error, data } が購読・再購読・reloadOn・resetOn・エラーでどう遷移し、どこで API が飛ぶか。Command の 4 strategy。EventService が結ぶ「書く → イベント → 取り直す」の実例(19 章) | [page18.png](diagrams/page18.png) |
 
 ![全体フロー](diagrams/page1.png)
 
