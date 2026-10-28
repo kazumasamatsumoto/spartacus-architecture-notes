@@ -514,6 +514,77 @@ s7=d15.box("ナビゲーション\n同上。子項目は State 済み\n→ cms/c
 for a,b in [(s1,s2),(s1,s3),(s1,s4),(s2,s5),(s3,s6),(s4,s7)]: d15.edge(a,b)
 d15.text("ソートと再訪の違い: ソートは API 1 本で商品行を全部作り直す。再訪は API 1 本で DOM を 1 箇所も触らない。API の本数と描画コストは別の軸(16.7)。", 820, 905, 940, 40, 11)
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+'</mxfile>'
+d16=D("16 zone.js の見張りと dirty の 2 つの時刻")
+d16.text("zone.js は何を見張っていて、いつ tick を起こすのか。印が付く時刻と見つかる時刻はなぜ分かれるのか。左: zone.js → NgZone → tick。右: クリック 1 回と OCC 応答 1 回を時間軸で。17 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gL=d16.group("zone.js → NgZone → tick: 歩く人はいつ来るか", 40, 70, 760, 900, "#f5f5f5", "#666666")
+z0=d16.box("zone.js がブラウザ API を差し替える(読み込み時)\nsetTimeout / addEventListener / XHR / Promise.then / fetch / queueMicrotask → すべて「タスク」になる(zone.js:1680-2327)", 70, 110, 700, 56, *GREY, 11)
+z1=d16.box("タスクを数える\nscheduleTask で +1、runTask の finally で -1(zone.js:187-214, 144-186)。0 ↔ 1 の瞬間だけ onHasTask(:403-418)\nPromise の続きは自前のキューに積み、タスクの終わりにまとめて流す(:452-468, 538-566)", 70, 186, 700, 72, *BLUE, 11)
+z2=d16.box("NgZone の 'angular' zone のフック(_effect-chunk2.mjs:2529-2585)\nonInvokeTask / onInvoke: 入るとき onEnter(isStable=false)、出るとき onLeave → checkStable\nonHasTask(microTask の増減): hasPendingMicrotasks を更新 → checkStable", 70, 278, 700, 72, *BLUE, 11)
+z3=d16.box("checkStable の 3 条件(:2487-2502)\n① 実行中のタスクが無い(_nesting == 0) ② Angular zone のマイクロタスクが 0 ③ 前回 stable 以降に何か動いた\nマクロタスク(HTTP や setTimeout の残り)は見ない → 「全部返ってきたら」ではなく「今の仕事が終わったら」", 70, 370, 700, 76, *ORANGE, 11)
+z3b=d16.box("eventCoalescing: true(app.config.ts:30)\nDOM イベントの直後だけ ② をわざと偽にして止め、rAF / setTimeout(0) の早い方で checkStable(:2504-2527)。マイクロタスクには効かない", 70, 466, 700, 56, *YEL, 11)
+z4=d16.box("onMicrotaskEmpty → NgZoneChangeDetectionScheduler(core.mjs:299-325)\nappRef.dirtyFlags |= 1(Global)→ ApplicationRef._tick()", 70, 542, 700, 50, *GREEN, 11)
+z5=d16.box("tick(_debug_node-chunk.mjs:12396-12498)\nsynchronize → synchronizeOnce → 各 root view を detectChangesInternal(mode 0 Global)\n→ detectChangesInView(:5900-5933)が view ごとにフラグを読む・決める・消す(1024|8192 は判定直後 :5913、64 は評価後 :5848)", 70, 612, 700, 76, *GREEN, 11)
+for a,b in [(z0,z1),(z1,z2),(z2,z3),(z3,z3b),(z3b,z4),(z4,z5)]: d16.edge(a,b)
+d16.box("結論: 印を付ける人と印を見つける人は別。付けるのは値が変わったコードの中(同期)、見つけるのは tick の中だけ。\ntick は「Angular zone のマイクロタスクが 0 になった瞬間」に走る。HTTP の本数ではなく、仕事の区切りの数だけ走る。", 70, 712, 700, 70, *RED, 11)
+d16.box("印の 3 つの入口と時刻: ① async パイプ = 値が流れた瞬間(応答処理の中) ② DOM イベント = ハンドラの前(wrapListener :8232) ③ @Input = 親の tick の最中(同じ tick の数十行あとで見つかる)\ntick の中で付いた 64 は、その tick では見つからない(requiresRefreshOrTraversal は 1024 / 8192 / consumer.dirty しか見ない)→ 次の tick へ", 70, 798, 700, 72, *YEL, 10)
+d16.text("根拠: zone.js 0.16.3 / @angular/core 21.2.25 / @angular/common _module-chunk.mjs:761-850(FetchBackend は fetch と body 読み取りを zone の外で行う)/ @angular/build utils.js:160-167, 366-373(zone.js ありなら async/await を then に落とす)/ projects/storefrontapp/project.json:23, app.config.ts:28, 30", 70, 884, 700, 70, 10)
+gR=d16.group("時間軸(橙 = 印を付ける、緑 = tick で印を見つけて消す、灰 = zone の外や印に関係ない処理)", 840, 70, 940, 900, "#fff7e6", "#d79b00")
+CW=440
+d16.text("実例 1 ソートのクリック(16.5)", 860, 104, CW, 24, 12, "fontStyle=1;")
+c1=d16.box("t1 click → zone.js globalCallback → invokeTask → onEnter(isStable = false)", 860, 134, CW, 44, *GREY, 10)
+c2=d16.box("t1 wrapListener がハンドラの前に markViewDirty(ProductList, 5)\nProductList → PageSlot → PageLayout[main] → Storefront → App → root に 64|1024", 860, 192, CW, 56, *ORANGE, 10)
+c3=d16.box("t1 ハンドラ: アクション → Effect → HttpClient → fetch 開始(zone の外)\nハンドラ終了 → eventTask + eventCoalescing → checkStable を保留", 860, 262, CW, 56, *GREY, 10)
+c4=d16.box("t2 次フレーム(rAF / setTimeout 0)→ checkStable → onMicrotaskEmpty → tick #1\n印の道筋だけ評価。header / footer は飛ばす。印を消す", 860, 332, CW, 56, *GREEN, 10)
+c5=d16.box("t3 応答ヘッダ → fetch の Promise 解決。ボディ読み取りは zone の外(tick なし)", 860, 402, CW, 44, *GREY, 10)
+c6=d16.box("t4 await の続きが Angular zone のマイクロタスクで走る\nobserver.next → reducer → selector → async パイプ markForCheck\nProductList → root に 64|1024", 860, 460, CW, 64, *ORANGE, 10)
+c7=d16.box("t4 マイクロタスク終了 → 数が 0 → onHasTask → checkStable → tick #2 その場で\nProductList を評価、行を作り直し(16.4)。印を消す。coalescing は効かない", 860, 538, CW, 56, *GREEN, 10)
+for a,b in [(c1,c2),(c2,c3),(c3,c4),(c4,c5),(c5,c6),(c6,c7)]: d16.edge(a,b)
+X2=1320
+d16.text("実例 2 ホーム再訪: Router + cms/pages(16.6)", X2, 104, CW, 24, 12, "fontStyle=1;")
+e1=d16.box("t1 リンクの click → wrapListener で印 → Router が遷移を開始", X2, 134, CW, 44, *ORANGE, 10)
+e2=d16.box("t1' 次フレームで tick #1(リンクの view の道筋だけ)", X2, 192, CW, 44, *GREEN, 10)
+e3=d16.box("t2… Router の各段(Guard / cms/pages の fetch / NavigationEnd)は Promise の連鎖\n= マイクロタスク。段が終わるたびに checkStable → tick", X2, 250, CW, 56, *GREY, 10)
+e4=d16.box("応答 → State を同じ値で上書き → data$ | async を持つ全 view が markForCheck\n(Banner / Paragraph / Logo / Navigation …)→ それぞれ root まで 64|1024", X2, 320, CW, 56, *ORANGE, 10)
+e5=d16.box("tick #2…#n 印の付いた view を全部評価\nbindingUpdated が全部 false → DOM は 1 箇所も変わらない(16.6)", X2, 390, CW, 56, *GREEN, 10)
+e6=d16.box("遷移 1 回で tick は複数回。tick の回数と DOM を触った回数は別の軸。\ntick 1 回の費用 = 印の道筋 + Default の view(App / Storefront / ProductList)", X2, 460, CW, 56, *YEL, 10)
+for a,b in [(e1,e2),(e2,e3),(e3,e4),(e4,e5),(e5,e6)]: d16.edge(a,b)
+d16.box("本家の OCC 応答が Angular zone に戻る経路(17.3)\nFetchBackend は fetch とボディ読み取りを runOutsideAngular で行う(_module-chunk.mjs:793, 834)。\nしかし doRequest は Observable の購読時 = Angular zone の中で始まるので、runOutsideAngular の外側の await の続き(observer.next)は Angular zone に戻る。\nこれは CLI が zone.js ありのアプリで async/await を Promise.then に落とすから(@angular/build utils.js:160-167, 366-373)。", 860, 630, 900, 96, *BLUE, 10)
+d16.box("きっかけ別の tick の時刻\nクリック: リスナ終了 → 次フレーム(coalescing) / setTimeout 完了(ミニアプリの擬似 OCC): その場 / Promise・await の続き: その場 / OCC 応答(fetch): 応答処理の続きが終わった瞬間 / Router 遷移: 段ごとに複数回 / zone の外からの markForCheck・signal.set: scheduler が rAF / setTimeout で予約(hybrid)", 860, 744, 900, 90, *GREY, 10)
+d16.text("ミニアプリの観測パネル(playground/mini-spartacus)の CD 行は afterEveryRender で tick の終わりを検出する(debug-log.service.ts:29)。ソートで CD 行が 2 行(t2 と t4)出て、どちらにも PageLayout[header] が無いのはこの時間軸のとおり。", 860, 850, 900, 50, 10)
+
+d17=D("17 Signal の反応グラフと async パイプとの違い")
+d17.text("Signal は Observable + async パイプと何が違うのか。印はどこに付き、誰が tick を予約するのか。左: 値が変わってから DOM が変わるまでの 2 つの経路。右: producer / consumer のリンクと set() の経路。18 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gL=d17.group("値が変わってから DOM が変わるまで: 2 つの経路を並べる", 40, 70, 900, 900, "#f5f5f5", "#666666")
+AX=70; BX=510; W=410
+d17.text("Observable + async パイプ(Spartacus の主経路)", AX, 104, W, 24, 12, "fontStyle=1;")
+d17.text("signal をテンプレートで読む", BX, 104, W, 24, 12, "fontStyle=1;")
+rows=[
+ (GREY, 56, "値が変わる: reducer が State を書き換え、selector が新しい値を流す", "値が変わる: s.set(v)。equal(既定は Object.is 相当)で同じなら何もしない。印も付かない(_effect-chunk.mjs:365-372)"),
+ (ORANGE, 72, "印: AsyncPipe._updateLatestValue → markForCheck → markViewDirty\n自分〜根元に 64|1024(「購読している view」単位、_common_module-chunk.mjs:2601-2607)", "印: signalValueChanged → producerNotifyConsumers → consumerMarkDirty → consumerMarkedDirty\n読んだ view に consumer.dirty、先祖に 8192 だけ(markAncestorsForTraversal、_debug_node-chunk.mjs:5645-5647)"),
+ (BLUE, 60, "tick の予約: 自分ではしない。zone が起こす tick を待つ(17 章)。zone の外なら notify(4)", "tick の予約: notify(0) → dirtyFlags |= 2。zone の中なら zone に任せ、外なら rAF / setTimeout で自前(18.4)。zone が無くても動く"),
+ (ORANGE, 72, "評価判定: detectChangesInView の flags & 64 / flags & 1024\nOnPush でないと Global の tick で毎回評価される", "評価判定: 同じ関数の consumer.dirty && consumerPollProducersForChange(version 比較、:5908)\nOnPush かどうかに依らず「読んだ view」だけ"),
+ (GREEN, 56, "DOM: bindingUpdated の Object.is で変わったバインディングだけ(16.4)", "DOM: 同じ。その前に equal と computed の version 比較で評価そのものが止まる"),
+ (YEL, 72, "購読の開始: async パイプが初めて評価されたとき(遅延)\n= 8.0 規則 3「購読した瞬間に取りに行く」", "購読の開始: toSignal は作った瞬間(rxjs-interop.mjs:126-141)\n= コンポーネント生成時に API が飛ぶ。*ngIf で隠れていても"),
+]
+y=134
+for col,h,a,b in rows:
+    d17.box(a, AX, y, W, h, *col, 10); d17.box(b, BX, y, W, h, *col, 10); y+=h+14
+d17.box("結論: signal が変えるのは「どの view に印が付くか」と「誰が tick を予約するか」だけ。API の本数・応答の形・State の形は変わらない。\nバックエンド側で signal の有無によって変えることは無い。変わるのは購読の開始時刻(toSignal は生成時)。", AX, y+6, 850, 72, *RED, 11)
+d17.text("根拠: _effect-chunk.mjs:26-41(REACTIVE_NODE), 43-87(producerAccessed), 91-103(producerUpdateValueVersion), 105-129, 163-178, 340-396 / _debug_node-chunk.mjs:5641-5677(テンプレートの consumer), 5758-5770, 5908-5912, 18262-18266 / _effect-chunk2.mjs:1781-1805, 2884-3011(effect) / rxjs-interop.mjs:74-158 / core.mjs:25-57(input)", AX, y+92, 850, 70, 10)
+gR=d17.group("反応グラフ: 誰が誰を読んだか(producer → consumer)と、set() が印を付ける経路", 980, 70, 800, 900, "#fff7e6", "#d79b00")
+p1=d17.box("signal: storeCode\nversion = 3, value = '0001'\nconsumers → [computed hours]", 1010, 120, 230, 70, *BLUE, 10)
+p2=d17.box("input(): productCode\n親テンプレートの [productCode] が親の tick の中で set() する(18.7)", 1300, 120, 230, 70, *BLUE, 10)
+q1=d17.box("computed: hours\nproducers → [storeCode @ v3]\n読まれたときに version を比べ、違えば再計算(18.2)", 1010, 240, 230, 80, *PURP, 10)
+t1=d17.box("テンプレートの consumer(lView)\nhours() を読んだ瞬間にリンクが張られる\nREACTIVE_TEMPLATE_CONSUMER(:5648-5650)", 1300, 240, 230, 80, *ORANGE, 10)
+f1=d17.box("effect(view): フォーカス制御など\nrefreshView の中、テンプレートの後で実行(:5795)", 1010, 370, 230, 64, *PURP, 10)
+f2=d17.box("effect(root) / toObservable\nsynchronizeOnce の先頭で flush(:12454-12457)", 1300, 370, 230, 64, *PURP, 10)
+d17.edge(p1,q1,"読む"); d17.edge(q1,t1,"読む"); d17.edge(p2,t1,"読む"); d17.edge(q1,f1,"読む"); d17.edge(p1,f2,"読む", pts=[(1125,105),(1415,105)])
+s1=d17.box("storeCode.set('0002') の経路(同期、値は渡さない)\n① version++、epoch++(_effect-chunk.mjs:391-396) ② consumers を辿って consumerMarkDirty(computed → テンプレートの consumer → effect)\n③ テンプレート consumer の consumerMarkedDirty → markAncestorsForTraversal: 先祖に 8192、changeDetectionScheduler.notify(0)\n④ effect は scheduler に予約(root)/ view に 8192(view)。実行は次の tick", 1010, 470, 740, 96, *RED, 10)
+s2=d17.box("次の tick で: detectChangesInView が consumer.dirty を見つけ、version 比較で本当に変わっていれば評価(:5908)\n先祖(8192)は通過するだけ。兄弟は触らない。評価の中で bindingUpdated が変わった箇所だけ DOM へ", 1010, 586, 740, 60, *GREEN, 10)
+d17.edge(s1,s2)
+d17.box("Spartacus 2612 の実態: signal 系 API は 24 箇所 / 12 ファイル(spec 除く)。State → view の主経路(data$ / ProductService / Facade)は Observable + async のまま\n・consent-management.component.ts:72: isLoading = signal(false)(コード内で読む状態の入れ物)\n・subscription-product-price.component.ts:33-50: toSignal + computed × 3 → テンプレートで oneTimeCharges()\n・order-attachments-dialog.component.ts:42, 86-90: OnPush + signal + toSignal(initialValue: 0)\n・store-finder-list.component.ts:68, 79-81: viewChild signal + effect でフォーカス\n・http-error-handler.interceptor.ts:46: toSignal(userId)(サービス内で購読なしに最新値を読む)\n・NgRx の selectSignal は本体で 0 件", 1010, 666, 740, 130, *YEL, 10)
+d17.box("カスタム実装で signal を選ぶとき(18.8): Facade(15 章)はそのまま。コンポーネントで toSignal(component.data$) → computed → toObservable → switchMap(facade.getHours) → toSignal。\n変わるのは購読の開始時刻だけ。/stores/{code}/hours が 1 本飛ぶ事実と応答の形は同じ。", 1010, 812, 740, 72, *BLUE, 10)
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

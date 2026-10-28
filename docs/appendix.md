@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [16. 変更検知と dirty フラグ: API の応答が届いたあと、どの view が描き直るのか](16-change-detection.md)
+[目次](README.md) | ← [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md)

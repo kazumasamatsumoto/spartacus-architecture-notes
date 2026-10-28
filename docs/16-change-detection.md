@@ -181,4 +181,4 @@ view が評価されても、DOM が書き換わるとは限らない。バイ�
 
 ---
 
-[目次](README.md) | ← [15. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md) | [付録](appendix.md) →
+[目次](README.md) | ← [15. 業務データを扱うカスタムコンポーネント: Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md) | [17. zone.js と変更検知の実行モデル: 印が付く瞬間と、印が見つかる瞬間](17-zone-rendering.md) →

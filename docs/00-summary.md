@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(15 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(17 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -32,6 +32,8 @@
 | 13 API の形 → State の形: 3 層の作り変え | cms/pages の JSON が Normalizer → Effect → Reducer を通って cms ステートになるまでと、State で見える違いごとの作り手・変えたいときの入口(5 章) | [page13.png](diagrams/page13.png) |
 | 14 ルーティングと配置: 普通の Angular との違い | URL とページの対応表を誰が持つか(左)、配置は「文字列をキーに 4 つの表を引く」の繰り返し(右)(3 章 3.0) | [page14.png](diagrams/page14.png) |
 | 15 変更検知の 3 段階と dirty の経路 | A いつ tick / B どの view(dirty 印は自分から根元まで、OnPush で印なしは飛ばす)/ C どのバインディングが DOM を触るか。ソートとホーム再訪を view の木で比較(16 章) | [page15.png](diagrams/page15.png) |
+| 16 zone.js の見張りと dirty の 2 つの時刻 | zone.js がブラウザ API を差し替えてタスクを数え、Angular zone のマイクロタスクが 0 になった瞬間に tick を起こすまで。クリックと OCC 応答を時間軸に並べ、印を付ける時刻と見つける時刻を分ける(17 章) | [page16.png](diagrams/page16.png) |
+| 17 Signal の反応グラフと async パイプとの違い | 値が変わってから DOM が変わるまでを Observable + async と signal で並べる。producer / consumer のリンクと、set() が印を付ける経路(18 章) | [page17.png](diagrams/page17.png) |
 
 ![全体フロー](diagrams/page1.png)
 
