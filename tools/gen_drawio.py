@@ -688,6 +688,49 @@ d20.box("差が出る所: 重複排除(Store 全体で 1 回 vs resource を作�
 d20.box("選び方(21.8): ① 本体が持つサーバー状態 → Facade + async か toSignal ② 自前のサーバー状態 → 15 章 Facade + 19 章 Query(NgRx の枝は DevTools・ssrTransfer・共有辞書が要るときだけ)③ 画面だけの状態 → signal ④ 画面をまたぐクライアント状態 → root サービスの signal\nFacade の返り値は Observable のまま。toSignal は末端で 1 回", 1260, 522, 500, 100, *GREEN, 10)
 d20.box("バックエンドへの意味: API 契約は不変。resource を直接使うと同じ GET が複数回・途中で abort されたリクエストが増える。cx-state に載るのは NgRx の 4 枝だけ(Query・signal・resource は載らない)\n依頼書には機能ごとに状態の種類 ①〜④ を 1 行", 1260, 638, 500, 84, *RED, 10)
 d20.text("根拠: core-libs/core/package.json:22-24 / product-store.module.ts:20-30 / cms-store.module.ts:25 / site-context-store.module.ts:24 / site-theme-store.module.ts:23 / private.providers.ts:55 / subscription-product-price.component.ts:33-51 / http-error-handler.interceptor.ts:46, 91 / docs/spa-bff-reference-implementation.md:1156-1177 / grep 集計は 21.7", 1260, 738, 500, 100, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+'</mxfile>'
+d21=D("21 カスタマイズの 7 段と 100 シナリオの分布")
+d21.text("「〜を変えたい」はどの段で吸収できるか。左ほど安い。各段の件数は 100 シナリオ(22 章)を「いちばん浅く済む段」で数えたもの。段 0 と段 1 で 64 件", 40, 20, 1740, 30, 16, "fontStyle=1;")
+tiers=[
+ ("段 0  バックエンドのデータ・CMS だけ\n18 件", "フロントは変更なし\n#12 類似商品の見出し / #26 検索候補の件数 / #27 リストかグリッド / #36 クーポン / #51 マイアカウントのメニュー / #62 コンテンツページ / #68 404 / #71-72 言語・通貨", GREEN),
+ ("段 1  フロントの設定値\n46 件", "provideConfig に 1 ブロック\n#21 一覧の件数 / #24 無限スクロール / #14・#25 fields / #20 maxAge / #41-44 チェックアウト / #61 商品 URL / #74 文言 / #81-83 レイアウト / #98 ssrTransfer", BLUE),
+ ("段 2  見た目・アウトレット\n8 件", "SCSS・CSS 変数・provideOutlet\n#1 標準の見た目 / #28 カードへの差し込み / #38 カート行の置き換え / #78 ブランドカラー / #84-85 前後・置き換え / #90 スロットの CSS", YEL),
+ ("段 3  コンポーネントの差し替え・追加\n15 件", "cmsComponents.<typeCode>.component\n#2 同じ typeCode で差し替え / #3 新 ItemType / #11 類似商品の件数 / #19 画像 / #31 ミニカート / #46 独自ステップ / #52 注文履歴の件数", ORANGE),
+ ("段 4  変換\n3 件", "*_NORMALIZER / *_SERIALIZER\n#16 商品の独自項目 / #94 応答の変換 / #95 送信の変換", PURP),
+ ("段 5  取得・ロジックの差し替え\n8 件", "Adapter / Facade / サービス / Interceptor\n#54 ログイン後の遷移 / #60 ユーザー固有 API / #65 meta / #92 別サーバー / #96 HTTP エラー / #100 Facade", GREY),
+ ("BE  バックエンド実装が必要\n2 件", "フロントに設定が無い\n#22 並び順の選択肢 / #23 ファセットの表示数(Solr の設定)", RED),
+]
+prev=None
+for i,(h,b,col) in enumerate(tiers):
+    x=40+i*250
+    t=d21.box(h, x, 80, 220, 60, *col, 12, "fontStyle=1;")
+    d21.box(b, x, 160, 220, 150, *col, 10, "align=left;spacingLeft=6;verticalAlign=top;")
+    if prev: d21.edge(prev,t)
+    prev=t
+d21.text("段の読み方: 「0 → 3」は段 0 で済むが、もっと変えたいなら段 3。バックエンドの欄に作業がある行は 53 件。ほとんどは CMS への配置・属性の公開・DTO への項目追加で、新しいエンドポイントが要るのは機能や取得先が新しいとき(#45・#59・#60・#92)だけ", 40, 325, 1720, 40, 12)
+gP=d21.group("落とし穴: 設定がありそうで無いもの(22.12)", 40, 380, 1060, 420, "#fff2f2", "#b85450")
+pit=[
+ "maximumNumberProducts / displayProductTitles は定義だけで未使用(cms.model.ts:148-150)→ 類似商品の件数は段 3",
+ "minPerFacet は定義だけ。移行ツールに「削除済み」(cms.model.ts:197)",
+ "注文履歴の件数は private PAGE_SIZE = 5(order-history.component.ts:61)→ 差し替え",
+ "guards は部品単位ではなく、ページのルートガードとして評価(cms-components.service.ts:253)",
+ "参照タイプをカンマ区切りにすると Selector の完全一致で 0 件(product-references.selectors.ts:35)",
+ "productSearch の fields から keywordRedirectUrl を消すと、検索語リダイレクトが黙って止まる",
+ "数量の上限・ログイン後の遷移先には設定キーが無い(add-to-cart.component.ts:224、auth-redirect.service.ts:81)",
+ "独自のチェックアウトステップは完了チェックを素通り(checkout-steps-set.guard.ts:106)",
+ "a11yPrimaryColorContrast が有効だと --cx-color-primary が !important で上書き(root.scss:66-70)",
+]
+for i,t in enumerate(pit):
+    d21.box(t, 60, 420+i*41, 1020, 34, *RED, 10, "align=left;spacingLeft=6;")
+gU=d21.group("要件の会話での使い方(22.14)", 1140, 380, 620, 420, "#f5f5f5", "#666666")
+use=[
+ ("まず段を引く。「件数を変えたい」でも #11・#21・#39・#52 で段が違う", BLUE),
+ ("段 0・段 1 はその場で試せる。CMS の属性を変える、provideConfig を 1 ブロック書く。動く画面を見せれば API の議論が要らない", GREEN),
+ ("段 3 以上は「なぜ浅い段で済まないか」を 1 行書く。22.12 の根拠を添えると見積もりの理由になる", ORANGE),
+ ("BE の欄は「新しい API」か「既存 API の中身(fields・DTO)」かを分けて依頼書に書く(11.8、12 章、14 章)", PURP),
+]
+for i,(t,col) in enumerate(use):
+    d21.box(t, 1160, 420+i*90, 580, 76, *col, 11, "align=left;spacingLeft=6;")
+d21.text("根拠: core/config/config-providers.ts:18, 55 / core/cms/config/cms-config.ts:61-130 / sf/cms-structure/outlet/outlet.model.ts:9-10 / core/product/connectors/product/converters.ts:11 / core/lazy-loading/facade-factory/facade-factory.ts:20 / 各行の根拠は 22 章の表(232 か所、全件照合済み)", 40, 810, 1720, 30, 10)
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

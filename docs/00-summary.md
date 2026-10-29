@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(20 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(21 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -37,6 +37,7 @@
 | 18 Query の状態機械と Command の戦略 | QueryService の 1 つの状態 { loading, error, data } が購読・再購読・reloadOn・resetOn・エラーでどう遷移し、どこで API が飛ぶか。Command の 4 strategy。EventService が結ぶ「書く → イベント → 取り直す」の実例(19 章) | [page18.png](diagrams/page18.png) |
 | 19 zone モードと zoneless の経路の差 | zone モードで tick が起きる 2 本の経路(zone.js の onMicrotaskEmpty と scheduler の予約)と、zoneless に残る 1 本。Global と Targeted の違い、安定判定(zone のタスク数 vs PendingTasks)、Angular 21 の既定と Spartacus 本体の設定・集計(20 章) | [page19.png](diagrams/page19.png) / [svg](diagrams/page19.svg) |
 | 20 状態管理の 2 つの作り方と変更検知の 2 つのモード | 左: Spartacus 本体の NgRx 経路(Connector → Effect → Reducer → Store → Selector → Facade → async パイプ)。中: Angular 21 の signal 経路(resource / computed → テンプレートの読み取り)と toSignal / toObservable の橋。右: 「状態の持ち方 × 変更検知のモード」の 2×2、本体の集計、状態の種類 ①〜④ による選び方(21 章) | [page20.png](diagrams/page20.png) / [svg](diagrams/page20.svg) |
+| 21 カスタマイズの 7 段と 100 シナリオの分布 | 段 0(バックエンドのデータ・CMS だけ)から段 5(取得・ロジックの差し替え)と BE までの 7 段、各段の件数と代表例、設定がありそうで無い落とし穴、要件の会話での使い方(22 章) | [page21.png](diagrams/page21.png) / [svg](diagrams/page21.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

@@ -253,4 +253,4 @@ export class MemberRankComponent {
 
 ---
 
-[目次](README.md) | ← [20. zone.js と zoneless: 「tick をいつ起こすか」を誰が決めるか](20-zoneless.md) | [付録](appendix.md) →
+[目次](README.md) | ← [20. zone.js と zoneless: 「tick をいつ起こすか」を誰が決めるか](20-zoneless.md) | [22. カスタマイズシナリオ 100: その要件はどの段で吸収できるか](22-customization-scenarios.md) →
