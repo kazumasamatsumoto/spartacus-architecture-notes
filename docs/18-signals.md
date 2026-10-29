@@ -155,7 +155,7 @@ if (consumer) consumer.dirty = false;
 
 `markAncestorsForTraversal` の先頭は `changeDetectionScheduler.notify(0)` である(`_effect-chunk2.mjs:1794`)。`ChangeDetectionSchedulerImpl.notify` は `source 0` で `appRef.dirtyFlags |= 2`(ViewTreeTraversal)にする(`_debug_node-chunk.mjs:18262-18266`)。17.4 のとおり、Angular zone の中にいれば `shouldScheduleTick` が `false` を返して zone の tick を待ち、外にいれば自前で予約する。
 
-zone が起こす tick は `dirtyFlags |= 1` なので常に Global(`mode 0`)で、Default の view は印が無くても評価される。これに対して scheduler が自前で起こす tick(zone の外からの `set()`、または `provideZonelessChangeDetection` の環境)は `1` を立てないので **Targeted(`mode 1`)** になる(`synchronizeOnce`、`:12469`)。Targeted では `1024`、`8192`、`consumer.dirty` の付いた view しか訪ねない。Spartacus 本体は zone モードなので通常は Global だが、「signal を使えば zone 無しでも動く」のはこの経路があるからである。
+zone が起こす tick は `dirtyFlags |= 1` なので常に Global(`mode 0`)で、Default の view は印が無くても評価される。zone モードでは scheduler が自前で起こす tick(zone の外からの `set()`)も、`tick()` の冒頭で `dirtyFlags & 7` なら `1` を立てる(`:18345-18347`)ので、やはり Global になる。**Targeted(`mode 1`)** になるのは zoneless(`provideZonelessChangeDetection`、または Angular 21 で `provideZoneChangeDetection` を書かない既定)のときだけで、そのときは `1` を立てる者がいない(`synchronizeOnce`、`:12469`。20 章)。Targeted では `1024`、`8192`、`consumer.dirty` の付いた view しか訪ねない。Spartacus 本体は zone モードなので通常は Global だが、「signal を使えば zone 無しでも動く」のはこの経路があるからである。
 
 Spartacus 2612 は `provideZoneChangeDetection` を使っており(`app.config.ts:30`)、zoneless への切り替えは行っていない。標準コンポーネントの大半が `async` パイプに依存している以上、zone を外すと `async` パイプの `markForCheck` 経由(`notify(4)`)で動くことにはなるが、本家で検証された構成ではない。
 

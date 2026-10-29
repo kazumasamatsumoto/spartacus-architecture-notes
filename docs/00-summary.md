@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(18 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(19 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -35,6 +35,7 @@
 | 16 zone.js の見張りと dirty の 2 つの時刻 | zone.js がブラウザ API を差し替えてタスクを数え、Angular zone のマイクロタスクが 0 になった瞬間に tick を起こすまで。クリックと OCC 応答を時間軸に並べ、印を付ける時刻と見つける時刻を分ける(17 章) | [page16.png](diagrams/page16.png) |
 | 17 Signal の反応グラフと async パイプとの違い | 値が変わってから DOM が変わるまでを Observable + async と signal で並べる。producer / consumer のリンクと、set() が印を付ける経路(18 章) | [page17.png](diagrams/page17.png) |
 | 18 Query の状態機械と Command の戦略 | QueryService の 1 つの状態 { loading, error, data } が購読・再購読・reloadOn・resetOn・エラーでどう遷移し、どこで API が飛ぶか。Command の 4 strategy。EventService が結ぶ「書く → イベント → 取り直す」の実例(19 章) | [page18.png](diagrams/page18.png) |
+| 19 zone モードと zoneless の経路の差 | zone モードで tick が起きる 2 本の経路(zone.js の onMicrotaskEmpty と scheduler の予約)と、zoneless に残る 1 本。Global と Targeted の違い、安定判定(zone のタスク数 vs PendingTasks)、Angular 21 の既定と Spartacus 本体の設定・集計(20 章) | [page19.png](diagrams/page19.png) / [svg](diagrams/page19.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

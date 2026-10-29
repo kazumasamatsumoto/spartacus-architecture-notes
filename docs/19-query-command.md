@@ -225,4 +225,4 @@ API は 2 本(PATCH + GET)。PATCH の応答本文は画面に使われない。
 
 ---
 
-[目次](README.md) | ← [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md) | [付録](appendix.md) →
+[目次](README.md) | ← [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md) | [20. zone.js と zoneless: 「tick をいつ起こすか」を誰が決めるか](20-zoneless.md) →
