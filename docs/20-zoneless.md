@@ -6,7 +6,7 @@
 
 > **この章が答える問い**: zone.js を外すと、16〜17 章の「印を付ける」「印を見つける」のどこが変わり、どこが変わらないのか。Angular 21 では何も書かなければ zoneless なのに、Spartacus が `provideZoneChangeDetection` を明示して zone モードを続けている理由は何か。カスタム実装はどう書けば両方のモードで動くのか
 
-> **位置づけ**: 16 章(印の種類)、17 章(zone モードの実行モデル)、18 章(signal)の続き。17 章の表と関数をそのまま使い、「zone モードと zoneless で値が変わる行」だけを取り出す。18.4 の末尾で触れた「zone が無くても動く経路」の全体像
+> **位置づけ**: 16 章(印の種類)、17 章(zone モードの実行モデル)、18 章(signal)の続き。17 章の表と関数をそのまま使い、「zone モードと zoneless で値が変わる行」だけを取り出す。18.4 の末尾で触れた「zone が無くても動く経路」の全体像。**この章は変更検知の軸だけを扱う。signal を例に出す箇所があるが、zoneless にするために signal や NgRx の置き換えが要るわけではない**(状態管理の軸は 21 章、2 軸の切り分けは 21.1)
 
 > **根拠の取り方**: Angular 側は `mini-spartacus/node_modules` の `@angular/core` 21.2.25(`fesm2022/core.mjs`、`_debug_node-chunk.mjs`、`_effect-chunk2.mjs`)、`@angular/common` の `_module-chunk.mjs`、`@angular/router` の `_router-chunk.mjs`、CLI の `@schematics/angular` を読む。Spartacus 側はクローン(v2612.0.0)の `projects/storefrontapp`、`core-libs/schematics`、`docs/migration/221121_7`、コンポーネントの `grep` 集計。17 章と同じく、ビルド後のコードに enum 名は残らないので、数値の横に TypeScript の名前を添える
 
@@ -248,4 +248,4 @@ Spartacus 本体が zone モードでも、カスタムのコンポーネント�
 
 ---
 
-[目次](README.md) | ← [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md) | [付録](appendix.md) →
+[目次](README.md) | ← [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md) | [21. 状態管理の選択: NgRx(Store / Facade / Observable)と Signal(signal / computed / resource)](21-state-management.md) →

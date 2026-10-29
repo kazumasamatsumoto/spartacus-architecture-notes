@@ -42,7 +42,7 @@
 - [13. JSP からヘッドレスへ](13-jsp-to-headless.md) — JSP が持っていた責務をどこへ移すか
 - [14. バックエンド側のチェックリスト](14-backend-checklist.md)
 
-### 第 IV 部 作る: フロント側の実装(15〜20 章)
+### 第 IV 部 作る: フロント側の実装(15〜21 章)
 
 - [15. Facade / Connector / Adapter の作り方](15-facade-connector-adapter.md) — 業務データを扱うコンポーネントの 4 層と雛形一式
 - [16. 変更検知と dirty フラグ](16-change-detection.md) — API の応答が届いたあと、どの view が評価され、どの DOM が触られるか。ヘッダーが残り一覧の行が作り直される理由
@@ -50,6 +50,7 @@
 - [18. Signal API](18-signals.md) — 印の付け方が view 単位から「読んだ場所」単位に変わる。Observable + async パイプとの対応表、Spartacus 2612 での実態、カスタム実装での使い方
 - [19. Query / Command パターン](19-query-command.md) — ストア無しで「取得済みなら取らない」「更新したら取り直す」をどう作っているか。Query の状態遷移表、Command の 4 strategy、EventService の配線、NgRx との対応表
 - [20. zone.js と zoneless](20-zoneless.md) — zone.js を外すと 16〜17 章のどこが変わりどこが変わらないか。tick を起こす経路(2 本 → 1 本)、Global と Targeted、安定判定と SSR、Angular 21 の既定が zoneless なのに Spartacus が zone モードを明示する理由、両モードで動くカスタム実装の 4 規則
+- [21. 状態管理の選択: NgRx と Signal](21-state-management.md) — 「signal か NgRx か」(状態の持ち方)と「zone か zoneless か」(変更検知)は別の軸。Store / Action / Reducer / Selector / Effect / Facade の仕事を signal / computed / resource / toSignal が何で担うか、Spartacus 2612 の集計(NgRx が木、signal は末端 13 ファイル)、状態の種類 ①〜④ で決める選び方
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
 ## 質問と、それに答えた章の対応
@@ -89,7 +90,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 19 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 20 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -113,4 +114,5 @@
 - [18. Signal API: 印の付け方が view 単位から「読んだ場所」単位に変わる](18-signals.md)
 - [19. Query / Command パターン: ストア無しで「取得済みなら取らない」と「更新したら取り直す」を作る](19-query-command.md)
 - [20. zone.js と zoneless: 「tick をいつ起こすか」を誰が決めるか](20-zoneless.md)
+- [21. 状態管理の選択: NgRx(Store / Facade / Observable)と Signal(signal / computed / resource)](21-state-management.md)
 - [付録](appendix.md)

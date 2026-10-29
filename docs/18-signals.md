@@ -6,7 +6,7 @@
 
 > **この章が答える問い**: Signal は Observable + `async` パイプと何が違うのか。印はどこに付き、誰が tick を予約し、tick はどう見つけるのか。Spartacus 2612 はどこまで signal を使っていて、カスタム実装ではどう使えばよいのか
 
-> **位置づけ**: 16 章(どの view に印が付くか)と 17 章(印が付く時刻・見つかる時刻)の続き。Angular 16 以降の反応性モデルを、同じ「印を付ける / 見つける」の語彙で説明する。Spartacus の標準コンポーネントは Observable + NgRx 主体なので、この章は「本家の読み方」というより「カスタム実装で signal を選んだとき、16〜17 章のどこが置き換わるか」の章
+> **位置づけ**: 16 章(どの view に印が付くか)と 17 章(印が付く時刻・見つかる時刻)の続き。Angular 16 以降の反応性モデルを、同じ「印を付ける / 見つける」の語彙で説明する。Spartacus の標準コンポーネントは Observable + NgRx 主体なので、この章は「本家の読み方」というより「カスタム実装で signal を選んだとき、16〜17 章のどこが置き換わるか」の章。**この章が扱うのは変更検知の軸(印の付き方)であって、「NgRx の代わりに signal で状態を持つか」という状態管理の軸は 21 章で扱う**(2 軸の切り分けは 21.1)
 
 > **根拠の取り方**: 17 章と同じく、Angular 本体はミニアプリの `node_modules`(`@angular/core` 21.2.25)のビルド済みファイルを行番号で引く。signal の中核は `@angular/core/fesm2022/_effect-chunk.mjs`(反応グラフ)、`_effect-chunk2.mjs`(`signal()`、`effect()`)、`_debug_node-chunk.mjs`(テンプレートの consumer)、`rxjs-interop.mjs`(`toSignal` / `toObservable`)。Spartacus 側の利用箇所はクローン(v2612.0.0)を `grep` した結果で、`signal(` / `computed(` / `toSignal(` / `effect(` が本体のライブラリで使われているのは 24 箇所、ファイルにして 12 本(spec を除く)
 

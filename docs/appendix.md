@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [20. zone.js と zoneless: 「tick をいつ起こすか」を誰が決めるか](20-zoneless.md)
+[目次](README.md) | ← [21. 状態管理の選択: NgRx(Store / Facade / Observable)と Signal(signal / computed / resource)](21-state-management.md)
