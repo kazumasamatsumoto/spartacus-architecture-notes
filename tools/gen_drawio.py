@@ -731,6 +731,42 @@ use=[
 for i,(t,col) in enumerate(use):
     d21.box(t, 1160, 420+i*90, 580, 76, *col, 11, "align=left;spacingLeft=6;")
 d21.text("根拠: core/config/config-providers.ts:18, 55 / core/cms/config/cms-config.ts:61-130 / sf/cms-structure/outlet/outlet.model.ts:9-10 / core/product/connectors/product/converters.ts:11 / core/lazy-loading/facade-factory/facade-factory.ts:20 / 各行の根拠は 22 章の表(232 か所、全件照合済み)", 40, 810, 1720, 30, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+'</mxfile>'
+d22=D("22 カスタマイズの置き場所")
+d22.text("書く中身より書く場所で失敗する。左: ng add が作る骨格。中: すぐ読まれる root の injector と、遅延ロードで作られる子の injector。右: 段ごとの置き場所。23 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d22.group("アプリの骨格(ng add が作る)", 40, 70, 520, 770, "#f5f5f5", "#666666")
+a1=d22.box("app.config.ts\nprovideHttpClient(withFetch(), withInterceptorsFromDi())\nprovideZoneChangeDetection / importProvidersFrom(AppModule)", 60, 110, 480, 66, *BLUE, 10)
+a2=d22.box("app.module.ts\nStoreModule.forRoot / EffectsModule.forRoot / AppRoutingModule / SpartacusModule\n+ CustomModule(自作をここで読む)", 60, 196, 480, 66, *BLUE, 10)
+a3=d22.box("spartacus/spartacus.module.ts\nBaseStorefrontModule + 機能モジュール + 設定モジュール", 60, 282, 480, 50, *BLUE, 10)
+a4=d22.box("spartacus-configuration.module.ts\nアプリ全体の provideConfig(OCC・サイト・翻訳・レイアウト・features.level)", 60, 352, 230, 84, *GREEN, 10)
+a5=d22.box("spartacus-features.module.ts\n使う機能の *FeatureModule を並べる", 310, 352, 230, 84, *GREEN, 10)
+a6=d22.box("features/cart/cart-base-feature.module.ts(すぐ読む)\nCartBaseRootModule(設定・ルート・Facade の代理)\nfeatureModules: { cartBase: { module: () => import('./cart-base-wrapper.module') } }", 60, 456, 480, 80, *YEL, 10)
+a7=d22.box("features/cart/cart-base-wrapper.module.ts(遅延ロード)\nimports: [CartBaseModule, ...拡張]\n← カートの Service / Facade / Normalizer の上書きはここ", 60, 556, 480, 80, *ORANGE, 10)
+a8=d22.box("src/styles.scss(本体の SCSS を順番どおり)/ styles-config.scss(変数を先に)/ src/styles/cx-*.scss(部品ごとの上書き)", 60, 656, 480, 60, *PURP, 10)
+for x,y in [(a1,a2),(a2,a3),(a3,a4),(a3,a5),(a5,a6)]: d22.edge(x,y)
+d22.edge(a6,a7,"CMS に cartBase の部品が出たとき import()",dashed=True)
+d22.text("根拠: core-libs/schematics/src/add-spartacus/__snapshots__/index_spec.ts.snap:24-108 / shared/utils/lib-utils.ts:320-326 / add-spartacus/index.ts:147-167 / projects/storefrontapp/src/app/spartacus/features/cart/cart-base-feature.module.ts:23-70, cart-base-wrapper.module.ts:22-25", 60, 730, 480, 80, 10)
+gB=d22.group("2 層の injector: どこに provide すると効くか", 600, 70, 560, 770, "#f5f5f5", "#666666")
+b1=d22.box("root の injector(起動時)\nprovideConfig のマージ先 / @spartacus/core・storefront のサービス(ProductService、ProductAdapter、PRODUCT_NORMALIZER)/ ActiveCartFacade の代理(facadeFactory)/ HTTP_INTERCEPTORS / HttpErrorHandler", 620, 110, 520, 110, *BLUE, 10)
+b2=d22.box("子の injector(カートの部品が初めて出たとき)\nActiveCartFacade → ActiveCartService(facade-providers.ts:28-29)\nCART_NORMALIZER など、その機能の provider", 620, 300, 520, 90, *ORANGE, 10)
+d22.edge(b1,b2,"代理が import() して本物を探す(facade-factory.ts:20)",dashed=True)
+d22.box("✕ root に { provide: ActiveCartService, useClass: Mine }\n→ カートの中では子の provider が先に見つかる。黙って無視される", 620, 420, 250, 90, *RED, 10)
+d22.box("○ wrapper に { provide: ActiveCartService, useClass: Mine }\n→ 子の injector の中で上書きされる", 890, 420, 250, 90, *GREEN, 10)
+d22.box("✕ 遅延ロード側に routing / i18n / view の provideConfig\n→ 機能が読まれるまで値が無い", 620, 530, 250, 80, *RED, 10)
+d22.box("○ cmsComponents や、その機能の Adapter だけが使う endpoints は wrapper でも可\n(迷ったら root。provideConfig は provideDefaultConfig に必ず勝つ)", 890, 530, 250, 80, *GREEN, 10)
+d22.box("規則 1: アプリ全体で読む設定 → すぐ読まれる設定モジュール\n規則 2: 遅延ロードの機能のサービス → その機能の wrapper\n規則 3: core / storefront のサービス → root", 620, 630, 520, 80, *YEL, 11, "fontStyle=1;")
+d22.text("根拠: fl/cart/base/core/facade/facade-providers.ts:28-29 / fl/cart/base/root/facade/active-cart.facade.ts:16, 46 / core/lazy-loading/facade-factory/facade-factory.ts:20 / core/config/config-providers.ts:18, 55 / core-libs/skills/skills/spartacus-developer/references/correct-injector.md, configuration.md, proxy-facade-pattern.md", 620, 730, 520, 80, 10)
+gC=d22.group("段ごとの置き場所と書き方", 1200, 70, 560, 770, "#fff7e6", "#d79b00")
+rows=[
+ ("段 1 設定値: provideConfig({...})\n→ spartacus-configuration.module.ts か custom-config.module.ts(root)。配列は丸ごと書く。provideDefaultConfig は使わない", BLUE),
+ ("段 2 見た目: src/styles/cx-*.scss(グローバル)。cx-* セレクタと --cx-* 変数を狙う。部品の styleUrls では子に届かない", PURP),
+ ("段 2 アウトレット: provideOutlet({ id, position, component })(root)\n差し込んだ部品は ProductListItemContext.product$ / CartItemContext.item$ で文脈を受ける", PURP),
+ ("段 3 差し替え: class Mine extends 本体の部品 + cmsComponents: { <typeCode>: { component: Mine } }\n写さず継承。private には触れないので、そこだけ自分で書く", ORANGE),
+ ("段 4 変換: declare module で型を拡張 → Converter を実装 → { provide: *_NORMALIZER, useExisting, multi: true }\ncore の型は root、機能の型は wrapper", YEL),
+ ("段 5 差し替え: { provide: 本体の Adapter / Service, useClass / useExisting: Mine }\ncore は root、カート等は wrapper。Facade は代理なので中の Service を替える", RED),
+ ("確かめ方: ConfigurationService.unifiedConfig$ / OccEndpointsService.buildUrl / CmsService.getCurrentPage() / inject(CmsConfig).featureModules をログに出す", GREY),
+]
+for i,(t,col) in enumerate(rows):
+    d22.box(t, 1220, 110+i*96, 520, 84, *col, 10, "align=left;spacingLeft=6;")
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

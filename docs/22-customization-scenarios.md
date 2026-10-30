@@ -303,4 +303,4 @@ grep -oE '`(core|sf|styles|setup|fl|core-libs)/[^`]+:[0-9][0-9, -]*`' 22-customi
 
 ---
 
-[目次](README.md) | ← [21. 状態管理の選択: NgRx(Store / Facade / Observable)と Signal(signal / computed / resource)](21-state-management.md) | [付録](appendix.md) →
+[目次](README.md) | ← [21. 状態管理の選択: NgRx(Store / Facade / Observable)と Signal(signal / computed / resource)](21-state-management.md) | [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md) →

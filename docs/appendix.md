@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [22. カスタマイズシナリオ 100: その要件はどの段で吸収できるか](22-customization-scenarios.md)
+[目次](README.md) | ← [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md)
