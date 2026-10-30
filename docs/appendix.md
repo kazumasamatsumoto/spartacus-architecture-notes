@@ -45,4 +45,4 @@ components inline: 33  (すべて typeCode・uid・各属性を含む完全な�
 
 ---
 
-[目次](README.md) | ← [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md)
+[目次](README.md) | ← [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md)

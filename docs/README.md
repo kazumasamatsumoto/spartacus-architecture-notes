@@ -51,11 +51,12 @@
 - [19. Query / Command パターン](19-query-command.md) — ストア無しで「取得済みなら取らない」「更新したら取り直す」をどう作っているか。Query の状態遷移表、Command の 4 strategy、EventService の配線、NgRx との対応表
 - [20. zone.js と zoneless](20-zoneless.md) — zone.js を外すと 16〜17 章のどこが変わりどこが変わらないか。tick を起こす経路(2 本 → 1 本)、Global と Targeted、安定判定と SSR、Angular 21 の既定が zoneless なのに Spartacus が zone モードを明示する理由、両モードで動くカスタム実装の 4 規則
 - [21. 状態管理の選択: NgRx と Signal](21-state-management.md) — 「signal か NgRx か」(状態の持ち方)と「zone か zoneless か」(変更検知)は別の軸。Store / Action / Reducer / Selector / Effect / Facade の仕事を signal / computed / resource / toSignal が何で担うか、Spartacus 2612 の集計(NgRx が木、signal は末端 13 ファイル)、状態の種類 ①〜④ で決める選び方
-### 第 V 部 使う: 要件から触る場所を引き、書く(22〜24 章)
+### 第 V 部 使う: 要件から触る場所を引き、書く(22〜25 章)
 
 - [22. カスタマイズシナリオ 100](22-customization-scenarios.md) — 「〜を変えたい」100 件を、段 0(バックエンドのデータ・CMS だけ)〜段 5(Adapter / Facade 差し替え)と BE(バックエンド実装が必要)の 7 段に振り分けた索引。各行にフロントの作業・バックエンドの作業・根拠。設定がありそうで無い落とし穴の一覧
 - [23. フロント側カスタマイズの実装ガイド](23-frontend-customization-guide.md) — どのファイルに何をどう書くか。`ng add` が作る骨格、root と遅延ロードの 2 層の injector による置き場所の 3 規則、段 1〜5 のコード例(設定・SCSS・アウトレット・部品の継承・Normalizer・Adapter / Service / Facade の差し替え・インターセプタ)、よくある失敗の見分け方
 - [24. バックエンド側カスタマイズの実装ガイド](24-backend-customization-guide.md) — SAP Commerce の 4 層(型 items.xml・中身 ImpEx・変換 Data / WsDTO / Populator・窓口 OCC Controller)と置く拡張、CMS 属性が OCC でどんな形になるか(デモ実測)、Solr・OAuth・CORS、リリースの順番(バックエンドが先。fields に無い項目は 400)。SAP 公式サンプルリポジトリで書き方を確かめ、確かめられなかったものは「要確認」と明記
+- [25. JSP やタグの Java 呼び出しと、フロント / バックの責務](25-jsp-java-calls-and-responsibilities.md) — アクセラレータの Web 拡張(ページコントローラ・BeforeViewHandler・Validator・JSP・タグ・EL 関数)はヘッドレスでは実行されない。ビュー層から Java を呼ぶ 8 つの形の行き先、OPF の JSP 版と Spartacus 版の比較、責務を決める 6 つの問い、両方に置くもの(正はバック、写しはフロント)、棚卸しの grep
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
@@ -83,6 +84,7 @@
 | カスタマイズシナリオをいっぱい作って。100 ケース目標 | 22 |
 | フロントでカスタマイズするときの実装場所と実装方法をコード付きで | 23 |
 | バックエンド側のカスタマイズをコード付きで | 24 |
+| 既存アクセラレータで JSP やタグから Java を呼んでいた処理はどうなるか。フロントとバックの責務はどう分けるか | 25 |
 
 ## 調査対象
 
@@ -99,7 +101,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 23 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 24 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -127,4 +129,5 @@
 - [22. カスタマイズシナリオ 100: その要件はどの段で吸収できるか](22-customization-scenarios.md)
 - [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md)
 - [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md)
+- [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md)
 - [付録](appendix.md)

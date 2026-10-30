@@ -808,6 +808,40 @@ r3=d23.box("③ フロント: fields に項目を足す、cmsComponents を登�
 d23.edge(r1,r2); d23.edge(r2,r3)
 d23.box("順番を逆にすると: fields に WsDTO に無い項目 → HTTP 400 Incorrect field(デモ実測)→ 商品の画面ごと出ない", 1220, 680, 520, 60, *RED, 11)
 d23.text("根拠: デモ products/1934793?fields=code,noSuchField → 400 / core/occ/adapters/product/default-occ-product-config.ts:14-26 / core/occ/utils/occ-user-ids.ts:7-9", 1220, 760, 520, 60, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+'</mxfile>'
+d24=D("24 ビュー層の Java の行き先と責務の分け方")
+d24.text("JSP やタグの裏で動いていた Java は、ヘッドレスでは呼ばれない。左: アクセラレータの 1 つの Web アプリ。中: ヘッドレスで残る通り道と、各処理の行き先。右: フロントとバックを決める 6 つの問い。25 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d24.group("アクセラレータ(JSP): 1 つの Web アプリで完結", 40, 70, 520, 720, "#f5f5f5", "#666666")
+a1=d24.box("ページコントローラ(addon / storefront の web/src)\n@RequireHardLogIn・@PreValidateCheckoutStep\nmodel.addAttribute(\"opfPaymentMethods\", facade...)  ← 緑の Facade を呼ぶ", 60, 110, 480, 80, *RED, 10)
+a2=d24.box("BeforeViewHandler / Validator(web/src)\nビュー名の差し替え、metaRobots、パンくず、入力チェック", 60, 210, 480, 60, *RED, 10)
+a3=d24.box("JSP / タグ / EL 関数\n${x.displayName}・spring:theme・fn:escapeXml\nycommerce:sanitizeHTML・<script> の直書き", 60, 290, 480, 80, *RED, 10)
+a4=d24.box("Facade / Service(core・facades 拡張)\nOPFAcceleratorFacade.getActiveConfigurations()", 60, 470, 480, 60, *GREEN, 10)
+a5=d24.box("HTML", 60, 400, 480, 40, *GREY, 11)
+d24.edge(a1,a2); d24.edge(a2,a3); d24.edge(a3,a5)
+d24.box("赤 = storefront の Web 拡張の中。ヘッドレスでは /occ/v2 の通り道に無いので一度も実行されない\n緑 = OCC の Controller からも呼べる", 60, 550, 480, 70, *YEL, 10)
+d24.text("根拠: opf(7cd4c67)opfacceleratoraddon/extensioninfo.xml:16-19 / opfacceleratorcore/extensioninfo.xml:13-16 / OPFPaymentCheckoutStepController.java:76-99 / OPFAcceleratorAddonBeforeViewHandler.java:33-38 / opfPaymentMethodSelector.tag:2-89 / DefaultOPFAcceleratorFacade.java:157-162", 60, 640, 480, 100, 10)
+gB=d24.group("ヘッドレス: 残る通り道と、各処理の行き先", 600, 70, 560, 720, "#f5f5f5", "#666666")
+b1=d24.box("ブラウザ: Angular(Spartacus)\nURL(cxUrl)・文言(cxTranslate)・画像 URL・レイアウト・画面の状態\n写し: AuthGuard・CustomFormValidators・数量の上限", 620, 110, 520, 90, *BLUE, 10)
+b2=d24.box("/occ/v2(commercewebservices + 自社の occ 拡張)\n本物: @Secured・入力の検証(400)・cart validate\nfields で選んだ WsDTO の項目", 620, 250, 520, 90, *ORANGE, 10)
+b3=d24.box("Facade / Service(JSP 時代のものを使い回す)\n価格の formattedValue・合計・割引・在庫・検索", 620, 390, 520, 70, *GREEN, 10)
+b4=d24.box("外部サービス(例: OPF)\nブラウザから OCC を経ずに、公開鍵で直接呼ぶ。カートのアクセスコードは OCC が発行", 620, 500, 520, 70, *PURP, 10)
+d24.edge(b1,b2,"JSON"); d24.edge(b2,b3); d24.box("移行の第一原則: web/src に直接書いたロジックは、先に Facade へ下ろす(アクセラレータが動いたままできる)", 620, 600, 520, 60, *YEL, 11, "fontStyle=1;")
+d24.text("根拠: integration-libs/opf/base/opf-api/adapters/opf-api-base.adapter.ts:65-79, 91-116 / opf-checkout-payments.component.html:1-3, 26, 60-64 / fl/cart/base/occ/config/default-occ-cart-config-factory.ts:31-32 / core/model/product.model.ts:70 / core/auth/user-auth/guards/auth.guard.ts:30-42 / sf/cms-components/content/paragraph/paragraph.component.ts:49-51", 620, 680, 520, 100, 10)
+gC=d24.group("どちらに置くか: 上から順に当てる", 1200, 70, 560, 720, "#fff7e6", "#d79b00")
+qs=[
+ ("Q1 ブラウザで書き換えられたら困るか(価格・割引・在庫・権限)→ バック", RED),
+ ("Q2 フロントに無いデータ・大きなデータが要るか(検索・並び順・ファセット)→ バック", RED),
+ ("Q3 業務担当がデプロイなしで変えたいか(文章・配置・robots・表示条件)→ バック(CMS)", ORANGE),
+ ("Q4 アプリや他システムでも同じ答えが要るか → バック(Facade)", ORANGE),
+ ("Q5 見た目・言い回し・URL の形・画面の組み立てか → フロント", BLUE),
+ ("Q6 画面の一時的な状態か(開閉・選択中・入力途中)→ フロント", BLUE),
+]
+prev=None
+for i,(t,col) in enumerate(qs):
+    q=d24.box(t, 1220, 110+i*80, 520, 60, *col, 11, "align=left;spacingLeft=6;")
+    if prev: d24.edge(prev,q,"いいえ")
+    prev=q
+d24.box("両方に置くもの: ログイン要求・入力チェック・数量の上限・外部サービスの証明\n正はバック、フロントは写し(規則は依頼書でもらう)", 1220, 600, 520, 70, *GREEN, 11)
+d24.box("✕ バックが「残り 3 点」や HTML 断片を返す / フロントが合計を計算し直す / フロントだけで権限を確かめる", 1220, 690, 520, 60, *RED, 10)
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

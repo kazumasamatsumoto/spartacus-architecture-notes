@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(23 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(24 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -40,6 +40,7 @@
 | 21 カスタマイズの 7 段と 100 シナリオの分布 | 段 0(バックエンドのデータ・CMS だけ)から段 5(取得・ロジックの差し替え)と BE までの 7 段、各段の件数と代表例、設定がありそうで無い落とし穴、要件の会話での使い方(22 章) | [page21.png](diagrams/page21.png) / [svg](diagrams/page21.svg) |
 | 22 カスタマイズの置き場所 | 左: ng add が作る骨格(app.config → AppModule → SpartacusModule → 設定 / 機能モジュール → feature と wrapper)。中: root と遅延ロードの 2 層の injector、上書きが効く場所と効かない場所、置き場所の 3 規則。右: 段 1〜5 の書き方と確かめ方(23 章) | [page22.png](diagrams/page22.png) / [svg](diagrams/page22.svg) |
 | 23 バックエンドの 4 層とフロントの段 | 左: 型・中身・変換・窓口の 4 層と置く拡張、設定(CORS・OAuth)。中: CMS の属性が OCC でどんな形になるか(デモ実測)と、言えないこと。右: フロントの段との対応と、リリースの順番(24 章) | [page23.png](diagrams/page23.png) / [svg](diagrams/page23.svg) |
+| 24 ビュー層の Java の行き先と責務の分け方 | 左: アクセラレータの Web 拡張(コントローラ・BeforeViewHandler・JSP / タグ)と Facade。中: ヘッドレスで残る通り道(Angular → /occ/v2 → Facade、外部サービスへの直接呼び出し)。右: フロントとバックを決める 6 つの問い(25 章) | [page24.png](diagrams/page24.png) / [svg](diagrams/page24.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

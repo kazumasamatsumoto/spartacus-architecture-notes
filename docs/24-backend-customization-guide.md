@@ -490,4 +490,4 @@ CMS の属性が OCC にどう出るか(24.5)だけは、仕組みを公開資�
 
 ---
 
-[目次](README.md) | ← [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md) | [付録](appendix.md) →
+[目次](README.md) | ← [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md) | [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md) →
