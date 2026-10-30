@@ -676,4 +676,4 @@ providers: [
 
 ---
 
-[目次](README.md) | ← [22. カスタマイズシナリオ 100: その要件はどの段で吸収できるか](22-customization-scenarios.md) | [付録](appendix.md) →
+[目次](README.md) | ← [22. カスタマイズシナリオ 100: その要件はどの段で吸収できるか](22-customization-scenarios.md) | [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md) →

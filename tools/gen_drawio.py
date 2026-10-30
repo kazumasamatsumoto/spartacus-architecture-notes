@@ -767,6 +767,47 @@ rows=[
 ]
 for i,(t,col) in enumerate(rows):
     d22.box(t, 1220, 110+i*96, 520, 84, *col, 10, "align=left;spacingLeft=6;")
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+'</mxfile>'
+d23=D("23 バックエンドの 4 層とフロントの段")
+d23.text("バックエンドの仕事は 4 層のどこまで降りるか。左: 層と置く拡張。中: CMS の属性が OCC でどんな形になるか(デモ実測)。右: フロントの段との対応とリリースの順番。24 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gL=d23.group("バックエンドの 4 層(拡張名は仮)", 40, 70, 560, 780, "#f5f5f5", "#666666")
+l1=d23.box("中身: ImpEx / Backoffice(データ拡張)\n部品の作成・スロット配置([mode=append])・ContentPage・CMSUserGroupRestriction・商品参照・Solr・OAuth クライアント\nJava は書かない。22 章の段 0 はすべてここ", 60, 110, 520, 96, *GREEN, 10)
+l2=d23.box("型: *-items.xml(mycore)\n既存型は autocreate=false generate=false で属性を足す\nCMS 部品は SimpleCMSComponent を継承。code = typeCode = cmsComponents のキー\n→ システム更新", 60, 226, 520, 96, *BLUE, 10)
+l3=d23.box("変換: *-beans.xml(Data / WsDTO)+ Populator + modifyPopulatorList(myfacades / myocc)\nData と WsDTO の項目名を揃えると DataMapper が対応づける\nWsDTO の項目名 = フロントの fields に書く名前", 60, 342, 520, 96, *ORANGE, 10)
+l4=d23.box("窓口: Controller(myocc、/occ/v2 に載る)\n@Controller + @RequestMapping(\"/{baseSiteId}/users/{userId}/...\")\n@Secured / @ApiBaseSiteIdAndUserIdParam / DataMapper.map(data, WsDTO, fields)\nfieldSetLevelMapping で BASIC / DEFAULT / FULL", 60, 458, 520, 110, *RED, 10)
+for x,y in [(l2,l1),(l2,l3),(l3,l4)]: d23.edge(x,y)
+d23.box("設定: local.properties / manifest\ncorsfilter.commercewebservices.allowedHeaders ⊇ フロントが送るヘッダー(X-Anonymous-Consents、Occ-Personalization-*、独自ヘッダー)\nOAuth: フロント既定 client_id = mobile_android_public / docs の例は mobile_android + secret → 揃える", 60, 588, 520, 100, *YEL, 10)
+d23.text("根拠: SAP 公式サンプル opf(7cd4c67)beans.xml:801-803・spring.xml:348-351 / cxai-extn(311e1f0)CxaioccController.java:29-53・cxaiocc-web-spring.xml:14-26・extensioninfo.xml:13 / cxai-assist(c52062c)items.xml:13-20, 18-32 / cx-translate(dec6529)admin-component.impex:10-16 / Spartacus docs cors.md・installing 2205", 60, 700, 520, 120, 10)
+gM=d23.group("CMS の属性は OCC でどう出るか(デモ実測 2026-10-30)", 640, 70, 520, 780, "#f5f5f5", "#666666")
+shapes=[
+ ("数値・真偽値 → 文字列\nmaximumNumberProducts: \"5\" / displayProductPrices: \"true\"", BLUE),
+ ("列挙 → code の文字列\ntotalDisplay: \"SUBTOTAL\" / context: \"LANGUAGE\"", BLUE),
+ ("ローカライズ文字列 → 要求した言語の文字列\ntitle: \"You may also like...\"", BLUE),
+ ("メディア → オブジェクト / レスポンシブ → フォーマット名がキー\nmedia: { tablet, desktop, mobile, widescreen }", GREEN),
+ ("参照 → ネストしたオブジェクト\nnavigationNode / lightboxBannerComponent", GREEN),
+ ("部品のコレクション → uid を空白区切り\ncomponents: \"ProductDetailsTabComponent ProductSpecsTabComponent ...\"", ORANGE),
+ ("商品のコレクション → 属性名が変わる\nproducts → productCodes: \"300938 358639 ...\"(フロントは split(' '))", ORANGE),
+]
+for i,(t,col) in enumerate(shapes):
+    d23.box(t, 660, 110+i*74, 480, 62, *col, 10, "align=left;spacingLeft=6;")
+d23.box("言えないこと: 独自の型の属性が追加実装なしで同じ形で出るか(公開資料で未確認)。コレクションは型ごとの変換があると考える\n→ 型を足したら最初に cms/components?componentIds=<uid> を叩いて形を確かめ、依頼書に書く", 660, 636, 480, 90, *RED, 10)
+d23.text("根拠: デモ OCC cms/pages(ProductPage 1934793、homepage)/ core/occ/adapters/cms/converters/occ-cms-page-normalizer.ts:166 / sf/.../product-carousel.component.ts:74 / core/occ/occ-models/occ.models.ts:282, 287", 660, 740, 480, 70, 10)
+gR=d23.group("フロントの段との対応とリリースの順番", 1200, 70, 560, 780, "#fff7e6", "#d79b00")
+rows=[
+ ("段 0(CMS の値・配置・ナビ・ページ・言語・通貨)→ 中身だけ", GREEN),
+ ("段 3 新しい CMS 部品 → 型 + 中身(+ 24.5 の確認)", BLUE),
+ ("段 1 + 4 商品・カート・注文に項目 → 型 + 変換", ORANGE),
+ ("段 5 新しいリソース → 型 + 変換 + 窓口", RED),
+ ("並び順・ファセット・検索語リダイレクト → Solr の ImpEx + 再インデックス", PURP),
+ ("OAuth・CORS・独自ヘッダー → 設定", YEL),
+]
+for i,(t,col) in enumerate(rows):
+    d23.box(t, 1220, 110+i*58, 520, 48, *col, 11, "align=left;spacingLeft=6;")
+r1=d23.box("① バックエンドを出す(型・変換・窓口)。ImpEx は Staged → 同期 → Online", 1220, 470, 520, 50, *GREY, 11)
+r2=d23.box("② curl で確かめる: cms/components / users/anonymous/cms/pages / products/{code}?fields=code,<項目>", 1220, 540, 520, 50, *GREY, 11)
+r3=d23.box("③ フロント: fields に項目を足す、cmsComponents を登録、エンドポイントを足す", 1220, 610, 520, 50, *GREY, 11)
+d23.edge(r1,r2); d23.edge(r2,r3)
+d23.box("順番を逆にすると: fields に WsDTO に無い項目 → HTTP 400 Incorrect field(デモ実測)→ 商品の画面ごと出ない", 1220, 680, 520, 60, *RED, 11)
+d23.text("根拠: デモ products/1934793?fields=code,noSuchField → 400 / core/occ/adapters/product/default-occ-product-config.ts:14-26 / core/occ/utils/occ-user-ids.ts:7-9", 1220, 760, 520, 60, 10)
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))
