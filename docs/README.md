@@ -85,6 +85,7 @@
 | フロントでカスタマイズするときの実装場所と実装方法をコード付きで | 23 |
 | バックエンド側のカスタマイズをコード付きで | 24 |
 | 既存アクセラレータで JSP やタグから Java を呼んでいた処理はどうなるか。フロントとバックの責務はどう分けるか | 25 |
+| サブエージェント開発で、スキルやエージェントの責務・分類単位の分け方のパターンを表やマトリクスで | 番外 |
 
 ## 調査対象
 
@@ -130,4 +131,5 @@
 - [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md)
 - [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md)
 - [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md)
+- [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html))
 - [付録](appendix.md)

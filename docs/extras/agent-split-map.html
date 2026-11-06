@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>エージェント分割パターン地図</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: map-first tool. Controls + scatter + detail panel on top, then sortable table, pairing grid, recipes. */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --ink:#18222f; --muted:#5b6878; --line:#d5dce4; --grid:#e6ebf0;
+  --agent:#2f5d8a; --agent-soft:#dbe7f3; --skill:#b5651d; --skill-soft:#f6e6d6; --focus:#0f7a6b;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161d; --surface:#18202a; --ink:#e4e9ef; --muted:#97a3b1; --line:#2c3846; --grid:#222c38;
+  --agent:#7fb0e0; --agent-soft:#1f3347; --skill:#e3a062; --skill-soft:#3b2a1b; --focus:#4fc7b5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161d; --surface:#18202a; --ink:#e4e9ef; --muted:#97a3b1; --line:#2c3846; --grid:#222c38;
+  --agent:#7fb0e0; --agent-soft:#1f3347; --skill:#e3a062; --skill-soft:#3b2a1b; --focus:#4fc7b5; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.35;margin:0}
+h1{font-size:clamp(26px,4vw,36px);font-weight:900;letter-spacing:.01em}
+h2{font-size:22px;font-weight:700}
+h3{font-size:17px;font-weight:700}
+p{margin:0;max-width:68ch}
+.lede{color:var(--muted);margin-top:10px}
+.note{font-size:13px;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:14px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;letter-spacing:.04em}
+.tag.agent{background:var(--agent-soft);color:var(--agent)}
+.tag.skill{background:var(--skill-soft);color:var(--skill)}
+/* controls */
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;padding:6px 12px;border:0;background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+button:focus-visible,select:focus-visible,th button:focus-visible,.pt:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* map */
+.mapgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.mapgrid{grid-template-columns:minmax(0,1fr)}}
+.plot{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px;overflow-x:auto}
+.plot svg{display:block;width:100%;min-width:520px;height:auto}
+.axis-t{font-family:var(--f-body);font-size:12px;fill:var(--muted)}
+.axis-n{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.pt{cursor:pointer}
+.pt text{font-family:var(--f-body);font-size:11.5px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.pt.dim{opacity:.18}
+.pt.sel text{font-weight:700}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.detail dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.detail dt{color:var(--muted)}
+.detail dd{margin:0}
+.bar{display:inline-flex;gap:3px;vertical-align:middle}
+.bar i{width:9px;height:9px;border-radius:2px;background:var(--grid);display:block}
+.bar i.on{background:currentColor}
+.agentc{color:var(--agent)} .skillc{color:var(--skill)}
+.kv{display:flex;flex-direction:column;gap:2px}
+.kv b{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.kv p{font-size:14px}
+/* table */
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+th button[data-dir]::after{content:attr(data-dir);margin-left:4px}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--grid)}
+tbody tr.sel{background:var(--agent-soft)}
+td.n{font-family:var(--f-mono);text-align:center}
+td .ex{color:var(--muted);font-size:12.5px}
+/* pair grid */
+.pair th.rot{writing-mode:vertical-rl;white-space:nowrap;padding:8px 4px;text-align:left}
+.pair td.c{text-align:center;font-size:16px;color:var(--skill)}
+.pair td.c.weak{color:var(--muted);font-size:12px}
+/* recipes */
+.recipes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.recipe{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.recipe .chips{display:flex;flex-wrap:wrap;gap:6px}
+.recipe p{font-size:14px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);align-items:center}
+@media (prefers-reduced-motion:no-preference){.pt circle,.pt rect{transition:transform .25s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <h1>エージェント分割パターン地図</h1>
+  <p class="lede">サブエージェントとスキルの分け方を、23 のパターンにして地図に置きました。軸を切り替えると、パターンの近さや遠さが見えます。点をクリックすると、向いている場面・避けたい場面・例が右に出ます。</p>
+  <p class="note" style="margin-top:6px">点数(1〜5)は、筆者がパターンの性質から付けた目安です。測った値ではありません。自分のチームの事情に合わせて読み替えてください。</p>
+</header>
+
+<section aria-labelledby="map-h">
+  <h2 id="map-h">地図</h2>
+  <div class="controls">
+    <div class="ctl"><label for="xsel">横軸</label><select id="xsel"></select></div>
+    <div class="ctl"><label for="ysel">縦軸</label><select id="ysel"></select></div>
+    <div class="ctl"><label id="kind-l">表示</label>
+      <div class="seg" role="group" aria-labelledby="kind-l" id="kindseg">
+        <button type="button" data-k="all" aria-pressed="true">両方</button>
+        <button type="button" data-k="agent" aria-pressed="false">エージェント</button>
+        <button type="button" data-k="skill" aria-pressed="false">スキル</button>
+      </div></div>
+    <div class="legend"><span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--agent)"/></svg> エージェントの分け方</span><span><svg width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" transform="rotate(45 6 6)" fill="var(--skill)"/></svg> スキルの分け方</span></div>
+  </div>
+  <div class="mapgrid">
+    <div class="plot"><svg id="plot" viewBox="0 0 680 520" role="img" aria-label="パターンの散布図"></svg></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+</section>
+
+<section aria-labelledby="tbl-h">
+  <h2 id="tbl-h">一覧</h2>
+  <p class="note">列の見出しをクリックすると並べ替えます。行をクリックすると、地図とその右の説明もその行に合わせます。</p>
+  <div class="tablebox"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<section aria-labelledby="pair-h">
+  <h2 id="pair-h">エージェントの分け方 × スキルの分け方</h2>
+  <p>エージェントの分け方とスキルの分け方は、別々に選べます。軸を変えて組み合わせるのが普通です。たとえば、エージェントは工程で分け、スキルは技術領域で分けます。●はよく合う組み合わせ、○は条件付きで合う組み合わせです。</p>
+  <div class="tablebox"><table class="pair" id="pair"></table></div>
+</section>
+
+<section aria-labelledby="rec-h">
+  <h2 id="rec-h">規模別の組み合わせ例</h2>
+  <div class="recipes" id="recipes"></div>
+</section>
+
+<section aria-labelledby="rule-h">
+  <h2 id="rule-h">迷ったときの決め方</h2>
+  <div class="recipes">
+    <div class="recipe"><h3>エージェントを分ける理由は 3 つだけ</h3><p>1 つ目は、親の文脈を汚したくない大量の読み込みです(探索・調査)。2 つ目は、並列で速くしたいときです。3 つ目は、権限や視点を分けたいときです(読み取り専用、批評役)。どれにも当たらないなら、エージェントを分けずにスキルで専門化します。</p></div>
+    <div class="recipe"><h3>境界は「引き継ぎが少ない線」に引く</h3><p>エージェント同士は要約でしか話せません。そのため、境界をまたぐ情報が多いと品質が落ちます。職能別(FE / BE)は、API の形を何度も往復するなら引き継ぎが重くなります。機能別やデータ分割は、境界をまたぐ情報が少なくて済みます。</p></div>
+    <div class="recipe"><h3>スキルの粒度は「一緒に読まれるもの」で決める</h3><p>スキルの説明文は常に読み込まれ、本文は呼ばれたときに読み込まれます。毎回一緒に使う知識は 1 つにまとめます。大きくなったら、本文を目次にして詳細を別ファイルに逃がします(段階的に読み込ませる)。たまにしか使わない手順は、別のスキルとして切り出します。</p></div>
+  </div>
+</section>
+</div>
+
+<script>
+const AX=[
+ {k:'gran',n:'粒度',lo:'粗い',hi:'細かい'},
+ {k:'cut',n:'切り口',lo:'何を作るか(業務・機能)',hi:'どう作るか(技術・工程)'},
+ {k:'iso',n:'文脈の軽さ',lo:'重い',hi:'軽い'},
+ {k:'hand',n:'引き継ぎの少なさ',lo:'多い',hi:'少ない'},
+ {k:'par',n:'並べやすさ',lo:'低い',hi:'高い'},
+ {k:'reuse',n:'再利用しやすさ',lo:'低い',hi:'高い'},
+ {k:'clear',n:'責務の明確さ',lo:'曖昧',hi:'明確'},
+ {k:'ops',n:'保守の軽さ',lo:'重い',hi:'軽い'}
+];
+const AXHELP={
+ iso:'エージェント: 子の文脈をどれだけ絞れるか。スキル: 必要なときだけ小さく読まれるか',
+ hand:'エージェント: 境界をまたいで渡す情報の少なさ。スキル: 他のスキルを参照せずに済むか',
+ par:'エージェント: 同時に走らせやすいか。スキル: 他のスキルと組み合わせやすいか'
+};
+// [gran,cut,iso,hand,par,reuse,clear,ops]
+const P=[
+ {id:'A1',k:'agent',s:'機能別',n:'機能グループ別',ex:'バッチ / 画面 / メール / 帳票',v:[3,1,4,4,4,2,4,3],
+  when:'機能ごとに技術も担当者も分かれていて、機能同士の結合が弱いとき。1 つの依頼が 1 つの機能で閉じることが多いとき。',
+  avoid:'機能をまたぐ変更(共通部品や認証)が多いとき。各エージェントが同じ規約を別々に持ってしまい、ずれやすい。',
+  tip:'共通の規約は「規約スキル」に出して、全エージェントに同じものを読ませる。'},
+ {id:'A2',k:'agent',s:'職能別',n:'職能・レイヤ別',ex:'フロントエンド / バックエンド / SRE / QA',v:[2,4,3,2,3,4,4,4],
+  when:'人のチーム編成に合わせたいとき。レイヤごとに道具と規約がはっきり違うとき(Angular と Java など)。',
+  avoid:'1 つの機能を作るのに API の形を何度も往復するとき。要約での引き継ぎが増え、境界で食い違う。',
+  tip:'境界の契約(OCC の項目名、fields、エラーの形)を成果物として固定し、それを両方に渡す。'},
+ {id:'A3',k:'agent',s:'ドメイン別',n:'業務ドメイン別',ex:'注文 / 在庫 / 会員 / 決済',v:[3,1,4,3,4,3,4,3],
+  when:'業務の境界(境界づけられたコンテキスト)がはっきりしていて、用語や規則がドメインごとに違うとき。',
+  avoid:'ドメインの境界がまだ決まっていない初期。境界の引き直しのたびにエージェントを作り直すことになる。',
+  tip:'ドメイン知識はスキル(業務知識スキル)にし、エージェントは薄く保つ。'},
+ {id:'A4',k:'agent',s:'工程別',n:'工程別',ex:'調査 → 設計 → 実装 → レビュー → テスト',v:[3,5,3,2,2,5,5,4],
+  when:'どの機能でも同じ流れで進めたいとき。工程ごとに必要な道具と権限が違うとき。',
+  avoid:'工程の前後で同じ情報を何度も読み直すとき。直列なので並列化しにくく、遅い。',
+  tip:'工程の間は、計画書や差分のようなファイルで渡す。要約だけで渡すと、細部が落ちる。'},
+ {id:'A5',k:'agent',s:'視点別',n:'視点・役割別',ex:'実装役 / 批評役 / 検証役',v:[3,4,4,3,4,5,4,4],
+  when:'自分の仮説に引きずられない見方がほしいとき(レビュー、反証、セキュリティ確認)。',
+  avoid:'批評役に結論を渡してしまうとき。仮説を渡すと「確認しました」が返ってきやすい。',
+  tip:'批評役には結論ではなくコードと要件だけを渡す。'},
+ {id:'A6',k:'agent',s:'権限別',n:'権限・ツール境界別',ex:'読み取り専用の探索 / 書き込み可の実装 / 本番操作',v:[2,5,3,3,3,5,5,4],
+  when:'事故の範囲を限りたいとき。本番やデータ削除に触れるエージェントを 1 つに閉じたいとき。',
+  avoid:'権限だけで分けて仕事の中身を決めないとき。結局どれに頼むか迷う。',
+  tip:'他の分け方と重ねて使う(例: 工程別 × 権限別)。'},
+ {id:'A7',k:'agent',s:'データ分割',n:'データ分割(fan-out)',ex:'ファイルごと / ディレクトリごと / チケットごとに同じ作業',v:[5,3,5,4,5,4,3,3],
+  when:'同じ作業を大量の対象に当てるとき(全ファイルの棚卸し、100 シナリオの検証)。',
+  avoid:'対象同士に依存があるとき。結果をまとめる側の負担が大きくなる。',
+  tip:'出力の形(表の列やスキーマ)を先に決めて全員に渡すと、まとめるのが楽になる。'},
+ {id:'A8',k:'agent',s:'モデル別',n:'モデル・コスト別',ex:'軽いモデルで分類 / 重いモデルで設計',v:[3,5,2,3,3,4,3,3],
+  when:'量が多い単純作業と、少数の難しい判断が混ざっているとき。',
+  avoid:'軽いモデルの判断ミスがそのまま後ろに流れるとき。',
+  tip:'軽いモデルの出力は、重いモデルか機械的な検査で確かめる。'},
+ {id:'A9',k:'agent',s:'単一+スキル',n:'ジェネラリスト 1 つ + スキル',ex:'メインのエージェントだけ。専門性はスキルで足す',v:[1,3,1,5,1,4,3,5],
+  when:'小さなチームや小さなリポジトリ。引き継ぎによる品質低下を避けたいとき。',
+  avoid:'大量の読み込みで文脈があふれるとき。並列で速くしたいとき。',
+  tip:'まずこれで始め、文脈があふれた作業だけをエージェントに切り出す。'},
+ {id:'A10',k:'agent',s:'階層型',n:'オーケストレーター + 専門ワーカー',ex:'まとめ役が計画し、専門エージェントに配る',v:[4,3,4,2,4,3,4,2],
+  when:'大きな作業を分解して並列に進め、最後に統合したいとき。',
+  avoid:'まとめ役の計画が粗いとき。ワーカーが同じ範囲を重複して触る。',
+  tip:'ワーカーの範囲を明示し、触ってよいファイルを分ける(worktree を分けるのも手)。'},
+ {id:'A11',k:'agent',s:'モジュール別',n:'モジュール・リポジトリ別',ex:'monorepo のパッケージごと(core / storefront / feature-libs)',v:[3,2,4,3,4,3,4,3],
+  when:'コードの所有範囲がパッケージで決まっていて、パッケージごとに規約やビルドが違うとき。',
+  avoid:'変更の多くがパッケージをまたぐとき。',
+  tip:'パッケージの公開 API(Facade など)を境界の契約として扱う。'},
+ {id:'A12',k:'agent',s:'イベント別',n:'イベント・タイミング別',ex:'PR 作成時 / 障害時 / 毎朝の定期実行',v:[3,2,4,4,3,3,4,3],
+  when:'起動のきっかけごとに、やることと読む情報がはっきり違うとき。',
+  avoid:'同じ処理を複数のきっかけで重複して持つとき。',
+  tip:'処理そのものはスキルにまとめ、イベント別のエージェントはそれを呼ぶだけにする。'},
+ {id:'A13',k:'agent',s:'利用者別',n:'利用者・ペルソナ別',ex:'顧客対応 / 社内運用 / 開発者支援',v:[2,1,3,4,3,2,3,3],
+  when:'相手によって口調、公開してよい情報、権限が違うとき。',
+  avoid:'裏でやる処理がほぼ同じとき。同じ知識が重複する。',
+  tip:'共通の知識はスキル、相手ごとの違いはエージェント側の指示に置く。'},
+ {id:'A14',k:'agent',s:'成果物別',n:'成果物別',ex:'コード / ドキュメント / 図 / テスト',v:[3,4,3,3,4,4,4,4],
+  when:'成果物ごとに書き方の型と検証方法が違うとき(図は生成スクリプト、ドキュメントは引用の検証)。',
+  avoid:'成果物同士の整合(コードと説明の一致)が重要なとき。',
+  tip:'整合は最後に 1 つのエージェントで照合する。'},
+ {id:'S1',k:'skill',s:'手順',n:'手順スキル(1 手順 = 1 スキル)',ex:'デプロイ / リリース / DB 移行 / ドキュメントの同期と push',v:[5,5,5,4,4,3,5,3],
+  when:'毎回同じ順番でやる作業。抜けると事故になる作業。',
+  avoid:'手順が案件ごとに大きく変わるとき。分岐だらけになる。',
+  tip:'確認コマンドと失敗時の戻し方まで書く。'},
+ {id:'S2',k:'skill',s:'規約',n:'規約・スタイルスキル',ex:'コーディング規約 / 命名 / コミットメッセージ / 文体',v:[3,4,3,5,5,5,4,4],
+  when:'どのエージェントにも同じ書き方を守らせたいとき。',
+  avoid:'規約を全部詰め込んで毎回大量に読ませるとき。',
+  tip:'よく破られる規則だけを短く。残りはリンターに任せる。'},
+ {id:'S3',k:'skill',s:'業務知識',n:'ドメイン知識スキル',ex:'業務用語 / 料金・割引の規則 / 承認フロー',v:[2,1,3,4,4,4,3,3],
+  when:'コードからは読み取れない業務の前提が多いとき。',
+  avoid:'知識が古くなっても誰も更新しないとき。',
+  tip:'出典と更新日を書き、コードで確かめられることは書かない。'},
+ {id:'S4',k:'skill',s:'ライブラリ',n:'ライブラリ・フレームワークスキル',ex:'Spartacus 開発(@spartacus/skills)/ Angular / SAP Commerce の拡張',v:[2,4,2,4,4,5,4,3],
+  when:'フレームワーク固有の「どこに何を書くか」の規則が多いとき。',
+  avoid:'公式ドキュメントの丸写し。古くなりやすく、長い。',
+  tip:'Spartacus 2612 の spartacus-developer のように、本文は目次にして references/*.md に分ける。'},
+ {id:'S5',k:'skill',s:'チェック',n:'チェックリスト・レビュー観点スキル',ex:'a11y / セキュリティ / パフォーマンス / 引用の検証',v:[4,4,4,5,5,5,5,4],
+  when:'レビュー役のエージェントに観点を持たせたいとき。',
+  avoid:'観点が多すぎて全部が浅くなるとき。',
+  tip:'観点ごとに 1 スキル。重大度の基準も書く。'},
+ {id:'S6',k:'skill',s:'テンプレ',n:'テンプレート・生成スキル',ex:'CMS 部品の雛形 / ADR / 章の型(問い・位置づけ・根拠)',v:[4,3,4,4,4,4,5,3],
+  when:'同じ形の成果物を何度も作るとき。',
+  avoid:'型が合わない成果物にまで当てはめるとき。',
+  tip:'完成例を 1 つ添える。型だけより再現性が上がる。'},
+ {id:'S7',k:'skill',s:'カタログ',n:'参照・カタログスキル',ex:'OCC API 一覧 / エラーコード表 / 環境ごとの URL',v:[3,3,2,5,4,4,4,2],
+  when:'引くための表が要るとき。',
+  avoid:'表が大きく、毎回全部読ませるとき。生成元から自動で作らないと古くなる。',
+  tip:'表は別ファイルにして、必要な行だけ grep させる。'},
+ {id:'S8',k:'skill',s:'ワークフロー',n:'ワークフロースキル(手順を束ねる)',ex:'新機能の追加を最初から最後まで / 障害対応一式',v:[1,2,1,2,2,2,3,2],
+  when:'複数の手順を決まった順に呼び、途中で人の確認を挟みたいとき。',
+  avoid:'中身を全部 1 つに書くとき。長く、部分的な再利用ができない。',
+  tip:'中身は手順スキルに分け、ワークフローは呼び出し順だけを書く。'},
+ {id:'S9',k:'skill',s:'領域まるごと',n:'領域まるごとスキル(段階的に読み込む)',ex:'「フロント開発」1 つ。本文は目次、詳細は references/',v:[1,4,3,4,3,4,3,3],
+  when:'1 つの領域の知識が多いが、毎回使うのはその一部というとき。',
+  avoid:'目次が曖昧で、どの詳細ファイルを読むべきかエージェントが判断できないとき。',
+  tip:'目次の各行に「いつ読むか」を書く。'}
+];
+const PAIRS={ // agent -> {skill: 2=good,1=conditional}
+ A1:{S2:2,S3:1,S6:2,S1:1}, A2:{S4:2,S9:2,S2:2,S5:1}, A3:{S3:2,S7:1,S2:1}, A4:{S6:2,S5:2,S1:2,S8:1},
+ A5:{S5:2,S2:1}, A6:{S1:2,S5:1}, A7:{S6:2,S5:2,S7:1}, A8:{S5:1,S6:1}, A9:{S9:2,S4:2,S1:2,S8:1,S2:1},
+ A10:{S8:2,S6:1,S2:1}, A11:{S4:2,S2:2,S7:1}, A12:{S1:2,S8:2}, A13:{S3:2,S7:1}, A14:{S6:2,S5:2,S2:1}
+};
+const RECIPES=[
+ {t:'1〜3 人、1 リポジトリ',a:['A9','A5'],s:['S4','S1','S5'],d:'エージェントは基本 1 つ。レビューのときだけ批評役を分ける。専門性はライブラリスキルと手順スキルで足す。'},
+ {t:'5〜15 人、フロントとバックが別チーム',a:['A2','A5','A6'],s:['S4','S9','S2','S5'],d:'職能別にエージェントを分け、API の契約(OCC の項目、fields、エラー)は成果物として固定して渡す。探索は読み取り専用エージェントに任せる。'},
+ {t:'大規模 monorepo、並列で進めたい',a:['A10','A11','A7'],s:['S8','S2','S1'],d:'まとめ役がパッケージ単位で配り、棚卸しのような量の多い作業は fan-out する。ワークフロースキルで呼び出し順を固定する。'},
+ {t:'運用・定型作業が中心',a:['A12','A6'],s:['S1','S8'],d:'PR 時、障害時、定期実行で起動を分け、中身は手順スキルに置く。本番操作は権限を分けたエージェントに閉じる。'},
+ {t:'業務ルールが複雑(EC の価格・在庫など)',a:['A3','A5'],s:['S3','S7','S5'],d:'ドメインごとに分け、業務知識スキルに規則と出典を書く。改ざんや計算の誤りは検証役で確かめる。'},
+ {t:'この調査ノートのようなドキュメント作り',a:['A7','A5','A14'],s:['S6','S5','S1'],d:'引用の確認は fan-out、主張の反証は批評役が担う。章の型はテンプレートスキル、同期と push は手順スキルに置く。'}
+];
+const byId=Object.fromEntries(P.map(p=>[p.id,p]));
+const st={x:'cut',y:'gran',kind:'all',sel:'A2',sort:{k:'id',dir:1}};
+try{const s=JSON.parse(localStorage.getItem('agentmap')||'{}');if(s.x)st.x=s.x;if(s.y)st.y=s.y;}catch(e){}
+const ai=k=>AX.findIndex(a=>a.k===k);
+const val=(p,k)=>p.v[ai(k)];
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;};
+function save(){try{localStorage.setItem('agentmap',JSON.stringify({x:st.x,y:st.y}))}catch(e){}}
+
+function initSelects(){
+  for(const id of ['xsel','ysel']){const s=document.getElementById(id);
+    AX.forEach(a=>{const o=document.createElement('option');o.value=a.k;o.textContent=a.n;s.appendChild(o);});
+    s.value=id==='xsel'?st.x:st.y;
+    s.addEventListener('change',()=>{st[id==='xsel'?'x':'y']=s.value;save();draw();});}
+  document.querySelectorAll('#kindseg button').forEach(b=>b.addEventListener('click',()=>{
+    st.kind=b.dataset.k;document.querySelectorAll('#kindseg button').forEach(x=>x.setAttribute('aria-pressed',x===b));draw();}));
+}
+
+function draw(){
+  const svg=document.getElementById('plot');svg.innerHTML='';
+  const W=680,H=520,L=70,R=24,T=24,B=72;
+  const sx=v=>L+(v-0.5)/5*(W-L-R), sy=v=>T+(5.5-v)/5*(H-T-B);
+  const xa=AX[ai(st.x)], ya=AX[ai(st.y)];
+  for(let i=1;i<=5;i++){
+    el('line',{x1:sx(i),x2:sx(i),y1:T,y2:H-B,stroke:'var(--grid)','stroke-width':1},svg);
+    el('line',{x1:L,x2:W-R,y1:sy(i),y2:sy(i),stroke:'var(--grid)','stroke-width':1},svg);
+    el('text',{x:sx(i),y:H-B+16,'text-anchor':'middle',class:'axis-n'},svg).textContent=i;
+    el('text',{x:L-10,y:sy(i)+4,'text-anchor':'end',class:'axis-n'},svg).textContent=i;
+  }
+  el('rect',{x:L,y:T,width:W-L-R,height:H-T-B,fill:'none',stroke:'var(--line)'},svg);
+  const xt=el('text',{x:(L+W-R)/2,y:H-B+38,'text-anchor':'middle',class:'axis-t','font-weight':700},svg);xt.textContent=xa.n;
+  el('text',{x:L,y:H-B+56,class:'axis-t'},svg).textContent='← '+xa.lo;
+  el('text',{x:W-R,y:H-B+56,'text-anchor':'end',class:'axis-t'},svg).textContent=xa.hi+' →';
+  const yt=el('text',{x:16,y:(T+H-B)/2,'text-anchor':'middle',class:'axis-t','font-weight':700,transform:`rotate(-90 16 ${(T+H-B)/2})`},svg);yt.textContent=ya.n+'('+ya.lo+' → '+ya.hi+')';
+  // group overlapping
+  const groups={};P.forEach(p=>{const key=val(p,st.x)+','+val(p,st.y);(groups[key]=groups[key]||[]).push(p);});
+  const pos={};
+  Object.values(groups).forEach(g=>{const n=g.length;g.forEach((p,i)=>{
+    const bx=sx(val(p,st.x)),by=sy(val(p,st.y));
+    if(n===1){pos[p.id]=[bx,by];return;}
+    const cols=1, r=Math.floor(i/cols), c=i%cols, rows=Math.ceil(n/cols);
+    pos[p.id]=[bx-12, by+(r-(rows-1)/2)*20];});});
+  P.forEach(p=>{
+    const [x,y]=pos[p.id];
+    const g=el('g',{class:'pt'+(st.kind!=='all'&&st.kind!==p.k?' dim':'')+(st.sel===p.id?' sel':''),tabindex:0,role:'button','aria-label':p.n},svg);
+    const col=p.k==='agent'?'var(--agent)':'var(--skill)';
+    const rr=st.sel===p.id?7:5;
+    if(st.sel===p.id) el('circle',{cx:x,cy:y,r:11,fill:'none',stroke:'var(--focus)','stroke-width':2},g);
+    if(p.k==='agent') el('circle',{cx:x,cy:y,r:rr,fill:col},g);
+    else el('rect',{x:x-rr*.8,y:y-rr*.8,width:rr*1.6,height:rr*1.6,fill:col,transform:`rotate(45 ${x} ${y})`},g);
+    const t=el('text',{x:x+9,y:y+4},g);t.textContent=p.s;
+    const pick=()=>{st.sel=p.id;draw();renderTable();};
+    g.addEventListener('click',pick);
+    g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}});
+  });
+  renderDetail();
+}
+
+const bar=(v,k)=>`<span class="bar ${k==='agent'?'agentc':'skillc'}" aria-label="${v} / 5">${[1,2,3,4,5].map(i=>`<i class="${i<=v?'on':''}"></i>`).join('')}</span>`;
+
+function renderDetail(){
+  const p=byId[st.sel];const d=document.getElementById('detail');
+  const pairs=p.k==='agent'?Object.entries(PAIRS[p.id]||{}).map(([s,w])=>({id:s,w})):
+    Object.entries(PAIRS).filter(([a,m])=>m[p.id]).map(([a,m])=>({id:a,w:m[p.id]}));
+  pairs.sort((a,b)=>b.w-a.w);
+  d.innerHTML=`<div><span class="tag ${p.k}">${p.k==='agent'?'エージェント':'スキル'} · ${p.id}</span></div>
+  <h3>${p.n}</h3><p class="note">例: ${p.ex}</p>
+  <dl>${AX.map((a,i)=>`<dt title="${AXHELP[a.k]||''}">${a.n}</dt><dd>${bar(p.v[i],p.k)} <span class="mono note">${p.v[i]}</span>${i<2?` <span class="note">${p.v[i]<=2?a.lo:p.v[i]>=4?a.hi:'中間'}</span>`:''}</dd>`).join('')}</dl>
+  <div class="kv"><b>向いている場面</b><p>${p.when}</p></div>
+  <div class="kv"><b>避けたい場面</b><p>${p.avoid}</p></div>
+  <div class="kv"><b>コツ</b><p>${p.tip}</p></div>
+  <div class="kv"><b>${p.k==='agent'?'合うスキル':'合うエージェントの分け方'}</b><p>${pairs.map(x=>`${x.w===2?'●':'○'} ${byId[x.id].n}`).join('<br>')||'—'}</p></div>`;
+}
+
+function renderTable(){
+  const t=document.getElementById('tbl');
+  const cols=[{k:'id',n:'ID'},{k:'kind',n:'種類'},{k:'name',n:'パターン'}].concat(AX.map(a=>({k:a.k,n:a.n,num:true})));
+  t.tHead.innerHTML='<tr>'+cols.map(c=>`<th scope="col"><button type="button" data-k="${c.k}" ${st.sort.k===c.k?`data-dir="${st.sort.dir>0?'▲':'▼'}"`:''}>${c.n}</button></th>`).join('')+'</tr>';
+  t.tHead.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.k; st.sort={k,dir:st.sort.k===k?-st.sort.dir:(AX.some(a=>a.k===k)?-1:1)}; renderTable();}));
+  const rows=P.filter(p=>st.kind==='all'||p.k===st.kind).slice().sort((a,b)=>{
+    const k=st.sort.k;let va,vb;
+    if(k==='id'){va=a.id[0]+a.id.slice(1).padStart(2,'0');vb=b.id[0]+b.id.slice(1).padStart(2,'0');}
+    else if(k==='kind'){va=a.k;vb=b.k;} else if(k==='name'){va=a.n;vb=b.n;} else {va=val(a,k);vb=val(b,k);}
+    return (va>vb?1:va<vb?-1:0)*st.sort.dir;});
+  t.tBodies[0].innerHTML=rows.map(p=>`<tr data-id="${p.id}" class="${st.sel===p.id?'sel':''}" tabindex="0"><td class="mono">${p.id}</td><td><span class="tag ${p.k}">${p.k==='agent'?'エージェント':'スキル'}</span></td><td>${p.n}<div class="ex">${p.ex}</div></td>${p.v.map(v=>`<td class="n">${v}</td>`).join('')}</tr>`).join('');
+  t.tBodies[0].querySelectorAll('tr').forEach(r=>{const go=()=>{st.sel=r.dataset.id;draw();renderTable();document.getElementById('map-h').scrollIntoView({behavior:'smooth',block:'start'});};
+    r.addEventListener('click',go);r.addEventListener('keydown',e=>{if(e.key==='Enter'){go();}});});
+}
+
+function renderPair(){
+  const A=P.filter(p=>p.k==='agent'),S=P.filter(p=>p.k==='skill');
+  const t=document.getElementById('pair');
+  t.innerHTML=`<thead><tr><th scope="col">エージェント \\ スキル</th>${S.map(s=>`<th scope="col" class="rot">${s.s}</th>`).join('')}</tr></thead><tbody>`+
+   A.map(a=>`<tr><th scope="row" style="position:static">${a.n}</th>${S.map(s=>{const w=(PAIRS[a.id]||{})[s.id];return `<td class="c ${w===1?'weak':''}">${w===2?'●':w===1?'○':''}</td>`}).join('')}</tr>`).join('')+'</tbody>';
+}
+
+function renderRecipes(){
+  document.getElementById('recipes').innerHTML=RECIPES.map(r=>`<div class="recipe"><h3>${r.t}</h3>
+  <div class="chips">${r.a.map(i=>`<span class="tag agent">${byId[i].s}</span>`).join('')}${r.s.map(i=>`<span class="tag skill">${byId[i].s}</span>`).join('')}</div><p>${r.d}</p></div>`).join('');
+}
+
+initSelects();draw();renderTable();renderPair();renderRecipes();
+</script>
+</body>
+</html>
