@@ -871,12 +871,12 @@ d25.box("storefront・addon の web 層\n(web/src・JSP・タグ・_ui・base_*.
 d25.box("localextensions.xml・manifest.json・*.properties\n→ 両側が触る衝突点。拡張の追加は先に main へ\n(実験 A は衝突、A' は自動 merge)", 720, 320, 460, 80, *YEL, 10)
 d25.box("Backoffice で直したデータ(CMS・商品・設定)\n→ git に無い。リポジトリ戦略の外。ImpEx に起こしたものだけ届く", 720, 420, 460, 70, *GREY, 10)
 d25.box("移行側で見つけたバックのバグ\n→ main で直して、merge で受け取る(移行側だけで直さない)", 720, 510, 460, 60, *ORANGE, 10)
-d25.box("移行側で既存ファイルを動かす・整形し直す・先に消す\n→ 保守の修正と modify/delete で衝突する(実験 D, F)", 720, 590, 460, 60, *RED, 10)
-d25.text("根拠: tools/git-sync-experiment.sh A〜F / 25 章 25.1(web/src は /occ/v2 の通り道に無い)/ cloud-commerce-sample-setup(546fe5b)core-customize/manifest.json:8-18, 36-39, 132-163, 320", 720, 670, 460, 60, 10)
+d25.box("移行側で既存ファイルを動かす・整形し直す・先に消す\n→ 保守の修正と modify/delete で衝突する(実験 D, F, G)", 720, 590, 460, 60, *RED, 10)
+d25.text("根拠: tools/git-sync-experiment.sh A〜F・git-layout-experiment.sh G / 25 章 25.1(web/src は /occ/v2 の通り道に無い)/ cloud-commerce-sample-setup(546fe5b)core-customize/manifest.json:8-18, 36-39, 132-163, 320", 720, 670, 460, 60, 10)
 gC=d25.group("取り込み続ける条件と、戦略ごとの可否", 1240, 70, 520, 760, "#fff7e6", "#d79b00")
 cs=[
- "C1 共通の祖先: 保守の履歴を持つ(ブランチか、履歴ごと複製)",
- "C2 パスを動かさない: core-customize/hybris/bin/custom/… は同じ場所",
+ "C1【前提】共通の祖先: 保守の履歴を持つ(ブランチか、履歴ごと複製。別リポジトリでも可)",
+ "C2【前提】保守が触るファイルのパスが一致(足すのは自由。構成変更は保守側で先に)",
  "C3 一方向の merge: main → migration。rebase・cherry-pick しない",
  "C4 移行側は足すだけ: 既存ファイルの変更は先に main へ",
  "C5 web 層の変更は台帳で拾い、Angular へ移植する",
