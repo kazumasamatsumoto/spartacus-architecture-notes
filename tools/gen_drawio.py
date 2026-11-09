@@ -842,6 +842,59 @@ for i,(t,col) in enumerate(qs):
     prev=q
 d24.box("両方に置くもの: ログイン要求・入力チェック・数量の上限・外部サービスの証明\n正はバック、フロントは写し(規則は依頼書でもらう)", 1220, 600, 520, 70, *GREEN, 11)
 d24.box("✕ バックが「残り 3 点」や HTML 断片を返す / フロントが合計を計算し直す / フロントだけで権限を確かめる", 1220, 690, 520, 60, *RED, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+'</mxfile>'
+# ---------- 25. repository strategy for parallel maintenance ----------
+d25=D("25 hybris と並行開発するリポジトリ戦略")
+d25.text("保守開発(hybris・アクセラレータ)を続けたまま移行する。左: ブランチの流れ。中: 保守の変更が移行側へどう届くか。右: 取り込み続けるための条件と、戦略ごとの可否。26 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d25.group("ブランチ: 保守 main → 移行 migration の一方向 merge", 40, 70, 620, 760, "#f5f5f5", "#666666")
+d25.text("main(保守。本番はアクセラレータのまま)", 60, 100, 280, 20, 11, "fontStyle=1;")
+d25.text("migration(移行。js-storefront と切替)", 370, 100, 280, 20, 11, "fontStyle=1;")
+m0=d25.box("T0: 移行開始時点\nここから migration を切る(コピーしない)", 60, 130, 270, 50, *GREY, 10)
+m1=d25.box("MNT-090 OCC 拡張と Facade への移動\n(移行のための追加でも、先に main へ)", 60, 210, 270, 60, *GREEN, 10)
+m2=d25.box("MNT-101 Facade のバグ修正", 60, 300, 270, 40, *GREEN, 10)
+m3=d25.box("MNT-102 JSP・タグ・web/src の修正", 60, 370, 270, 40, *RED, 10)
+m4=d25.box("保守リリース R1", 60, 440, 270, 40, *GREY, 10)
+m5=d25.box("MNT-110 …(保守は続く)", 60, 520, 270, 40, *GREEN, 10)
+v1=d25.box("MIG-1 js-storefront/ を追加", 370, 210, 270, 40, *BLUE, 10)
+v2=d25.box("merge main(R1)\nmerge コミットで。rebase・squash・cherry-pick しない", 370, 430, 270, 60, *ORANGE, 10)
+v3=d25.box("MIG-2 台帳の MNT-102 を Angular へ移植", 370, 520, 270, 40, *BLUE, 10)
+v4=d25.box("切替: manifest を JS Storefront へ\nstorefront 拡張の削除は切替の後", 370, 600, 270, 60, *PURP, 10)
+d25.edge(m0,m1); d25.edge(m1,m2); d25.edge(m2,m3); d25.edge(m3,m4); d25.edge(m4,m5)
+d25.edge(m0,v1,"branch",exit=(1,0.5),entry=(0.5,0),pts=[(505,155)])
+d25.edge(v1,v2); d25.edge(v2,v3); d25.edge(v3,v4)
+d25.edge(m4,v2,"merge",color="#d79b00")
+d25.edge(m5,v4,"最後の merge",color="#d79b00",exit=(0.5,1),entry=(0,0.5),pts=[(195,630)])
+d25.box("緑 = merge でそのまま届く(同じハッシュ)\n赤 = merge で届くが Spartacus では動かない → 台帳に載せて手で移植\n橙 = 取り込み。保守リリースごとなど決まった間隔で", 60, 690, 580, 70, *YEL, 10)
+d25.text("根拠: tools/git-sync-experiment.sh(git 2.50.1)A, A', E, F / cloud-commerce-sample-setup(546fe5b)README.md:46-47", 60, 775, 580, 40, 10)
+gB=d25.group("保守の変更は、移行側へどう届くか", 700, 70, 500, 760, "#f5f5f5", "#666666")
+d25.box("core・facades・service・items.xml・OCC 拡張\n→ merge で自動的に届く。Spartacus からもそのまま使える", 720, 110, 460, 70, *GREEN, 10)
+d25.box("storefront・addon の web 層\n(web/src・JSP・タグ・_ui・base_*.properties)\n→ merge で届くが一度も実行されない(25.1)\n→ 台帳: git log 前回..main -- '*/web/*' '*.jsp' '*.tag'", 720, 200, 460, 100, *RED, 10)
+d25.box("localextensions.xml・manifest.json・*.properties\n→ 両側が触る衝突点。拡張の追加は先に main へ\n(実験 A は衝突、A' は自動 merge)", 720, 320, 460, 80, *YEL, 10)
+d25.box("Backoffice で直したデータ(CMS・商品・設定)\n→ git に無い。リポジトリ戦略の外。ImpEx に起こしたものだけ届く", 720, 420, 460, 70, *GREY, 10)
+d25.box("移行側で見つけたバックのバグ\n→ main で直して、merge で受け取る(移行側だけで直さない)", 720, 510, 460, 60, *ORANGE, 10)
+d25.box("移行側で既存ファイルを動かす・整形し直す・先に消す\n→ 保守の修正と modify/delete で衝突する(実験 D, F)", 720, 590, 460, 60, *RED, 10)
+d25.text("根拠: tools/git-sync-experiment.sh A〜F / 25 章 25.1(web/src は /occ/v2 の通り道に無い)/ cloud-commerce-sample-setup(546fe5b)core-customize/manifest.json:8-18, 36-39, 132-163, 320", 720, 670, 460, 60, 10)
+gC=d25.group("取り込み続ける条件と、戦略ごとの可否", 1240, 70, 520, 760, "#fff7e6", "#d79b00")
+cs=[
+ "C1 共通の祖先: 保守の履歴を持つ(ブランチか、履歴ごと複製)",
+ "C2 パスを動かさない: core-customize/hybris/bin/custom/… は同じ場所",
+ "C3 一方向の merge: main → migration。rebase・cherry-pick しない",
+ "C4 移行側は足すだけ: 既存ファイルの変更は先に main へ",
+ "C5 web 層の変更は台帳で拾い、Angular へ移植する",
+ "C6 決まった間隔で取り込む(保守リリースごと)",
+]
+for i,t in enumerate(cs):
+    d25.box(t, 1260, 110+i*44, 480, 36, *YEL, 10, "align=left;spacingLeft=6;")
+ss=[
+ ("○ 推奨: 同じリポジトリ + migration ブランチ + upstream first", GREEN),
+ ("○ 同じリポジトリのトランク(main に js-storefront を置き、公開だけ止める)", GREEN),
+ ("○ 履歴ごと複製した別リポジトリ + upstream remote(実験 C)", BLUE),
+ ("△ フロントだけ別リポジトリ(バックは main。CCv2 へは同じリポジトリに揃える必要)", ORANGE),
+ ("✕ 履歴なしのコピー(unrelated histories。実験 B)", RED),
+ ("✕ cherry-pick で拾う運用(同じ変更が別ハッシュ。実験 E)", RED),
+]
+for i,(t,col) in enumerate(ss):
+    d25.box(t, 1260, 390+i*52, 480, 44, *col, 10, "align=left;spacingLeft=6;")
+d25.text("CCv2 のビルドとデプロイの細部(接続できるリポジトリ数、js-storefront のビルド失敗の扱い)は help.sap.com で要確認", 1260, 710, 480, 40, 10)
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))
