@@ -876,7 +876,7 @@ d25.text("根拠: tools/git-sync-experiment.sh A〜F・git-layout-experiment.sh 
 gC=d25.group("取り込み続ける条件と、戦略ごとの可否", 1240, 70, 520, 760, "#fff7e6", "#d79b00")
 cs=[
  "C1【前提】共通の祖先: 保守の履歴を持つ(ブランチか、履歴ごと複製。別リポジトリでも可)",
- "C2【前提】保守が触るファイルのパスが一致(足すのは自由。構成変更は保守側で先に)",
+ "C2【前提】保守が触るファイルのパスが一致、または接頭辞 1 つで対応(-X subtree=core-customize。26.4)",
  "C3 一方向の merge: main → migration。rebase・cherry-pick しない",
  "C4 移行側は足すだけ: 既存ファイルの変更は先に main へ",
  "C5 web 層の変更は台帳で拾い、Angular へ移植する",
