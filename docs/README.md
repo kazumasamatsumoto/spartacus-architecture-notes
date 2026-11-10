@@ -57,7 +57,7 @@
 - [23. フロント側カスタマイズの実装ガイド](23-frontend-customization-guide.md) — どのファイルに何をどう書くか。`ng add` が作る骨格、root と遅延ロードの 2 層の injector による置き場所の 3 規則、段 1〜5 のコード例(設定・SCSS・アウトレット・部品の継承・Normalizer・Adapter / Service / Facade の差し替え・インターセプタ)、よくある失敗の見分け方
 - [24. バックエンド側カスタマイズの実装ガイド](24-backend-customization-guide.md) — SAP Commerce の 4 層(型 items.xml・中身 ImpEx・変換 Data / WsDTO / Populator・窓口 OCC Controller)と置く拡張、CMS 属性が OCC でどんな形になるか(デモ実測)、Solr・OAuth・CORS、リリースの順番(バックエンドが先。fields に無い項目は 400)。SAP 公式サンプルリポジトリで書き方を確かめ、確かめられなかったものは「要確認」と明記
 - [25. JSP やタグの Java 呼び出しと、フロント / バックの責務](25-jsp-java-calls-and-responsibilities.md) — アクセラレータの Web 拡張(ページコントローラ・BeforeViewHandler・Validator・JSP・タグ・EL 関数)はヘッドレスでは実行されない。ビュー層から Java を呼ぶ 8 つの形の行き先、OPF の JSP 版と Spartacus 版の比較、責務を決める 6 つの問い、両方に置くもの(正はバック、写しはフロント)、棚卸しの grep
-- [26. 並行開発のリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) — hybris の保守を続けたまま移行するとき、保守の変更を移行側で取り込み続ける 6 条件(共通の祖先・パスの一致・一方向 merge・足すだけ・web 層の台帳・定期取り込み)。保守は現行構成のまま移行は core-customize/ で開発するときの `-X subtree` による取り込み。戦略 6 つの比較、git の実験 A〜H、SAP 公式サンプルの 1 リポジトリ構成、切替の手順
+- [26. 並行開発のリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) — 保守チームは現行構成(直下に bin/・config/)を変えず、移行チームは core-customize/・js-storefront/ で開発する。パスの違いを移行側だけで吸収する 2 方式(A: 移行リポジトリへ `git subtree` で取り込む、B: merge せずデプロイのたびに組み立てる)、git の実験 J・K、どちらでも残るもの(同じ行の衝突、JSP の移植)
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
@@ -86,7 +86,7 @@
 | フロントでカスタマイズするときの実装場所と実装方法をコード付きで | 23 |
 | バックエンド側のカスタマイズをコード付きで | 24 |
 | 既存アクセラレータで JSP やタグから Java を呼んでいた処理はどうなるか。フロントとバックの責務はどう分けるか | 25 |
-| hybris の保守と並行して移行するとき、リポジトリをどう分け、保守の変更履歴をどう取り込むか | 26 |
+| hybris の保守と並行して移行するとき、リポジトリをどう分け、保守の変更履歴をどう取り込むか(保守の構成は変えない前提) | 26 |
 | サブエージェント開発で、スキルやエージェントの責務・分類単位の分け方のパターンを表やマトリクスで | 番外 |
 
 ## 調査対象
@@ -133,6 +133,6 @@
 - [23. フロント側カスタマイズの実装ガイド: どのファイルに、何を、どう書くか](23-frontend-customization-guide.md)
 - [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md)
 - [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md)
-- [26. hybris と並行開発しながら移行するリポジトリ戦略: 保守の変更履歴を取り込み続ける条件](26-repository-strategy-parallel-maintenance.md)
+- [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html))
 - [付録](appendix.md)

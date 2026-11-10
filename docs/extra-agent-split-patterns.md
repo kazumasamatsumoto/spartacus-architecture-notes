@@ -207,4 +207,4 @@
 
 ---
 
-[目次](README.md) | ← [26. hybris と並行開発しながら移行するリポジトリ戦略: 保守の変更履歴を取り込み続ける条件](26-repository-strategy-parallel-maintenance.md) | [付録](appendix.md) →
+[目次](README.md) | ← [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) | [付録](appendix.md) →

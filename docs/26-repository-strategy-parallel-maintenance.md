@@ -1,382 +1,189 @@
-# 26. hybris と並行開発しながら移行するリポジトリ戦略: 保守の変更履歴を取り込み続ける条件
+# 26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略
 
-> **図**: 25 hybris と並行開発するリポジトリ戦略(`diagrams/spartacus-architecture.drawio`)。左: 保守 main から移行 migration へ一方向に merge するブランチの流れ。中: 保守の変更が種類ごとにどう届くか。右: 取り込み続けるための 6 条件と、戦略ごとの可否
+> **図**: 25 保守と移行を並行させるリポジトリ戦略(`diagrams/spartacus-architecture.drawio`)。左: 方式 A(移行リポジトリへ `git subtree` で取り込む)。中: 方式 B(merge せず、デプロイ用の木を組み立てる)。右: どちらでも残るものと、選び方
 
-![25 hybris と並行開発するリポジトリ戦略](diagrams/page25.png)
+![25 保守と移行を並行させるリポジトリ戦略](diagrams/page25.png)
 
-> **この章が答える問い**: hybris(アクセラレータ)の保守開発を止めずに Composable Storefront へ移行するとき、リポジトリとブランチをどう組めば、保守側の変更を移行側へ取り込み続けられるか。前提として何が同じでなければならないか(リポジトリか、フォルダ構成か)。どの戦略がその条件を満たし、どれが満たさないか
+> **この章が答える問い**: 保守チームは現行のリポジトリ(直下に `bin/`・`config/`)を一切変えない。移行チームは CCv2 の構成(`core-customize/`・`js-storefront/`)で開発する。この 2 つを並行して運用し、保守の変更を移行側へ届け続ける方法はあるか。何ができて、何ができないか
 
-> **位置づけ**: 13 章と 25 章は「コードをどこへ移すか」を扱った。この章は「その作業をどのリポジトリ・ブランチでやるか」を扱う。25.6 の移行手順(まず Facade へ下ろす)を、保守と並行する制約の下で並べ直す
+> **位置づけ**: 13 章と 25 章は「コードをどこへ移すか」を扱った。この章は「その作業を、保守と別の構成のリポジトリでどう並行させるか」を扱う
 
 > **根拠の取り方**:
-> - **CCv2 のリポジトリ構成**: SAP の公式サンプル [SAP-samples/cloud-commerce-sample-setup](https://github.com/SAP-samples/cloud-commerce-sample-setup) のコミット `546fe5b`(24 章で引いた `c3f81d1` より新しい)。以下 `sample/` と書く
-> - **git の挙動**: 小さな hybris 風リポジトリで保守と移行を再現した実験スクリプト [`tools/git-sync-experiment.sh`](../tools/git-sync-experiment.sh)(実験 A〜F)と [`tools/git-layout-experiment.sh`](../tools/git-layout-experiment.sh)(実験 G。フォルダ構成を変えた場合)、[`tools/git-subtree-merge-experiment.sh`](../tools/git-subtree-merge-experiment.sh)(実験 H。保守は現行構成のまま直下に `hybris/`、移行は `core-customize/` の場合)、[`tools/git-subtree-merge-experiment-bin-root.sh`](../tools/git-subtree-merge-experiment-bin-root.sh)(実験 I。保守の直下に `bin/`・`config/` がある場合)。git 2.50.1 で実行し、出力をそのまま載せる
-> - **CCv2 のビルドとデプロイの細部**(接続できるリポジトリの数、ビルドに使うブランチの指定、js-storefront のビルドが失敗したときの扱い)は help.sap.com を確かめられていない。そこに頼る記述は「一般形・要確認」と書く
+> - **CCv2 のリポジトリ構成**: SAP の公式サンプル [SAP-samples/cloud-commerce-sample-setup](https://github.com/SAP-samples/cloud-commerce-sample-setup) のコミット `546fe5b`(以下 `sample/`)と、SAP Learning の [Analyzing the Code Repository for the Build Process](https://learning.sap.com/courses/expanding-upon-technical-essentials-of-sap-commerce-cloud/examine-the-code-repository-connection-process-for-deployments_ad1539e5-2611-4de3-aea2-7b858bbc4455)
+> - **git の挙動**: 小さな hybris 風のリポジトリを 2 つ作って再現した実験スクリプト。[`tools/git-parallel-repo-experiment.sh`](../tools/git-parallel-repo-experiment.sh)(実験 J。方式 A)と [`tools/assemble-deploy-experiment.sh`](../tools/assemble-deploy-experiment.sh)(実験 K。方式 B。組み立て本体は [`tools/assemble-deploy.sh`](../tools/assemble-deploy.sh))。git 2.50.1 で実行し、出力をそのまま載せる
+> - **CCv2 の細部**(submodule を扱えるか、接続できるリポジトリの数、ビルドに使うブランチの指定)は help.sap.com を確かめられていない。そこに頼る記述は「要確認」と書く
 
 ---
 
-### 先に話し言葉で: 「取り込める」とは、git が共通の祖先を見つけられること
+### 先に話し言葉で: パスの違いは、移行側だけで吸収できる
 
-保守の変更を移行側で取り込めるかどうかは、結局 **`git merge` が通るかどうか** です。merge は、両側が共通の祖先を持っていて、そこから「どちらが何を変えたか」を比べられるときにだけ働きます。だから最初の条件は単純で、**移行側は保守リポジトリの履歴をそのまま持つ**こと。ブランチを切るか、履歴ごと複製する。ファイルをコピーして新しいリポジトリを作ると、その時点で取り込みの道は閉じます(26.2 実験 B)。
+結論から言うと、**できます**。保守チームは構成もブランチの運用も変えずに済みます。切替のあとも変える必要はありません。
 
-次に、保守の変更には 2 種類あることを押さえます。**core・facades・OCC のようなバックの変更は、merge すればそのまま Spartacus からも使えます。** 一方、**JSP・タグ・`web/src` の変更は、merge で届いても Spartacus では一度も実行されません**(25.1)。こちらは git では片付かないので、「移植が要る保守コミットの台帳」を作って Angular へ手で写します。
+保守と移行で違うのは、同じファイルの置き場所だけです。保守の `bin/custom/shop/...` は、CCv2 では `core-customize/hybris/bin/custom/shop/...` になります。この「頭に `core-customize/hybris/` を付ける」変換を、移行側だけで行えば済みます。やり方は 2 つあります。
 
-2 つ目の前提は、**保守が触るファイルが、移行側でも同じパスにあること**です。リポジトリそのものが同じである必要はなく、履歴ごと複製した別リポジトリでも取り込めます(実験 C)。フォルダ構成も、全部が同じである必要はありません。`js-storefront/` や新しい拡張を**足す**のは自由です。ただし、**既存のフォルダを動かすと取り込みが不安定になります**。git の「移動の検出」は推測なので、保守が新しいファイルを足したり、移行側で中身を書き換えたりすると外れます(26.3 実験 G)。オンプレの構成(`hybris/` 直下)から CCv2 の構成(`core-customize/hybris/`)へ移すような変更は、移行側ではなく**保守側で先にやって**、構成をそろえてから分かれます。
+- **方式 A: 移行リポジトリに、保守の履歴ごと取り込む。** `git subtree` を使うと、保守のコミットが `core-customize/hybris/` の下に付け替えられて、移行リポジトリに merge されます。git の 3-way merge が効くので、移行側が保守のファイルを書き換えていても、行が重ならなければ自動で合わさります(26.2)。
+- **方式 B: merge しない。デプロイのたびに組み立てる。** 保守リポジトリの指定コミットを `core-customize/hybris/` に展開し、移行リポジトリの `js-storefront/` や `manifest.json` を重ねます。これを CCv2 につなぐデプロイ用リポジトリに commit します。2 つのリポジトリは互いを一切知りません(26.3)。
 
-最後に、衝突を小さくする作法です。**移行側は足すだけにする。** 既存のファイル(Facade、`localextensions.xml`、設定)を変えたいときは、先に保守側に入れて流してもらう(upstream first)。ディレクトリを動かさない、整形し直さない、storefront を先に消さない。取り込みは保守リリースのたびに merge で行い、rebase や cherry-pick は使わない。これだけ守れば、保守のコミットは同じハッシュのまま移行側に並びます。
+どちらを選んでも、**できないこと**が 2 つ残ります。これは構成の問題ではなく、並行開発そのものの性質です(26.5)。
 
----
-
-### 26.1 何を取り込むのか: 保守の変更を 4 種類に分ける
-
-| 保守側で変わる場所 | 例 | 移行側での意味 | 取り込み方 |
-|---|---|---|---|
-| core・facades・service 拡張、`items.xml`、ImpEx、既存の OCC 拡張 | Facade の価格計算の修正 | Spartacus も OCC 経由で同じコードを使う | **merge で自動**。同じハッシュのまま届く(実験 A') |
-| storefront・addon の web 層(`web/src`、JSP、タグ、`_ui`、`base_*.properties`) | 表示文言、数量の上限、BeforeViewHandler | merge で届くが、`/occ/v2` の通り道に無いので**実行されない**(25.1) | **台帳に載せて Angular へ移植**(26.6) |
-| `localextensions.xml`、`manifest.json`、`*.properties` | 拡張の追加、プロパティ変更 | 両側が触るので衝突しやすい | 拡張・設定の追加は**先に main へ**(実験 A と A') |
-| Backoffice で直したデータ(CMS、商品、設定) | ページの差し替え、文言 | git に無い | リポジトリ戦略の外。ImpEx に起こしたものだけ届く |
-
-2 行目が、並行開発の本当のコストになる。保守で直した画面のふるまいは、merge では移行側に効かない。これを落とさない仕組みが要る(26.6)。
+- 両チームが同じファイルの同じ行を変えたら、誰かが手で解きます。
+- 保守が直した JSP やタグは、Spartacus では動きません。台帳に載せて Angular へ手で移します。
 
 ---
 
-### 26.2 取り込み続けるための 6 条件と、それを確かめた実験
+### 26.1 前提: 何がずれていて、誰がどのファイルを持つか
 
-6 条件のうち **C1 と C2 は前提条件**で、満たしていないと取り込みの仕組みそのものが成り立たない。C3〜C6 は、前提を満たしたうえで衝突と漏れを小さくする運用の条件。
+**ずれているのはパスだけ。** CCv2 は、リポジトリ直下に `core-customize/`(必須)と `js-storefront/`(任意)を置き、それぞれに `manifest.json` を置く構成を求めます(SAP Learning の上記ページ。直下に 1 つの manifest を置く旧構成は「no longer recommended」)。サンプルも同じ形です(`sample/README.md:46-47`)。
 
-| 条件 | 内容 | 破るとどうなるか |
+| | 保守リポジトリ(変えない) | CCv2 での置き場所 |
 |---|---|---|
-| **C1 共通の祖先**(前提) | 移行側は保守リポジトリの履歴を持つ(同じリポジトリのブランチか、履歴ごと複製したリポジトリ) | `refusing to merge unrelated histories`。無理に merge すると全ファイルが add/add 衝突(実験 B) |
-| **C2 保守が触るファイルのパスが一致する**(前提) | 既存のファイルは保守と同じパスに置く。新しいディレクトリを足すのは自由。構成を変えるなら保守側で先に変える(26.3)。保守の構成を変えられないなら、接頭辞 1 つの対応にして `-X subtree` で取り込む(26.4) | 移動と書き換えが重なると modify/delete 衝突(実験 D、G3)。保守が移動先に新しいファイルを足すたびに止まる(実験 G1b) |
-| **C3 一方向の merge** | main → migration の向きだけ。merge コミットで取り込み、rebase・squash・cherry-pick しない | cherry-pick すると同じ変更が別ハッシュで 2 つ残り、「どこまで取り込んだか」を履歴で追えない(実験 E) |
-| **C4 移行側は足すだけ** | 既存ファイルの変更(Facade の移動、拡張の追加、設定)は先に main へ入れる | 同じ箇所を両側が触って衝突する(実験 A) |
-| **C5 web 層の変更は台帳で拾う** | 前回の取り込み以降の保守コミットのうち、web 層を触ったものを一覧にする | 保守で直した画面のふるまいが、移行後に元へ戻る |
-| **C6 決まった間隔で取り込む** | 保守リリースのたび、など | 差が溜まるほど衝突が大きくなる。C5 の台帳も一度に膨らむ |
+| カスタム拡張 | `bin/custom/...` | `core-customize/hybris/bin/custom/...` |
+| 設定 | `config/localextensions.xml`、`config/*.properties` | `core-customize/hybris/config/...` |
+| ビルド定義 | (無い) | `core-customize/manifest.json`、`js-storefront/manifest.json` |
+| Spartacus | (無い) | `js-storefront/` |
 
-C1〜C4 は実験で確かめた。スクリプトは `T0`(移行開始時点)の小さなリポジトリを作り、保守側に次のコミットを積む。
+**ファイルの持ち主を決める。** 並行開発が楽になるかどうかは、移行側が保守のファイルを書き換える回数でほぼ決まります。
 
-- **MNT-101**: Facade の修正(バック)
-- **MNT-102**: タグと `web/src` の修正(web 層)
-- **MNT-103**: `localextensions.xml` に拡張を追加
+| 持ち主 | ファイル | 移行側での扱い |
+|---|---|---|
+| 保守 | `bin/`・`config/` の下にあるもの全部 | 移行側は原則として触らない。変えたいものは保守へ依頼して、保守のリリースで受け取る(upstream first) |
+| 移行 | `js-storefront/`、`core-customize/manifest.json`、移行だけで使う新しい拡張(例: `bin/custom/migocc/`) | 自由に変える。保守とは衝突しない |
+| 両方が変えたい | 既存の Facade や OCC 拡張、`localextensions.xml`、`*.properties` | 衝突点。できるだけ「保守へ依頼」か「manifest で足す」に寄せる |
 
-そのうえで、移行側の作り方を変えて取り込みを試した。
-
-**実験 A: 同じリポジトリの migration ブランチ。移行側も `localextensions.xml` の末尾に `xocc` を足した**
-
-```
---- 取り込み前の移植台帳: migration にまだ無い保守コミットのうち web 層を触ったもの
-4fad48f MNT-102 show currency, max qty 50 (storefront only)
---- merge main -> migration
-CONFLICT (content): Merge conflict in core-customize/hybris/config/localextensions.xml
-```
-
-**実験 A': `xocc` の追加だけを先に保守 main へ入れた(upstream first)**
-
-```
-Merge made by the 'ort' strategy.
---- migration 側から見た Facade の履歴(保守のハッシュのまま)
-f6e2e8b MNT-101 fix negative price in PriceFacade
-cb76ebb initial
---- main2 の MNT-101 のハッシュ
-f6e2e8b MNT-101 fix negative price in PriceFacade
-```
-
-**実験 B: T0 のファイルをコピーして新しいリポジトリを作った(履歴なし)**
-
-```
-fatal: refusing to merge unrelated histories
---- --allow-unrelated-histories
-CONFLICT (add/add): Merge conflict in core-customize/hybris/bin/custom/xfacades/src/PriceFacade.java
-CONFLICT (add/add): Merge conflict in core-customize/hybris/bin/custom/xstorefront/web/src/CartPageController.java
-CONFLICT (add/add): Merge conflict in core-customize/hybris/bin/custom/xstorefront/web/webroot/WEB-INF/tags/price.tag
-CONFLICT (add/add): Merge conflict in core-customize/hybris/config/localextensions.xml
-```
-
-**実験 C: 履歴ごと複製した別リポジトリ(clone して upstream を fetch)**
-
-```
-Merge made by the 'ort' strategy.
---- 取り込んだ MNT-104 のハッシュ(元リポジトリと同じ)
-af488a3 MNT-104 min price 1 / max qty 40
-af488a3 MNT-104 min price 1 / max qty 40
-```
-
-**実験 D: 移行側で `core-customize` を `backend` へ移動した**
-
-```
---- 移動だけなら rename 検出で追従
-Merge made by the 'ort' strategy.
---- 移動と同時に中身も書き換えると追従できない
-CONFLICT (modify/delete): core-customize/hybris/bin/custom/xfacades/src/PriceFacade.java deleted in HEAD and modified in main3.
-```
-
-**実験 E: MNT-101 を cherry-pick で拾ってから、あとで merge した**
-
-```
-Merge made by the 'ort' strategy.
---- 同じ変更が別ハッシュで 2 つある
-81ad1fd MNT-101 fix negative price in PriceFacade
-9167e4b MNT-101 fix negative price in PriceFacade
-```
-
-**実験 F: 移行側で storefront 拡張を先に消した**
-
-```
-CONFLICT (modify/delete): core-customize/hybris/bin/custom/xstorefront/web/src/CartPageController.java deleted in HEAD and modified in main3.
-CONFLICT (modify/delete): core-customize/hybris/bin/custom/xstorefront/web/webroot/WEB-INF/tags/price.tag deleted in HEAD and modified in main3.
-```
-
-ハッシュは実行のたびに変わる(コミット時刻を含むため)。変わらないのは「同じリポジトリでも別リポジトリでも、履歴を共有していれば保守のハッシュがそのまま届く」ことと、「衝突の有無」。
-
-実験 D の前半が示すとおり、git の rename 検出は**移動だけ**なら追従する。ただしそれは、移動したファイルの中身が元と十分似ている間だけ。移行では Facade や OCC を書き換えるので、移動に頼らないほうがよい(C2)。実験 F は、保守の web 層の修正が来るたびに「消したファイルが変更された」衝突になることを示す。衝突は台帳の代わりにはなるが、毎回人手で解く必要があり、取り込みが重くなる。web 層は消さずに残し、台帳で拾うほうが軽い(26.7)。
+**拡張とプロパティの追加は、`manifest.json` 側でできる。** サンプルの `core-customize/manifest.json` は、`extensions` に拡張を並べ(`:4-7`)、同じファイルの `useConfig.extensions` で `hybris/config/localextensions.xml` も読み込んでいます(`:49-56`)。プロパティも `properties` に直接書けます(`:58` 以降)。storefront の addon の指定も `storefrontAddons` にあります(`:8-18`)。つまり、移行で要る拡張や設定の追加の多くは、保守の `localextensions.xml` や `local.properties` を触らずに、移行が持つ `manifest.json` に書けます。両方を併記したときの優先順位は確かめていません(要確認)。
 
 ---
 
-### 26.3 前提の詳細: 何が同じでなければならないか
+### 26.2 方式 A: 移行リポジトリへ `git subtree` で取り込む
 
-「リポジトリとフォルダ構成が同じであること」が前提に見えるが、git が実際に要求するのはもっと狭い 2 つ。
-
-| 同じでなければならないもの | 同じでなくてよいもの | 根拠 |
-|---|---|---|
-| **履歴(共通の祖先)** | リポジトリそのもの。履歴ごと複製した別リポジトリでよい | 実験 B(コピーは不可)、実験 C(複製は可) |
-| **保守が触るファイルのパス** | フォルダ構成の全体。`js-storefront/`、新しい拡張、移行専用の設定ファイルは足してよい | 実験 A'(足すだけなら自動 merge) |
-
-2 つ目の「パス」が同じでないとき、git は**ファイルの中身が似ているかどうかから移動を推測**して、変更を移動先へ写す(rename 検出)。推測なので、当たる場合と外れる場合がある。CCv2 へ移る機会に、オンプレ構成(リポジトリ直下に `hybris/`)を CCv2 構成(`core-customize/hybris/`。`sample/README.md:46-47`)へ移す場合を、実験 G で試した。
-
-| 実験 | 移行側でやったこと | 保守側でやったこと | 結果 |
-|---|---|---|---|
-| G1a | `hybris/` → `core-customize/hybris/` へ移動だけ | 既存の Facade を修正 | `Merge made`(移動先へ写った) |
-| G1b | 同上 | **新しいファイルを追加** | `CONFLICT (file location): … added in main-work inside a directory that was renamed in HEAD`。毎回人が確認する必要がある |
-| G2 | 移動 + Facade の別の行を少し修正 | Facade を修正 | `Merge made`(両方の変更が入った) |
-| G3 | 移動 + Facade を大きく書き換え | Facade を修正 | `CONFLICT (modify/delete): hybris/…/PriceFacade.java deleted in HEAD and modified`。移動を見失う |
-| G3' | 同上を `git merge -X subtree=core-customize` で取り込む | 同上 | `CONFLICT (content): Merge conflict in core-customize/…/PriceFacade.java`。パスの対応は戻り、残るのは本物の内容の衝突だけ |
-| G4 | (構成変更は**保守 main で先に**行い、移行側はそこから分かれる) | 新しいパスで Facade を修正 | `Merge made` |
-
-ここから言えること。
-
-1. **構成変更は保守側で先にやり、構成をそろえてから分かれる(G4)。** これが一番確実。保守側も CCv2 で動かしているなら、構成はもともとそろっている
-2. **保守側の構成を変えられないなら、移動は移行側で 1 コミットにまとめ、取り込みは毎回 `-X subtree=core-customize` を付ける(G3')。** 接頭辞が 1 つ付くだけの移動なら、パスの対応を git に教えられる。手順と、5 種類の変更で確かめた結果は 26.4
-3. **拡張の名前変更・分割・統合は、並行期間中はやらない。** プレフィックスでは表せない移動なので、`-X subtree` でも救えない
-
-### 26.4 保守は現行構成のまま、移行は `core-customize/` で開発する場合の取り込み方
-
-保守チームはリポジトリの構成を変えず、移行チームだけが CCv2 の構成(`core-customize/hybris/…`。`sample/README.md:46-47`)で開発する場合を扱う。この形でも、次の 3 つを守れば保守のブランチを merge で取り込み続けられる。
-
-1. **移行ブランチは保守ブランチから分かれる**(C1。コピーしない)
-2. **分かれた直後に、リポジトリ直下を丸ごと接頭辞の下へ移す。そのコミットは `git mv` だけにする**
-3. **以後の取り込みは毎回 `git merge -X subtree=<接頭辞>`**。保守のパス `X` は、移行側の `<接頭辞>/X` に読み替えられる
-
-`-X subtree=<接頭辞>` は、相手側(保守)の木全体に接頭辞を付けて、こちら(移行)の木と重ねてから merge する指定。git の「移動の推測」に頼らないので、26.3 の G1b や G3 のような外れ方をしない。そのかわり、**保守と移行の対応が「接頭辞を 1 つ付ける」だけで表せること**が条件になる。接頭辞は、保守のリポジトリ直下に何があるかで決まる。
-
-| 保守のリポジトリ直下 | 接頭辞 | 実験 |
-|---|---|---|
-| **`bin/`・`config/`(リポジトリそのものが hybris ディレクトリ)** | **`core-customize/hybris`** | I |
-| `hybris/`(その下に `bin/custom`、`config`) | `core-customize` | H |
-
-対応が接頭辞 1 つで表せない場合は使えない(例: 移行側で拡張を別の階層へ動かす、拡張の名前を変える)。以下のコマンドは、直下が `bin/`・`config/` の構成で書く。直下が `hybris/` なら、接頭辞を `core-customize` に、台帳のパスを `hybris/bin/custom/…`、`hybris/config/…` に読み替える。
-
-**一度だけ: 分かれて、移す**
+**仕組み。** 移行リポジトリは別に作ります。そこへ保守リポジトリを remote として足し、`git subtree add` で保守の全履歴を `core-customize/hybris/` の下に取り込みます。以後は保守のリリースごとに `git subtree pull` を実行します。保守リポジトリには何も書き込みません。
 
 ```bash
-git switch -c migration origin/main          # 保守ブランチから分かれる(main は保守のブランチ名に読み替え)
-mkdir -p core-customize/hybris
-git mv $(git ls-tree --name-only HEAD) core-customize/hybris/   # ドットファイルも含めて直下を全部
-git commit -m "MIG-0 move everything into core-customize/hybris/ (git mv only)"
-# js-storefront/、core-customize/manifest.json、hybris/config/environments/*.properties の追加は、別のコミットで
+# 一度だけ(移行リポジトリで)
+git init mig && cd mig
+git commit --allow-empty -m "MIG-root"
+git remote add maint <保守リポジトリの URL>
+git fetch maint
+git subtree add --prefix=core-customize/hybris maint main      # --squash は付けない
+# このあと js-storefront/ と core-customize/manifest.json を足す
+
+# 保守リリースのたび
+git fetch maint
+git log --no-merges --format='%h %s' main..maint/main -- 'bin/custom/*/web/*' '*.jsp' '*.tag' 'config/*'   # 台帳
+git subtree pull --prefix=core-customize/hybris maint main -m "sync maintenance R<n>"
 ```
 
-直下を**全部**移すのは、`-X subtree` が保守の木全体に接頭辞を付けるから。`README.md` や `.gitignore` も `core-customize/hybris/` の下に入る。見た目は不自然だが、こうしないと保守がそれらを変えたときに移行側の別の場所へ写り、ずれる。`.gitignore` の中のパス(`bin/platform/` など)は、ファイルの置かれたディレクトリからの相対パスなので、移したあとも同じ意味のまま効く。
+**実験 J の結果**(`tools/git-parallel-repo-experiment.sh`)
 
-**毎回: 取り込む**
+| | 操作 | 結果 |
+|---|---|---|
+| J1 | `git subtree add` で移行リポジトリを作り、`js-storefront/`・`manifest.json`・移行専用の拡張を足す。Facade の 1 行も変える | 移行の直下は `core-customize` と `js-storefront` だけ。保守リポジトリのファイルは元のまま |
+| J2 | 保守が自分の構成のまま、Facade の別の行・JSP・設定を変え、拡張を足し、古い拡張を消し、直下に `scripts/` を足す | 保守側は何も意識しない |
+| J3 | 移行で `git subtree pull` | 6 ファイルがすべて `core-customize/hybris/` の下で反映された(追加・削除・変更)。Facade は両側の変更が合わさった。台帳には JSP と設定を触った保守コミットが出た |
+| J4 | 移行の backend 変更を `git subtree split` で保守の構成に戻す | 保守の構成(`bin/`・`config/`)に戻るが、**移行専用の `bin/custom/migocc/` まで一緒に付いてくる**。保守へ渡すには向かない |
+| J5 | 渡したいコミットだけを `git format-patch --relative=core-customize/hybris` で書き出し、保守で `git am -3` | 保守のパスに直った 1 ファイルの変更として入った。`-3` なしだと、保守が近くの行を変えていたため適用できなかった |
+| J6 | 保守がそれをリリースしたあとで `git subtree pull` | 衝突なし。同じ変更が両側にあるだけなので合わさった |
+| J7 | 両側が Facade の同じ行を変える | `CONFLICT (content)`。`core-customize/hybris/...` のパスで普通の衝突として出る |
+| J8 | 移行側で JSP の履歴と blame を見る | 保守のコミット(M1、M3)が移行の履歴に並ぶ。blame は保守のコミットと保守のパスを指す |
+
+**運用の決まり**
+
+- **`--squash` を付けない。** 付けると保守のコミットが 1 つにまとまり、J8 のように保守のコミットを辿れなくなる。
+- **保守へ返すときは `format-patch --relative` と `am -3` を使う(J5)。** `subtree split` は接頭辞の下を丸ごと持っていくので、移行専用の拡張まで混ざる(J4)。
+- **取り込むのは本番に出た状態だけ。** 保守の main やリリースタグを `pull` する。作業中のブランチは取り込まない。
+- **履歴は旧パスと並べて見る。** 移行リポジトリで `git log -- core-customize/hybris/<path>` とだけ書くと、取り込み前の保守のコミットが出ないことがある。`git log -- core-customize/hybris/<path> <path>` のように両方を並べるか、blame を使う(J8)。
+- **接頭辞を打ち間違えると止まる。** 存在しない接頭辞を渡すと `fatal: 'core-customize/hybri' does not exist; use 'git subtree add'` で止まった。それでも、取り込みは alias かスクリプトに固定しておく。
+
+**切替のあと。** 保守チームは構成を変える必要がありません。CCv2 は移行リポジトリにつなぎ、バックの開発は保守リポジトリのまま続けて、`subtree pull` で取り込み続けられます。いつか 1 つのリポジトリにまとめたくなったら、そのときに保守チームの都合で決めれば済みます。
+
+---
+
+### 26.3 方式 B: merge しない。デプロイのたびに組み立てる
+
+**仕組み。** 保守リポジトリと移行リポジトリは、互いを remote にもしません。CI が、保守の指定コミットと移行の HEAD から CCv2 用の木を作り、CCv2 につなぐデプロイ用リポジトリに commit します。
+
+```
+移行リポジトリ
+├── js-storefront/
+└── core-customize/
+    ├── manifest.json
+    ├── overlay/          ← core-customize/hybris/ の上に重ねるファイル
+    │   └── bin/custom/migocc/...        移行専用の拡張(保守には無いパス)
+    │   └── bin/custom/shop/src/Facade.java   保守のファイルを置き換える場合だけ
+    └── overlay.lock      ← 置き換えるファイルを、保守のどの版で見直したか(blob のハッシュ)
+```
+
+組み立ては [`tools/assemble-deploy.sh`](../tools/assemble-deploy.sh) で行います。手順は次のとおりです。
+
+1. `git archive` で保守の指定コミットを `core-customize/hybris/` に展開する
+2. 保守のファイルを置き換える overlay があれば、その保守ファイルの今の blob を `overlay.lock` と比べる。違っていれば止まる
+3. overlay、`manifest.json`、`js-storefront/` を重ね、`DEPLOYED_FROM` に両方のコミットを書く
 
 ```bash
-git switch migration
-git fetch origin
-
-# 1. 移植台帳。保守のコミットは旧パスで書かれているので、旧パスで絞る
-git log --no-merges --format='%h %ad %s' --date=short migration..origin/main -- \
-  'bin/custom/*/web/*' '*.jsp' '*.tag' '*.tld' 'config/*.properties' 'config/localextensions.xml'
-
-# 2. 取り込み
-git merge --no-ff -X subtree=core-customize/hybris origin/main
-
-# 3. 確認。2 段階で見る
-git ls-tree --name-only HEAD                  # core-customize と js-storefront だけ(付け忘れの検出)
-git ls-tree --name-only HEAD:core-customize   # hybris と manifest.json だけ(接頭辞の間違いの検出)
+tools/assemble-deploy.sh <保守リポジトリ> <保守のタグ> <移行リポジトリ> out/
+rsync -a --delete --exclude .git out/ deploy/ && git -C deploy add -A && git -C deploy commit -m "deploy R<n>"
 ```
 
-この 3 つをまとめたスクリプトを [`tools/sync-maintenance.sh`](../tools/sync-maintenance.sh) に置いた。既定値は直下が `bin/`・`config/` の構成。実験 I の状態で、取り込みの成功と、付け忘れ・接頭辞の間違いの検出を確かめてある。ブランチ名や、直下に置いてよい名前は自社に合わせる。衝突したときは、解いて commit したあとに `sync-maintenance.sh --check` で確認だけを流せる。
+**実験 K の結果**(`tools/assemble-deploy-experiment.sh`)
 
-**確かめた結果(実験 I。直下が `bin/`・`config/`)**
-
-保守側には次の変更を積んだ。既存の Facade の修正、新しい拡張の追加、拡張の削除、タグの修正、`localextensions.xml` と `local.properties` の変更、新しいトップレベルのディレクトリ(`scripts/`)の追加、`README.md` の変更である。移行側は、移動のあとに `manifest.json`、`environments/common.properties`、`js-storefront/` を足し、Facade の別の行を変えている。
-
-| 実験 | 取り込み方 | 結果 |
+| | 操作 | 結果 |
 |---|---|---|
-| I1 | 台帳(旧パスで絞る) | タグの修正と、設定の変更の 2 コミットだけが出る |
-| I2 | `git merge -X subtree=core-customize/hybris` | `Merge made`。全部が `core-customize/hybris/` の下に正しく入った(新しい拡張、削除、`scripts/deploy.sh`、`README.md` も)。Facade は両側の変更が入った。保守が `localextensions.xml` に足した拡張も入った。直下は `core-customize` と `js-storefront` だけ |
-| I3 | 接頭辞を `core-customize`(1 階層)と間違えた | `CONFLICT (rename/delete)`。新しい拡張が `core-customize/bin/custom/xnew/…` と、1 段ずれた場所に置かれる |
-| I4 | オプションを付け忘れた | 削除を含む取り込みでは `CONFLICT (rename/delete)`。**削除を含まない取り込みでは `Merge made` と黙って成功**し、新しい拡張が直下の `bin/custom/xnew/…` に置かれる |
-| I5 | 切替: 保守ブランチで `git merge --ff-only migration` | `Fast-forward`。保守ブランチの直下が `core-customize`、`js-storefront` になる |
+| K1 | 最初の組み立て | `core-customize/hybris/` の下に保守のファイルと移行専用の拡張、Facade の overlay が入った。`DEPLOYED_FROM` に保守と移行のコミットが残った |
+| K2 | 保守が、移行が置き換えていないファイルを変える(JSP、新しい拡張、`localextensions.xml`) | 何もしなくても次の組み立てに入った。デプロイの差分は 3 ファイル |
+| K3 | 保守が、移行が置き換えている Facade を直す | `REVIEW: bin/custom/shop/src/Facade.java changed in maintenance` で止まり、デプロイ用リポジトリには何も commit されなかった |
+| K4 | 移行が保守の差分を overlay に写し、`overlay.lock` を更新する | 組み立てが通った。Facade は両側の変更が入った |
+| K5 | デプロイの履歴を見る | 各デプロイの `DEPLOYED_FROM` から、どの保守コミットが本番に入ったかが分かる |
 
-I3 と I4 の誤りは、`sync-maintenance.sh --check` の 2 段階の確認で検出できる(`NG: リポジトリ直下に想定外: bin`、`NG: core-customize/ 直下に想定外: bin`)。
+**この方式の性質**
 
-この構成に特有の注意が 2 つある。
-
-- **`manifest.json` のパスがそのまま合う。** サンプルの `manifest.json` は `core-customize/` から見た相対パスで、`hybris/config/localextensions.xml` を読む(`sample/core-customize/manifest.json:49-56`)。保守の `config/localextensions.xml` は移すと `core-customize/hybris/config/localextensions.xml` になるので、保守が足した拡張は取り込むだけで CCv2 のビルドにも入る
-- **SAP 提供のファイルがリポジトリに入っていないか確かめる。** 直下が hybris ディレクトリそのものだと、`bin/platform` や `bin/modules` を commit している場合がある。`git ls-files bin | grep -v '^bin/custom/' | head` で確かめる。CCv2 はプラットフォームを自分で用意するので、これらは移行側では不要になるはず(要確認)。ただし移行側で消すと、保守がパッチを当てるたびに modify/delete 衝突になる(H5)。消すのは切替後にする
-
-**確かめた結果(実験 H。直下が `hybris/`)**
-
-保守側には、ありそうな変更を 5 種類まとめて積んだ。既存の Facade の修正、新しい拡張と新しいファイルの追加、拡張の削除、web 層のファイル名の変更、ルート直下のファイル(`.gitignore`、オンプレ用のデプロイスクリプト)の変更である。移行側は、移動のあとに Facade の別の行を変えている。
-
-| 実験 | 取り込み方 | 結果 |
-|---|---|---|
-| H1 | 素の `git merge`(オプションなし) | `CONFLICT (file location)`、`CONFLICT (rename/delete)`、`CONFLICT (rename/rename)` が 4 件。直下に `hybris/bin/custom/xnew/…` ができる |
-| H2 | `git merge -X subtree=core-customize` | `Merge made`。5 種類とも `core-customize/` の下へ正しく入った(追加・削除・名前変更・ルート直下のファイルも)。Facade は保守と移行の両方の変更が入った |
-| H3 | 2 回目の取り込みも同じ指定で | `Merge made` |
-| H3' | 2 回目以降に**オプションを付け忘れた** | `Merge made` と**黙って成功**し、保守が足した新しい拡張が直下の `hybris/bin/custom/xnew2/…` に置かれる |
-| H4 | 両側が同じ行を変えた | `CONFLICT (content): Merge conflict in core-customize/hybris/config/local.properties`。新しいパスで、本物の衝突として出る |
-| H5 | 移行側が消したファイル(オンプレ用デプロイスクリプト)を保守が変えた | `CONFLICT (modify/delete): core-customize/build/deploy-onprem.sh deleted in HEAD and modified in main` |
-| H6 | 履歴の見え方 | 下の表 |
-| H7 | 切替: 最後に取り込んだあと、保守ブランチで `git merge --ff-only migration` | `Fast-forward`。保守ブランチの直下が `core-customize`、`js-storefront` になる |
-
-**注意点(H・I 共通)**
-
-| 注意 | 理由 | 対策 |
-|---|---|---|
-| **毎回 `-X subtree` を付ける** | 付け忘れても黙って成功し、新しいファイルが直下の `hybris/` や `bin/` に置かれる(H3'、I4) | 取り込みはスクリプトか alias に固定する(`git config alias.sync-maint 'merge --no-ff -X subtree=core-customize/hybris'`。直下が `hybris/` なら接頭辞は `core-customize`)。CI で「ルート直下は決めた名前だけ」を検査する |
-| **保守のファイルを移行側で消さない** | 保守がそれを変えるたびに modify/delete 衝突(H5) | オンプレ専用のスクリプトや設定も、切替までは `core-customize/` の下に残す(使われないだけ。CCv2 のビルドが参照しないことは要確認) |
-| **同じ行の衝突は普通に起きる** | パスの対応が戻るだけで、内容の衝突は消えない(H4) | 衝突しやすいファイルは決まっている。次の 2 行 |
-| 拡張の一覧 | サンプルの `manifest.json` は拡張の一覧を `hybris/config/localextensions.xml` から読む(`sample/core-customize/manifest.json:49-56`) | 保守が `localextensions.xml` に足した拡張は、取り込むだけで CCv2 のビルドにも入る。移行側の拡張追加はここで衝突しやすいので、可能なら保守側に入れてもらう(C4) |
-| プロパティ | サンプルの `manifest.json` が読むのは `hybris/config/environments/*.properties`(`:20-48`)で、`local.properties` は列挙されていない | 保守の `local.properties` の変更は、取り込んでも CCv2 では効かない可能性がある。台帳に `hybris/config/*.properties` を入れ、environments 側へ写す(要確認) |
-| どのブランチを取り込むか | 保守の作業中のブランチを取り込むと、未リリースの変更が移行側に入る | 本番に出た状態(保守の main やリリースタグ)だけを取り込む。hotfix ブランチは保守の main に入ってから届く |
-
-**履歴の見え方(H6)**
-
-| 見方 | 結果 |
-|---|---|
-| `git log -- core-customize/<Facade>`(新パスだけ) | 移動のコミット、移行側のコミット、merge コミットだけ。**保守のコミットは出ない**(保守のコミットは旧パスを変えているため) |
-| `git log -- hybris/<Facade> core-customize/<Facade>`(旧パスと新パスを並べる) | 保守の `MNT-201` も出る。直下が `bin/` の構成なら `git log -- bin/custom/<…> core-customize/hybris/bin/custom/<…>` |
-| `git blame core-customize/<Facade>` | 保守が書いた行は、保守のコミットに帰属する(行の横に旧パス `hybris/bin/custom/…` と保守のハッシュが出る) |
-
-履歴は取り込めており、消えてはいない。新しいパスだけで `git log` すると見えないので、調べるときは旧パスを並べるか blame を使う。
-
-**切り替え(H7、I5)**
-
-最後の取り込みのあとは、移行ブランチに保守のコミットが全部入っている。保守ブランチで `git merge --ff-only migration` を実行すると、merge コミットも衝突も無く進む。この時点で保守ブランチの構成も `core-customize/` になる。**以後は `-X subtree` は不要**で、保守チームも新しい構成で作業する。切替後に保守の古いブランチ(旧構成)から取り込む必要が出たら、そのときだけ同じ `-X subtree=core-customize` を使う。
-
-### 26.5 戦略の比較
-
-| 戦略 | C1 祖先 | 保守のバック変更 | web 層変更の検知 | 未完成の移行コードが本番に入るか | CCv2 へのデプロイ | 判定 |
-|---|---|---|---|---|---|---|
-| **S1 同じリポジトリ + migration ブランチ + upstream first** | ○ | merge で自動 | 台帳(`git log migration..main -- …`) | 入らない(migration に置く)。upstream first で main に入れた追加は本番に出る | 移行環境は migration ブランチをビルド(一般形・要確認) | **推奨** |
-| S2 同じリポジトリのトランク(main に js-storefront も置き、公開だけ止める) | ○(merge 不要) | 同じブランチなので常に最新 | 台帳(期間で区切る) | **入る**。JS Storefront を公開しない設定で止める | 保守のビルドに Node のビルドが加わる(失敗時の扱いは要確認) | ○。移行チームと保守チームの距離が近いとき |
-| S3 履歴ごと複製した別リポジトリ + upstream remote | ○(実験 C) | `fetch upstream` + merge | 台帳 | 入らない | 移行側リポジトリを別のサブスクリプション/環境に接続する、または切替時に元へ戻す(要確認) | ○。権限やチームを分けたいとき |
-| S4 フロントだけ別リポジトリ(バックは保守 main に upstream first) | バックは ○ / フロントは新規なので不要 | main に直接入るので常に最新 | 台帳 | フロントは入らない。バックの追加は入る | CCv2 は `core-customize/` と `js-storefront/` を同じリポジトリに置く構成(`sample/README.md:46-47`)。どこかで 1 つに揃える必要がある(要確認) | △ |
-| S5 ファイルをコピーした新しいリポジトリ | ✕(実験 B) | 手で写す | 手で比べる | 入らない | — | **✕** |
-| S6 保守のコミットを cherry-pick で拾う運用 | ○ | 拾い漏れ・二重化(実験 E) | 手で選ぶ | 入らない | — | **✕** |
-
-**同じリポジトリに両方を置くのは、SAP の公式サンプルと同じ形**でもある。サンプルはリポジトリ直下に `core-customize/`(SAP Commerce)と `js-storefront/`(Spartacus)を並べる(`sample/README.md:46-47`)。`core-customize/manifest.json` はアクセラレータの `yacceleratorstorefront` と addon を残したまま(`sample/core-customize/manifest.json:8-18`、`accstorefront` アスペクト `:36-39`、`:320`)、SPA 用サイトの URL だけを JS Storefront に向けている(`website.electronics-spa.https` → `${ccv2.services.jsapps.url.0}`、`:132-163`)。つまり **1 つのリポジトリ・1 つのビルドで、アクセラレータのサイトと JS Storefront のサイトを同時に動かせる**。並行期間の構成として、そのまま使える形になっている。
-
-S1 を推奨する理由は 3 つ。
-
-1. **merge の起点が 1 つで済む。** 別リポジトリ(S3)だと remote の管理と、権限の二重管理が増える
-2. **upstream first と相性がよい。** バックの追加(OCC 拡張、Facade への移動)は main に入れて保守のテストで守る。移行ブランチに残るのは、本番のふるまいを変えるもの(manifest の切替、storefront の削除)と、フロントだけになる
-3. **未完成のフロントが保守のリリースを止めない。** S2 は、Node のビルドや依存の更新が保守のビルドに入り込む
+- **保守の変更が黙って消えることはない。** overlay は丸ごとの置き換えなので、比べなければ保守の修正を上書きして消す。それを `overlay.lock` で止めている(K3)。
+- **その代わり、置き換えたファイルは毎回手で合わせる。** git の 3-way merge は効かない。overlay で保守のファイルを置き換えるのは数ファイルまでにする。拡張や設定の追加は `manifest.json` へ(26.1)、Facade の変更は保守へ依頼する(upstream first)。
+- **保守のファイルを消すことはできない。** overlay は足すか置き換えるだけ。storefront を外すような変更は `manifest.json`(`storefrontAddons` は `:8-18`、`accstorefront` の aspect は `:320`)で表す。
+- **CI が要る。** デプロイ用リポジトリを作る仕組みは、移行チームが持つ。
 
 ---
 
-### 26.6 推奨構成(S1)の運用
+### 26.4 どちらを選ぶか
 
-**置き場所の表**
-
-| 変更 | 置く場所 | 理由 |
+| | 方式 A: `git subtree` | 方式 B: 組み立て |
 |---|---|---|
-| `web/src` のロジックを Facade へ下ろす(25.6 の 1) | **main** | 両側が使う。アクセラレータのまま動作を変えずにでき、保守のテストで守れる |
-| 新しい OCC 拡張・WsDTO・`fields`(24 章) | **main** | 追加だけなので保守に害は無い。ただし本番の `/occ/v2` に API が増えるので、`@Secured` と公開範囲は保守側でもレビューする |
-| `localextensions.xml` への拡張追加 | **main** | 衝突点を 1 本にする(実験 A → A') |
-| SPA 用のサイト・カタログの ImpEx | main(サイトを作るだけなら)/ migration(既存サイトを切り替えるなら) | 本番のふるまいが変わるかどうかで分ける |
-| `js-storefront/` | migration | 未完成のフロントを保守のビルドに入れない |
-| `manifest.json` の切替(SPA サイトの URL を jsapps へ、`storefrontAddons` の整理) | migration | 本番のふるまいが変わる |
-| storefront・addon 拡張の削除 | **切替後の main** | 先に消すと、保守の修正がすべて modify/delete 衝突になる(実験 F) |
-| 保守の web 層の修正 | main で修正 → 台帳 → migration で Angular へ移植 | merge では効かない(26.1) |
-| 移行中に見つけたバックのバグ | **main** で修正 → merge で受け取る | 移行側だけで直すと、保守の同じ箇所の修正と衝突し、本番は直らない |
+| 保守チームの作業 | なし | なし |
+| 保守の変更の届き方 | merge。行が重ならなければ自動で合わさる(J3) | 展開。移行が置き換えていないファイルは自動で入る(K2) |
+| 移行が保守のファイルを変えたとき | 3-way merge が効く。同じ行だけ衝突(J7) | 保守がそのファイルを変えるたびに止まり、手で写す(K3・K4) |
+| 本番に入った保守コミットの追い方 | 移行リポジトリの履歴と blame(J8) | `DEPLOYED_FROM`(K5) |
+| 道具 | git だけ | 組み立てスクリプトと CI |
+| 向いている場合 | 移行で既存の Facade や OCC 拡張を何か所も変える | 移行の変更がほとんど新しい拡張と `manifest.json` で済む。2 つのリポジトリを完全に分けたい |
 
-**取り込みの手順(保守リリースのたび)**
-
-```bash
-git switch migration
-git fetch origin
-
-# 1. 台帳: 前回の取り込み以降の保守コミットのうち、web 層を触ったもの
-git log --format='%h %ad %s' --date=short migration..origin/main -- \
-  'core-customize/hybris/bin/custom/*/web/*' \
-  'core-customize/hybris/bin/custom/*/acceleratoraddon/*' \
-  '*.jsp' '*.tag' '*.tld' '*base*.properties'
-
-# 2. 取り込み: merge コミットで(--no-ff)。squash・rebase しない
-git merge --no-ff origin/main -m "sync: main $(git rev-parse --short origin/main) into migration"
-
-# 3. 取り込んだ地点に印(任意。merge-base でも分かる)
-git tag sync/$(date +%Y%m%d) origin/main
-```
-
-1 の `migration..origin/main` は「main にあって migration に無いコミット」。取り込み直前に流すと、ちょうど今回入る分が出る(実験 A の台帳)。パスは自社の拡張名に合わせる。addon の web 層は `acceleratoraddon/web/` の下にある(25 章の OPF では `opfacceleratoraddon/acceleratoraddon/web/…`)。
-
-**台帳の形**(Issue でも表でもよい)
-
-| 保守コミット | 触ったもの | 25.2 の 8 つの形のどれか | Spartacus 側の行き先 | 移植チケット | 状態 |
-|---|---|---|---|---|---|
-| `4fad48f` MNT-102 | `price.tag`、`CartPageController.java` | タグ(整形)/ ページコントローラ(数量の上限) | フロントの整形パイプ / 上限はバックの検証が正、フロントは写し(25.5) | MIG-2 | 移植済み |
-
-台帳を空にしてから切り替える。これが「保守の変更が移行後に消えない」ことの確認になる。
-
-**main 側で守ること**
-
-- main を rebase・force push しない。履歴を書き換えると、migration が持っている祖先が消える
-- main への PR の squash merge は構わない。main 上で 1 コミットになるだけで、migration はそのコミットを merge で受け取る
-- web 層のパスを触る PR には、CI か CODEOWNERS で移行チームをレビューに入れる(ラベル自動付与など。仕組みは一般形)。台帳の拾い漏れを PR の時点で減らせる
-- 一括整形(フォーマッタ、改行コード、インデント)は、並行期間中はやらない。やるなら main で 1 コミットにまとめ、すぐ migration へ merge する
+**推奨は方式 A。** 移行では、既存の Facade や OCC 拡張に手を入れる場面が必ず出ます(25.6)。そのたびに手で写す方式 B より、git に合わせさせる方式 A のほうが手間も見落としも少なくなります。方式 B は、移行側の変更を overlay 数ファイルまでに抑えられると分かっている場合に選びます。
 
 ---
 
-### 26.7 やってはいけないこと
+### 26.5 どちらでも残るもの(できないこと)
 
-| やりがちなこと | 何が起きるか | 代わりに |
+| 残るもの | 理由 | 対処 |
 |---|---|---|
-| 「きれいに始めたい」と、ファイルをコピーして新しいリポジトリを作る | 以後の保守を merge で取れない(実験 B) | ブランチを切る。別リポジトリが要るなら履歴ごと複製(実験 C) |
-| 保守の修正を cherry-pick で拾う | 同じ変更が別ハッシュで残る。どこまで取り込んだかが `git log` で分からない(実験 E) | 保守リリースごとに main 全体を merge |
-| 移行側でディレクトリ構成を整理する(`core-customize` → `backend` など) | 移動と書き換えが重なると追従できない(実験 D、G3)。保守の新規ファイルで毎回止まる(G1b) | 構成変更は保守 main で先に(G4)、または切替後に |
-| 移行側で storefront・addon を先に消す | 保守の web 層修正のたびに modify/delete 衝突(実験 F) | 切替後に main で消す。検知は台帳で |
-| 移行側でバックのバグを直す | 本番は直らない。保守の修正と衝突する | main で直して流す |
-| 移行側で Facade を書き換えて OCC 用にする | 保守の Facade 修正と衝突。アクセラレータとの共通部分が割れる | Facade の変更は main で(アクセラレータの動作を変えない形で)。OCC 専用の差は OCC 拡張の Populator / Controller に |
-| 取り込みを切替直前にまとめてやる | 衝突と台帳が一度に膨らむ | C6: 保守リリースごと |
+| 同じ行の衝突 | 両チームが同じ行を変えれば、どちらを採るかは人が決めるしかない(J7、K3) | 衝突点(26.1 の「両方が変えたい」)を減らす。変更は保守へ依頼して、保守のリリースで受け取る |
+| JSP・タグ・`web/src` の修正 | 取り込んでも、Spartacus の通り道(`/occ/v2`)では実行されない(25.1) | 保守リリースごとに台帳を出し、Angular へ移す。方式 A は 26.2 の `git log`。方式 B は `git -C <保守> log --no-merges <前回の DEPLOYED_FROM の保守コミット>..<今回> -- 'bin/custom/*/web/*' '*.jsp' '*.tag' 'config/*'` |
+| Backoffice で直したデータ | git に無い | リポジトリ戦略の外。ImpEx に起こしたものだけが届く |
+| CCv2 の仕様に頼る部分 | 確かめていない | submodule を CCv2 のビルドが扱えるか、保守リポジトリと移行リポジトリの両方をつなげるか、ビルドするブランチの指定。どちらの方式も CCv2 には 1 つのリポジトリしか見せないので、これらに頼らずに済む |
+
+**取らないほうがよい形**
+
+- **履歴なしでファイルをコピーした移行リポジトリ。** 共通の祖先が無いので、あとから merge できない(`refusing to merge unrelated histories`)。方式 A は `subtree add` で、保守の全履歴を最初から持たせる。
+- **`git submodule` で保守リポジトリを `core-customize/hybris` に差し込む。** パスの違いは吸収できる。ただし、移行側が保守のファイルを変える場所が無い(submodule の中で変えると保守のリポジトリに commit することになる)。CCv2 のビルドが submodule を取りに行くかどうかも確かめていない(要確認)。
 
 ---
 
-### 26.8 切り替えとその後
-
-1. **台帳を空にする。** 最後の保守リリースまで取り込み、web 層の移植をすべて済ませる
-2. **保守の凍結期間を決める。** 最後の merge から切替までに main に入った変更は、もう一度取り込む(期間を短くするほど楽)
-3. **migration を main へ merge する。** 移行側の変更(js-storefront、manifest の切替)が main に入る。main のほうは migration に全部取り込み済みなので、こちら向きの merge で衝突は起きない(取り込みのたびに解いた結果が migration にある)
-4. **切替後の main で、storefront・addon 拡張を消す。** `localextensions.xml`、`manifest.json` の `storefrontAddons` と `accstorefront` アスペクトを整理する。ここで初めて構成の整理(C2 の制約の解除)をしてよい
-5. **migration ブランチを閉じる。** 以後は普通の 1 本の開発に戻る
-
----
-
-### 26.9 まとめ
+### 26.6 まとめ
 
 | 問い | 答え |
 |---|---|
-| 保守の変更を取り込める前提は | ① 移行側が保守の履歴を持つこと(共通の祖先。コピーは不可、履歴ごとの複製なら別リポジトリでも可)② 保守が触るファイルが移行側でも同じパスにあること(新しいフォルダを足すのは自由) |
-| フォルダ構成を変えたいときは | 保守 main で先に変えてから分かれる。できなければ移動を 1 コミットにまとめ、`-X subtree=<prefix>` で取り込む |
-| 保守は現行構成のまま、移行は `core-customize/` のとき | 分かれた直後に `git mv` だけのコミットで、直下を全部接頭辞の下へ移す。接頭辞は、保守の直下が `bin/`・`config/` なら `core-customize/hybris`、`hybris/` なら `core-customize`。以後の取り込みは毎回 `git merge --no-ff -X subtree=<接頭辞> <保守の ref>`。付け忘れても黙って成功するので、ルート直下の確認をスクリプトと CI に入れる(26.4) |
-| 推奨は | 同じリポジトリ + migration ブランチ + upstream first。SAP のサンプルも `core-customize/` と `js-storefront/` を 1 リポジトリに並べている |
-| merge で届くもの | core・facades・OCC。同じハッシュのまま届き、Spartacus からもそのまま使える |
-| merge では片付かないもの | web 層(JSP・タグ・`web/src`)。届いても実行されないので、台帳に載せて Angular へ移植 |
-| 衝突を減らす作法 | 移行側は足すだけ。既存ファイルの変更は先に main へ。移動・整形・先行削除をしない。保守リリースごとに merge |
-| 切替の完了条件 | 台帳が空。migration → main の merge のあとで storefront を消す |
+| 保守の構成を変えずに並行できるか | できる。パスの違い(`bin/` ↔ `core-customize/hybris/bin/`)は移行側だけで吸収する |
+| 方式 | A: 移行リポジトリへ `git subtree add` / `pull`(推奨)。B: merge せずデプロイのたびに組み立てる |
+| 保守へ返すとき | A は `format-patch --relative=core-customize/hybris` + `am -3`。`subtree split` は移行専用の拡張まで混ざる |
+| 移行が保守のファイルを変える回数 | 減らす。拡張と設定の追加は `manifest.json`(`sample/core-customize/manifest.json:4-7, 49-56, 58-`)、Facade の変更は保守へ依頼する |
+| できないこと | 同じ行の衝突を無くすこと、JSP の修正を自動で Spartacus に届けること |
+| 切替のあと | 保守は構成を変えなくてよい。A も B も、そのまま続けられる |
 
 ---
 
