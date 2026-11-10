@@ -13,7 +13,7 @@
 
 ### 図(draw.io)
 
-`docs/diagrams/spartacus-architecture.drawio`(25 ページ)。PNG / SVG 書き出し済み。
+`docs/diagrams/spartacus-architecture.drawio`(26 ページ)。PNG / SVG 書き出し済み。
 
 | ページ | 内容 | 画像 |
 |---|---|---|
@@ -42,6 +42,7 @@
 | 23 バックエンドの 4 層とフロントの段 | 左: 型・中身・変換・窓口の 4 層と置く拡張、設定(CORS・OAuth)。中: CMS の属性が OCC でどんな形になるか(デモ実測)と、言えないこと。右: フロントの段との対応と、リリースの順番(24 章) | [page23.png](diagrams/page23.png) / [svg](diagrams/page23.svg) |
 | 24 ビュー層の Java の行き先と責務の分け方 | 左: アクセラレータの Web 拡張(コントローラ・BeforeViewHandler・JSP / タグ)と Facade。中: ヘッドレスで残る通り道(Angular → /occ/v2 → Facade、外部サービスへの直接呼び出し)。右: フロントとバックを決める 6 つの問い(25 章) | [page24.png](diagrams/page24.png) / [svg](diagrams/page24.svg) |
 | 25 保守と移行を並行させるリポジトリ戦略 | 保守は構成を変えない。左: 方式 A(移行リポジトリへ git subtree で取り込み、format-patch で返す)。中: 方式 B(merge せず組み立て、overlay.lock で保守の変更を検出)。右: どちらでも残るものと選び方(26 章) | [page25.png](diagrams/page25.png) / [svg](diagrams/page25.svg) |
+| 26 フロントだけのコンポーネントカスタマイズ | 左: 部品のキーの決まり方(typeCode / flexType / uid)と対応表の引き方、種類 A〜D。中: 方法 M1〜M14 と使える種類。右: デモ 24 ページの実測と対応なし 6 件(27 章) | [page26.png](diagrams/page26.png) / [svg](diagrams/page26.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

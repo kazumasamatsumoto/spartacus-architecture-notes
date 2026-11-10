@@ -207,4 +207,4 @@
 
 ---
 
-[目次](README.md) | ← [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) | [付録](appendix.md) →
+[目次](README.md) | ← [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md) | [付録](appendix.md) →

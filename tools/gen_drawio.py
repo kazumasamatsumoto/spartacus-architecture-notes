@@ -892,6 +892,51 @@ for i,(t,col) in enumerate([
 ]):
     d25.box(t, 1260, 430+i*64, 480, 54, *col, 10, "align=left;spacingLeft=6;")
 d25.text("CCv2 の細部(submodule、接続できるリポジトリ数、ビルドするブランチ)は要確認。A も B も CCv2 には 1 リポジトリだけを見せる", 1260, 640, 480, 50, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+'</mxfile>'
+d26=D("26 フロントだけのコンポーネントカスタマイズ")
+d26.text("CMS の部品は「キー」で Angular 部品の対応表(cmsComponents)を引いて描かれる。キーの決まり方で 4 種類に分かれ、使える方法が変わる。27 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d26.group("キーが決まり、部品が描かれるまで", 40, 70, 560, 760, "#f5f5f5", "#666666")
+o=d26.box("OCC cms/pages の部品\n{ typeCode, uid, flexType, … }", 60, 110, 520, 50, *GREY, 11)
+k=d26.box("キーを決める(occ-cms-page-normalizer.ts:151-158)\nCMSFlexComponent → flexType\nJspIncludeComponent → uid\nそれ以外 → typeCode", 60, 190, 520, 80, *ORANGE, 11, "align=left;spacingLeft=8;")
+m=d26.box("対応表を引く(cms-components.service.ts:165-180)\nアプリの provideConfig > 機能ライブラリ > 本体の既定", 60, 300, 520, 50, *YEL, 11)
+y=d26.box("ある → Angular 部品を生成して描く\nCmsComponentData { uid, data$ } を注入", 60, 380, 250, 60, *GREEN, 10)
+n=d26.box("無い → 何も描かれない\n開発モードで警告だけ", 330, 380, 250, 60, *RED, 10)
+d26.edge(o,k); d26.edge(k,m); d26.edge(m,y); d26.edge(m,n)
+for i,(t,col) in enumerate([
+ ("A 標準の型: typeCode がキー。SearchBox・Banner・MiniCart など。多くは対応あり", BLUE),
+ ("B Flex: flexType がキー。Spartacus 用の部品なのでほぼ対応あり(デモは 86 中 65)", BLUE),
+ ("C JSP インクルード: uid がキー。Spartacus が知る uid は 6 つ(cms-config.ts:33-40)。他は自分で登録。JSP がサーバーで受けた値は来ない", PURP),
+ ("D 対応なし: 新しく作る/既存部品を割り当てる/アウトレットで差し込む/CMS から外す", RED),
+]):
+    d26.box(t, 60, 470+i*62, 520, 52, *col, 10, "align=left;spacingLeft=6;")
+gB=d26.group("方法 M1〜M14(変える範囲の小さい順)", 640, 70, 560, 760, "#f5f5f5", "#666666")
+rows=[("M1 スタイル(CSS 変数・cx-* セレクタ・$skipComponentStyles)","A B C",GREEN),
+("M2 文言(i18n.resources を provideConfig)","A B C",GREEN),
+("M3 機能の設定値(22 章)","A B C",GREEN),
+("M4 部品の固定データ(対応表の data)","A B C D",GREEN),
+("M5 部品の前後・置換(cxOutletRef=\"<キー>\")","A B C D",BLUE),
+("M6 同じキーで丸ごと差し替え(cmsComponents)","A B C",BLUE),
+("M7 継承して差し替え(extends + M6)","A B C",BLUE),
+("M8 部品ごとのサービス(providers)","A B C D",BLUE),
+("M9 guards・childRoutes・disableSSR・deferLoading・i18nKeys","A B C D",BLUE),
+("M10 スロット・ページ単位のアウトレット","—",YEL),
+("M11 スロットの並び(LayoutConfig.layoutSlots)","—",YEL),
+("M12 アイコン(IconConfig)","—",YEL),
+("M13 対応の無いキーに新しく作る","C D",RED),
+("M14 データの取り方(Service・Facade・Adapter。23.8)","—",GREY)]
+for i,(t,a,col) in enumerate(rows):
+    d26.box(t, 660, 110+i*48, 400, 40, *col, 10, "align=left;spacingLeft=6;")
+    d26.box(a, 1070, 110+i*48, 110, 40, *GREY, 10)
+d26.text("右列 = 使える種類(A〜D)。根拠は 27.2 の表", 660, 790, 520, 30, 10)
+gC=d26.group("デモサイト 24 ページの実測(2026-11-10)", 1240, 70, 520, 760, "#fff7e6", "#d79b00")
+d26.box("Spartacus の対応表: 258 行・229 キー\n同じキーを 2 か所以上で登録: 23 種類\n(B2B・OPF・CDC・My Account V2 が上書き)\ntools/cms-mapping-keys.js → 付録 27", 1260, 110, 480, 90, *BLUE, 10, "align=left;spacingLeft=6;")
+d26.box("ページに来たキー: 86 種類\n対応あり 80 / 対応なし 6\nCMSFlexComponent 65、JspIncludeComponent 0\ntools/cms-page-coverage.py", 1260, 220, 480, 80, *GREEN, 10, "align=left;spacingLeft=6;")
+for i,t in enumerate(["CheckoutComponent(カート)→ ProceedToCheckout と役目が重なる",
+"PromotionsComponent・PotentialPromotionsComponent(カート)→ 部品はあるがキー未登録",
+"CartSuggestionComponent(カート)→ 実装なし",
+"BundleCarouselComponent(商品詳細)→ 実装なし",
+"OrderConfirmationContinueButtonComponent(注文完了)→ 遅延ロード一覧にだけ名前"]):
+    d26.box(t, 1260, 330+i*56, 480, 46, *RED, 10, "align=left;spacingLeft=6;")
+d26.text("自分のサイトの CMS がアクセラレータのままなら、タブやアドレス帳などが JspIncludeComponent(C)で来ることがある", 1260, 620, 480, 50, 10)
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

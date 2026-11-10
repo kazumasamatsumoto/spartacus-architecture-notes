@@ -51,13 +51,14 @@
 - [19. Query / Command パターン](19-query-command.md) — ストア無しで「取得済みなら取らない」「更新したら取り直す」をどう作っているか。Query の状態遷移表、Command の 4 strategy、EventService の配線、NgRx との対応表
 - [20. zone.js と zoneless](20-zoneless.md) — zone.js を外すと 16〜17 章のどこが変わりどこが変わらないか。tick を起こす経路(2 本 → 1 本)、Global と Targeted、安定判定と SSR、Angular 21 の既定が zoneless なのに Spartacus が zone モードを明示する理由、両モードで動くカスタム実装の 4 規則
 - [21. 状態管理の選択: NgRx と Signal](21-state-management.md) — 「signal か NgRx か」(状態の持ち方)と「zone か zoneless か」(変更検知)は別の軸。Store / Action / Reducer / Selector / Effect / Facade の仕事を signal / computed / resource / toSignal が何で担うか、Spartacus 2612 の集計(NgRx が木、signal は末端 13 ファイル)、状態の種類 ①〜④ で決める選び方
-### 第 V 部 使う: 要件から触る場所を引き、書く(22〜26 章)
+### 第 V 部 使う: 要件から触る場所を引き、書く(22〜27 章)
 
 - [22. カスタマイズシナリオ 100](22-customization-scenarios.md) — 「〜を変えたい」100 件を、段 0(バックエンドのデータ・CMS だけ)〜段 5(Adapter / Facade 差し替え)と BE(バックエンド実装が必要)の 7 段に振り分けた索引。各行にフロントの作業・バックエンドの作業・根拠。設定がありそうで無い落とし穴の一覧
 - [23. フロント側カスタマイズの実装ガイド](23-frontend-customization-guide.md) — どのファイルに何をどう書くか。`ng add` が作る骨格、root と遅延ロードの 2 層の injector による置き場所の 3 規則、段 1〜5 のコード例(設定・SCSS・アウトレット・部品の継承・Normalizer・Adapter / Service / Facade の差し替え・インターセプタ)、よくある失敗の見分け方
 - [24. バックエンド側カスタマイズの実装ガイド](24-backend-customization-guide.md) — SAP Commerce の 4 層(型 items.xml・中身 ImpEx・変換 Data / WsDTO / Populator・窓口 OCC Controller)と置く拡張、CMS 属性が OCC でどんな形になるか(デモ実測)、Solr・OAuth・CORS、リリースの順番(バックエンドが先。fields に無い項目は 400)。SAP 公式サンプルリポジトリで書き方を確かめ、確かめられなかったものは「要確認」と明記
 - [25. JSP やタグの Java 呼び出しと、フロント / バックの責務](25-jsp-java-calls-and-responsibilities.md) — アクセラレータの Web 拡張(ページコントローラ・BeforeViewHandler・Validator・JSP・タグ・EL 関数)はヘッドレスでは実行されない。ビュー層から Java を呼ぶ 8 つの形の行き先、OPF の JSP 版と Spartacus 版の比較、責務を決める 6 つの問い、両方に置くもの(正はバック、写しはフロント)、棚卸しの grep
 - [26. 並行開発のリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) — 保守チームは現行構成(直下に bin/・config/)を変えず、移行チームは core-customize/・js-storefront/ で開発する。パスの違いを移行側だけで吸収する 2 方式(A: 移行リポジトリへ `git subtree` で取り込む、B: merge せずデプロイのたびに組み立てる)、git の実験 J・K、どちらでも残るもの(同じ行の衝突、JSP の移植)
+- [27. フロントだけのコンポーネントカスタマイズ一覧](27-frontend-component-customization-catalog.md) — CMS の部品はキー(typeCode / Flex は flexType / JSP インクルードは uid)で Angular 部品を引く。標準・Flex・JSP インクルード・対応なしの 4 種類、方法 M1〜M14、機能別の一覧、デモ 24 ページの実測(対応なし 6 件)。付録に Spartacus の対応 258 行の全件表([extras/27-cms-component-mappings.md](extras/27-cms-component-mappings.md))
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
@@ -87,6 +88,7 @@
 | バックエンド側のカスタマイズをコード付きで | 24 |
 | 既存アクセラレータで JSP やタグから Java を呼んでいた処理はどうなるか。フロントとバックの責務はどう分けるか | 25 |
 | hybris の保守と並行して移行するとき、リポジトリをどう分け、保守の変更履歴をどう取り込むか(保守の構成は変えない前提) | 26 |
+| フロントだけで部品をカスタマイズする方法の一覧。Spartacus 標準にある部品と、JSP の部品(無い部品)での違い | 27 |
 | サブエージェント開発で、スキルやエージェントの責務・分類単位の分け方のパターンを表やマトリクスで | 番外 |
 
 ## 調査対象
@@ -134,5 +136,6 @@
 - [24. バックエンド側カスタマイズの実装ガイド: どの拡張に、何を、どう書くか](24-backend-customization-guide.md)
 - [25. JSP やタグから Java を呼んでいた処理はどうなるか、フロントとバックの責務をどう分けるか](25-jsp-java-calls-and-responsibilities.md)
 - [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md)
+- [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html))
 - [付録](appendix.md)
