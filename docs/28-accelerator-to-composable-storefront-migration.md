@@ -18,7 +18,10 @@
 >   - [Installing SAP Commerce Cloud 2211-jdk21 for use with Composable Storefront](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/928ce101922944e3b546cf39d9831a4d.html?version=2211)
 >   - [Setting Up CORS](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/c7822c94d74c446f8ebd3721eacaacc9.html?version=2211)
 >   - [SmartEdit Integration](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/962112809f9a48f9b36aa05b208b3731/266db66bf8a7423193f30b5cacccd7ce.html?version=2211)
-> - **SAP Commerce 本体のソースは読めない**。アクセラレータの中の動きのうち、[help] にも書かれていないものは「要確認」と書く。手順の分け方は、上の根拠から組み立てた筆者の整理
+>   - アクセラレータ(2211 版のガイドは公開されておらず、最新が 2205 版): [WCMS Integration](https://help.sap.com/docs/SAP_COMMERCE/4c33bf189ab9409e84e589295c36d96e/8af9f8dc86691014b3e09a6aeb4664ec.html?version=2205)、[Adding a New CMS Page Template](https://help.sap.com/docs/SAP_COMMERCE/4c33bf189ab9409e84e589295c36d96e/8adbfc2d86691014a8fcf136b119868f.html?version=2205)、[Storefront Web Application Deconstructed](https://help.sap.com/docs/SAP_COMMERCE/4c33bf189ab9409e84e589295c36d96e/8af03fda8669101491e4aac2acaeb2dd.html?version=2205)、[Copying Files Between an AddOn and a Target Storefront](https://help.sap.com/docs/SAP_COMMERCE/b490bb4e85bc42a7aa09d513d0bcb18e/8acbff4b866910148e4be4ac7412dc83.html?version=2205)
+>   - 機能ごとの要件: [Schematics](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/e38d45609de04412920a7fc9c13d41e3.html?version=2211)、[Feature Compatibility Matrix](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/6c7b98dbe68f4a508cac17a207182f4c/7f4265e58242466aba453632401cdff4.html?version=2211)、各機能のページ(28.3 の表)
+>   - [Changes to Planned Removal Date for Deprecated Accelerator UI and Extensions](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/7e47d40a176d48ba914b50957d003804/1f1c6885781a4267a99c5d619d1f1edd.html?version=v2211)
+> - **SAP Commerce 本体のソースは読めない**。[help] にも書かれていないものは「要確認」と書く。手順の分け方は、上の根拠から組み立てた筆者の整理
 
 ---
 
@@ -51,10 +54,11 @@ SAP の FAQ は、アクセラレータから移す**直接の道は無い**と�
 | 出発点 | 何も無い | 画面・CMS・URL・ロジックが全部ある |
 | 最初の作業 | 型を定義する(`items.xml`) | 今あるページを OCC で取り、部品のキーを数える(27.1) |
 | バックエンドの仕事 | 型・ImpEx・Populator・OCC を足す | ほとんど足さない。`web/src` にあったロジックを Facade へ下ろし、足りない OCC を足す(25 章) |
-| CMS | 新しい部品を 1 つ置く | ページごとに作り直す。ラベル、JSP の部品、スクリプトの部品(28.4) |
+| CMS | 新しい部品を 1 つ置く | ページごとに作り直す。ラベル、JSP の部品、スクリプトの部品(28.6〜28.8) |
 | フロント | 部品を 1 つ作って登録する | 標準の部品をそのまま使い、足りない分だけ作る(27 章) |
 | 終わり方 | 部品が出たら終わり | サイト単位で一度に切り替え、アクセラレータの storefront 拡張を外して終わり |
 | SAP の公式の立場 | — | 直接の移行方法は無い。独自機能には API、スタイルは移せない、独自の CMS 部品は Angular で作り直す。両方を同時に動かすのは推奨しない([help] FAQ) |
+| アクセラレータの今後 | — | UI のテンプレート拡張とアドオンは 2205 で deprecated。2027 年 9 月とされていた削除予定は、2026 年 6 月に取り消され、固定の削除日は無くなった。ただしヘッドレスへの移行は強く推奨され、今後の機能は OCC(REST)だけで出る。deprecated なのは UI 側で、バックエンドの機能モジュールではない([help] Changes to Planned Removal Date) |
 
 ---
 
@@ -89,7 +93,20 @@ SAP の FAQ は、アクセラレータから移す**直接の道は無い**と�
 | 外部スクリプト | 分析タグ、同意バナー、決済のスクリプト。アクセラレータでは JSP に直書きされていることが多い |
 | JSP・タグの一覧 | ページテンプレートの JSP、部品の JSP、`JspIncludeComponent` が指す JSP、タグ。storefront とアドオンの両方。読み方は 28.7 |
 
-この段階で、**同じ名前の機能が Spartacus の機能ライブラリにあるか**も見ておきます。`spartacus/feature-libs/` と `spartacus/integration-libs/` のディレクトリ名が、そのまま機能の一覧です(`asm`、`cart`、`checkout`、`order`、`organization`、`storefinder`、`smartedit`、`opf`、`cdc` など)。アドオン 1 つが、機能ライブラリ 1 つと OCC の拡張 1 つに置き換わる、というのが基本の形です。どのアドオンがどのライブラリに対応するかは、公開のソースからは確かめられませんでした。要確認です。
+この段階で、**アドオンごとに Spartacus 側の受け手を決めます**。アドオンの JSP 部分は Spartacus では動きません。一方で、**バックエンドには残さなければならないアドオン**もあります。[help] の各機能ページで確かめた対応は次のとおりです(Composable Storefront 2211)。
+
+| アクセラレータのアドオン | Spartacus のライブラリ | バックエンドに要るもの([help]) | ページ |
+|---|---|---|---|
+| `assistedservicestorefront` | `@spartacus/asm` | `assistedservicewebservices` 拡張と、その CORS(`corsfilter.assistedservicewebservices.*`) | [Assisted Service Module](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/8b02b85517af4804a6cc3743f54ead07.html?version=2211) |
+| `smarteditaddon` | `@spartacus/smartedit` | 2105 以降と `spartacussampledata`(28.11) | [SmartEdit Integration](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/962112809f9a48f9b36aa05b208b3731/266db66bf8a7423193f30b5cacccd7ce.html?version=2211) |
+| B2B のアドオン(組織・承認) | `@spartacus/organization`、`@spartacus/checkout`(B2B チェックアウト・定期注文) | B2C と B2B を並べるなら `occ.rewrite.overlapping.paths.enabled`(一部の B2B の OCC に `org` を付ける)。`b2bocc` を要件とする記述は見つからなかった | [B2B Commerce Organization](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/7baec2c402ab439ebd36cf215b72bf3f.html?version=2211) |
+| `personalizationaddon` | `@spartacus/tracking`(personalization) | **`personalizationaddon` は残す**。文脈を OCC に出し、`PersonalizationScriptComponent` を供給するため。CORS に `occ-personalization-id`・`occ-personalization-time`。Backoffice で「Personalization for Commerce Web Services」を有効にする | [Personalization Integration](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/962112809f9a48f9b36aa05b208b3731/06a12afbc2fc4daaa9d5c9bbd8b02690.html?version=2211) |
+| `ordermanagementaddon`(キャンセル・返品) | `@spartacus/order` | 2005 以降。Order Management の導入も検討。機能は CMS で置き、既定では無効 | [Cancellations and Returns](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/25194600d51a4bbba5c5c2dd15d7bcfe.html?version=2211) |
+| `customerticketingaddon` | `@spartacus/customer-ticketing` | 2211 以降と `customerticketingocc` 拡張 | [Customer Service](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/7ecc65667bf34f19a2d4917fc18642f7.html?version=2211) |
+| `selectivecartaddon`(あとで買う) | 本体の設定 `cart.selectiveCart.enabled: true`(既定は false。`feature-libs/cart/base/root/config/default-cart-config.ts:14-15`) | **`selectivecartaddon` は残す**(「The selectivecartaddon AddOn is also required」) | [Selective Cart](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/c202453f2e7e4499930689dc65a1ecbd.html?version=2211) |
+| 同意・Cookie の通知 | 本体の Anonymous Consent(CMS の Flex 部品) | CORS の allowed / exposed ヘッダーに `x-anonymous-consents`。ConsentTemplate は `exposed=true` | [Anonymous Consent](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/7b5771346d9445e6a49dab9d62b6543a.html?version=2211) |
+
+それ以外のライブラリ(店舗検索 `@spartacus/storefinder`、店舗受け取り `@spartacus/pickup-in-store`、保存カート・クイック注文 `@spartacus/cart` など)の一覧は、Schematics のページにあります。各機能が使える Composable Storefront と SAP Commerce の最低版は、Feature Compatibility Matrix にあります。
 
 ---
 
@@ -221,7 +238,7 @@ OCC は、`JspIncludeComponent` ごとに、どの JSP を使うかを `page` �
 | `UpdateProfileComponent` | `accountProfileEditPage.jsp` |
 | `CookieNotificationComponent` | `/WEB-INF/views/responsive/pages/consent/cookienotification.jsp` |
 
-`CartComponent` は、Spartacus の対応表で名前が引ける部品でした(28.8)。しかし実際に描いていたのは、アドオン(`selectivecartsplitlistaddon`)が差し替えた JSP です。Spartacus 側にも「あとで買う」に当たる機能があり、設定で有効にします(`feature-libs/cart/base/components/cart-page-layout-handler.ts:63-66` の `isSelectiveCartEnabled`)。とはいえ、アドオンの JSP が何を表示していたかを読まないと、どちらが同じ仕様なのか判断できません。
+`CartComponent` は、Spartacus の対応表で名前が引ける部品でした(28.8)。しかし実際に描いていたのは、アドオン(`selectivecartsplitlistaddon`)が差し替えた JSP です。アドオンの JSP は、ビルドのときに storefront の `WEB-INF/views/addons/<アドオン名>/…` へ写されます。アドオンは storefront のどの資源でも上書きできます([help] Copying Files Between an AddOn and a Target Storefront)。Spartacus 側にも「あとで買う」に当たる機能があります。`cart.selectiveCart.enabled` で有効にし(`feature-libs/cart/base/components/cart-page-layout-handler.ts:63-66` の `isSelectiveCartEnabled`)、バックエンドの `selectivecartaddon` も残します(28.3)。とはいえ、アドオンの JSP が何を表示していたかを読まないと、どちらが同じ仕様なのか判断できません。
 
 **理由 3: JSP がスロットの出し分けまで決めていた**
 
@@ -265,7 +282,18 @@ grep -rnE '<form:form|action="|\.js"' $W --include='*.jsp' --include='*.tag'
 grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | uniq -c | sort -rn
 ```
 
-`JspIncludeComponent` の JSP のパスは、OCC の `cms/pages?…&fields=FULL` の `page` 属性から取れます。普通の部品の型とページテンプレートが、それぞれどの JSP で描かれるかは、アクセラレータ本体の規則によります。公開のソースでは確かめられなかったので、要確認です。
+**JSP の場所の決まり**([help] WCMS Integration、Adding a New CMS Page Template。どちらも 2205 版のアクセラレータのガイド):
+
+- **CMS 部品:**
+  - 描くコントローラは、`<typeCode>Controller` という名前の bean です。無ければ `DefaultCMSComponentController` が使われ、部品の属性をそのまま model に入れます。
+  - JSP の名前は、型コードを小文字にしたものです。
+    - 既定のコントローラなら `WEB-INF/views/cms/` の下(例: `cmsparagraphcomponent.jsp`)
+    - 専用のコントローラなら、そのコントローラが返すビュー名
+  - **専用のコントローラがある型は、JSP だけでなくコントローラも読みます。**
+- **ページテンプレート:** ページテンプレートの `frontendTemplateName` が JSP の名前です。例えば `layout/contentLayout2Page` は `WEB-INF/views/pages/layout/contentLayout2Page.jsp` に当たります。ログインやマイアカウントのような固定のページは、コントローラが直接ビュー名を返します。
+- **`JspIncludeComponent`:** `page` 属性に、Web アプリの中の JSP のパスがそのまま入っています(OCC の `cms/pages?…&fields=FULL` で取れる。28.7 の表)。
+
+この 3 つで、ページの JSP・部品の JSP・差し込まれる JSP を漏れなく拾えます。上の grep は、拾った JSP とタグの中身を読むためのものです。
 
 ---
 
@@ -283,7 +311,7 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 
 | 分類 | キー | Spartacus 用の CMS(`electronics-spa`)ではどうなっているか | どうするか |
 |---|---|---|---|
-| 全ページに出るスクリプトの部品 | `AssistedServiceComponent`、`PersonalizationScriptComponent`、`ProfileTagScriptComponent` | ASM と Personalization の部品は無い。ProfileTag は Flex の `ProfileTagComponent`(対応あり) | CMS から外し、機能ライブラリで受け持つ。ASM は `feature-libs/asm`、ProfileTag は `integration-libs/cds`(`integration-libs/cds/src/config/cds-config.ts`)。Personalization の受け手は要確認 |
+| 全ページに出るスクリプトの部品 | `AssistedServiceComponent`、`PersonalizationScriptComponent`、`ProfileTagScriptComponent` | ASM と Personalization の部品は無い。ProfileTag は Flex の `ProfileTagComponent`(対応あり) | ASM は CMS から外し、`@spartacus/asm` で受け持つ。**`PersonalizationScriptComponent` は外さない**。Spartacus の personalization は、`PlaceholderContentSlot` にあるこの部品から文脈を読む(`feature-libs/tracking/personalization/root/config/default-personalization-config.ts:11-18`。既定は `enabled: false`)。[help] Personalization Integration も、この部品を Staged と Online の `PlaceholderContentSlot` に置く ImpEx を示している。ProfileTag は `integration-libs/cds`(`integration-libs/cds/src/config/cds-config.ts`) |
 | 全ページに出る同意の JSP | `AnonymousConsentManagementComponent`、`CookieNotificationComponent` | Flex の `AnonymousConsentManagementBannerComponent`・`AnonymousConsentOpenDialogComponent`(対応あり。`core-libs/storefront/cms-components/anonymous-consent-management/anonymous-consent-management.module.ts:17, 27`) | 部品を Spartacus 用のものに差し替える |
 | ページ固有の JSP | `NewCustomerLoginComponent`、`OrderConfirmationContinueButtonComponent` | ログインのページは `ReturningCustomerRegisterComponent` などの Flex に置き換わっている。注文完了ページは Spartacus 用のサイトで取れず(404)、比べられなかった | 27.3 の C の手順で、既存の Angular の部品に割り当てるか、新しく作る |
 | Spartacus 用の CMS でも対応が無いもの | `CheckoutComponent`、`PromotionsComponent`、`PotentialPromotionsComponent`、`ReturningCustomerCheckoutLoginComponent`、`CartSuggestionComponent`、`BundleCarouselComponent` | 同じ名前の Flex または型のまま残り、やはり対応なし(27 章の 6 件と同じ並び) | SAP のサンプルでも描かれていない。要るものだけを 27.3 の D の手順で作り、残りは CMS から外す |
@@ -328,7 +356,7 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 
 **リポジトリ**: 保守チームの構成を変えずに並行させる方法は 26 章です(方式 A: `git subtree`、方式 B: デプロイのたびに組み立てる)。
 
-**ログインとカート**(画面ごとに切り替える場合だけの問題): アクセラレータは Web アプリのセッションで、Spartacus は OAuth のトークンで、ログインを持ちます。そのため、2 つの画面の間でログインはつながらないと考えておきます。会員のカートは OCC の `users/{userId}/carts` で取れるので、どちらでログインしても同じものが見えるはずです。匿名のカートは、アクセラレータではセッションに、Spartacus ではブラウザに識別子が残ります。こちらは引き継がれないと考えておきます。どちらも要確認です。「URL の一部だけを Spartacus に切り替える」ときは、ここが一番の問題になります。
+**ログインとカート**(画面ごとに切り替える場合だけの問題): アクセラレータは、ログインとカートを Web アプリのサーバー側のセッションで持ちます。Spartacus はブラウザの localStorage に持ちます。OCC のアクセストークンは `spartacus⚿⚿auth`、匿名のカートの識別子は `spartacus⚿<サイト>⚿cart` です([help] Cookie Reference)。そのため、2 つの画面の間でログインと匿名のカートはつながりません。2 つの画面の間でセッションやカートを共有する方法は、[help] には見つかりませんでした。会員のカートはバックエンドに保存されるので、OCC の `users/{userId}/carts` でどちらからも見えます。ログインしたときのカートの統合は、それぞれ別の仕組みで行われます。アクセラレータは `StorefrontAuthenticationSuccessHandler`、Spartacus は OCC の `POST users/{userId}/carts` に `oldCartId` を渡します([help] Storefront Web Application Deconstructed、Converting Anonymous Users to Registered Users)。SAP が同時稼働を推奨しない理由の 1 つがここです。
 
 **切り替えの単位**:
 
@@ -345,7 +373,7 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 
 前提として、SAP Commerce Cloud 2105 以降で、`spartacussampledata` が入っている必要があります。
 
-**最後に外すもの**: 切り替えが終わったら、`manifest.json` からアクセラレータの Web アプリ(`accstorefront` の aspect、`storefrontAddons`)を外します。`localextensions.xml` からは `yacceleratorstorefront` とアドオンの拡張を外します。Facade・Service・型の拡張は残します。
+**最後に外すもの**: 切り替えが終わったら、`manifest.json` からアクセラレータの Web アプリ(`accstorefront` の aspect)と `storefrontAddons` の指定を外し、`localextensions.xml` から `yacceleratorstorefront` を外します。アドオンは 1 つずつ判断します。`personalizationaddon` や `selectivecartaddon` のように、Spartacus の機能がバックエンドに要求するアドオンは残します(28.3 の表)。Facade・Service・型の拡張は残します。
 
 ---
 
@@ -376,8 +404,9 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 | 何が残り、何を捨てるか | Facade・Service・型・データは残る。storefront の Web 拡張(JSP・タグ・`web/src`)は捨てる。CMS の中身は作り直す |
 | 最初の手順 | 棚卸し。27 章のスクリプトを**今のアクセラレータのサイト**に流す(デモでは 44 種類中 15 が対応なし) |
 | バックエンドで最初にやること | `/occ`・OAuth クライアント・CORS。Spartacus 用のベースサイトを作り、配信する URL に合う `urlPatterns` を入れる(合わないと起動しない) |
+| アドオン | 1 つずつ Spartacus の受け手を決める。`personalizationaddon`・`selectivecartaddon` のようにバックエンドに残すものもある(28.3) |
 | JSP はどう扱うか | 捨てる前に読む。JSP 1 枚ごとに表示・出し分け・文言・操作・JS・子を書き出し、Spartacus の部品と突き合わせる。CMS に出る `JspIncludeComponent` は一部で、ページテンプレート・部品・タグ・アドオンの JSP も対象 |
-| CMS で作り直すもの | ページのラベル(URL の形に)、JSP の部品(Flex に)、スクリプトの部品(外す)。テンプレート名はそのまま使える。ただしアクセラレータのスロットが Spartacus のレイアウトに無いことがある(カートの `CenterLeftContentSlot`・`BottomContentSlot`) |
+| CMS で作り直すもの | ページのラベル(URL の形に)、JSP の部品(Flex に)、スクリプトの部品(ASM は外す。`PersonalizationScriptComponent` は残す)。テンプレート名はそのまま使える。ただしアクセラレータのスロットが Spartacus のレイアウトに無いことがある(カートの `CenterLeftContentSlot`・`BottomContentSlot`) |
 | 旧 URL | `…/p/<コード>` と `…/c/<コード>` は既定で受け付ける。作るリンクを旧形式にするなら `paths` を変える |
 | 公式の立場 | 直接の移行方法は無い。独自機能には API、スタイルは移せない、独自の CMS 部品は Angular で作り直す([help] FAQ) |
 | CMS の作り直し方 | SAP のサンプルデータと同じ形: アクセラレータのコンテンツカタログを `-spa` のカタログへ同期で写し、`cleaning.impex` で消し、JSP → Flex、ラベルを `/` 始まり、ヘッダーのスロットなどを ImpEx で入れる |

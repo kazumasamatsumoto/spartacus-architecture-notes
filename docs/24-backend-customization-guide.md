@@ -8,10 +8,11 @@
 
 > **位置づけ**: 23 章(フロント側の実装ガイド)の対になる章。12 章(何をどの単位で返すか)・13 章(JSP からの移行)・14 章(チェックリスト)が「判断」を書いたのに対して、この章は「書き方」を書く。コード例は 22 章のシナリオ番号(#11 など)で引ける
 
-> **根拠の取り方**: SAP Commerce 本体のソースは公開されておらず、help.sap.com の該当ページもログインが要る。そこで根拠を 4 種類に分け、各コード例にどれを使ったかを書く。
+> **根拠の取り方**: SAP Commerce 本体のソースは公開されていない。そこで根拠を 5 種類に分け、各コード例にどれを使ったかを書く。
 > - **SAP 公式サンプル**: SAP / SAP-samples の GitHub にある、SAP が書いた拡張(下の表。コミットを固定して読んだ)。製品ドキュメントではないが、書き方の実例として使う
 > - **Spartacus docs**: `sap.github.io/spartacus-docs` のインストール・CORS・機能ページ
 > - **Spartacus のクローン**(v2612.0.0): フロントがバックエンドに期待している形。パスの略記は 22 章と同じ(`core/` = `core-libs/core/src/`、`sf/` = `core-libs/storefront/`、`fl/` = `feature-libs/`)
+> - **SAP 公式ドキュメント(help.sap.com、SAP Commerce Cloud in the Public Cloud v2211 と 2211 の Javadoc)**: ログイン不要で読める。2026-11-17 に `http.svc/pagecontent` で本文を取得した(以下 [help]。初版ではログインが要ると誤って書き、確かめられなかった箇所を「要確認」にしていた)
 > - **デモ OCC の実測**: `composable-storefront-demo.eastus.cloudapp.azure.com:8443/occ/v2/electronics-spa`(2026-10-30 に取得)
 >
 > どれでも確かめられなかった書き方は **「一般形・要確認」** と書いた。拡張名(`mycore` など)は説明用の仮の名前である
@@ -203,12 +204,14 @@ INSERT_UPDATE CMSUserGroupRestriction;$contentCV[unique=true];uid[unique=true];n
 類似商品はデータだけで出る(13 章、22 章 #12〜13)。
 
 ```text
-# 一般形・要確認(公開の SAP 資料で該当する ImpEx を見つけられなかった)
+# 列名は Javadoc で確認。ImpEx の例そのものは公式資料に無い(ヘッダーの組み立ては一般形)
 $productCatalog=electronicsProductCatalog
 $catalogVersion=catalogversion(catalog(id[default=$productCatalog]),version[default='Staged'])[unique=true,default=$productCatalog:Staged]
 INSERT_UPDATE ProductReference;source(code,$catalogVersion)[unique=true];target(code,$catalogVersion)[unique=true];referenceType(code)[unique=true];active;preselected
 ;300938;1934794;SIMILAR;true;false
 ```
+
+根拠: `ProductReference` の属性(`source`・`target`・`referenceType`・`active`・`preselected`・`qualifier`・`quantity` など)は 2211 の Javadoc [ProductReferenceModel](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/catalog/model/ProductReferenceModel.html)、参照タイプの値(`ACCESSORIES`・`SIMILAR`・`CROSSELLING`・`UPSELLING` など)は [ProductReferenceTypeEnum](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/catalog/enums/ProductReferenceTypeEnum.html)。ImpEx の例そのものは [help] に見つからなかったので、ヘッダーの組み立ては一般形のまま。
 
 デモでは `products/1934793/references?referenceType=SIMILAR` が 4 件、`300938` は 0 件を返す(13 章)。フロントの Selector は参照タイプを完全一致で絞るので、コンポーネントの `productReferenceTypes` には 1 つだけ書く(`core/product/store/selectors/product-references.selectors.ts:35`)。
 
@@ -264,7 +267,7 @@ curl "https://<host>/occ/v2/<baseSite>/cms/components?componentIds=CampaignBanne
 </bean>
 ```
 
-根拠: 既存の Data に項目を足す書き方は `opf` の `opfacceleratorcore/resources/opfacceleratorcore-beans.xml:801-803`(`CartData`)と `:160-161`(`AddressData`)。**`ProductData` / `ProductWsDTO` のパッケージ名は公開資料で確かめていない(一般形・要確認)。**使っている版の生成済みクラスで確かめる。Data と WsDTO の項目名を揃えると、DataMapper が名前で対応づける(12.4)。
+根拠: 既存の Data に項目を足す書き方は `opf` の `opfacceleratorcore/resources/opfacceleratorcore-beans.xml:801-803`(`CartData`)と `:160-161`(`AddressData`)。パッケージ名は 2211 の Javadoc で確認した([ProductData](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/commercefacades/product/data/ProductData.html)、[ProductWsDTO](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/commercewebservicescommons/dto/product/ProductWsDTO.html))。`ProductWsDTO` という名前のクラスは `cmswebservices.dto` と `cmssmarteditwebservices.dto` にもあるので、パッケージまで正確に書く。Data と WsDTO の項目名を揃えると、DataMapper が名前で対応づける(12.4)。
 
 ### ② Populator を書く
 
@@ -292,7 +295,23 @@ public class WarrantyPopulator implements Populator<ProductModel, ProductData> {
 </bean>
 ```
 
-根拠: `opf` の `opfacceleratorcore/resources/opfacceleratorcore-spring.xml:348-351`(`cartConverter` に Populator を足している)。**商品の場合、OCC がどの Converter(または `ProductOption` ごとに組み立てる Populator)を通るかは版によって違う(一般形・要確認)。**足したあと、②の Populator が呼ばれているかをログで確かめる。
+根拠: `opf` の `opfacceleratorcore/resources/opfacceleratorcore-spring.xml:348-351`(`cartConverter` に Populator を足している)。[help] の「[ModifyPopulatorList](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/20125f0eca6340dba918bda360e3cdfa/45fab1996cba43ed97a62cac3f58d46d.html?version=v2211)」と「[Extending Data Objects](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/e1391e5265574bfbb56ca4c0573ba1dc/4d1e88e78fff4e12bdd1cf82e7cfebcf.html?version=v2211)」も、Converter を宣言し直さずに Populator を足すこの書き方を示している(例は顧客の `customerConverter`)。
+
+**商品は 2 段で作られる。** [help] の「[commercefacades Extension](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/e1391e5265574bfbb56ca4c0573ba1dc/8b832e6286691014a050d0863227d73b.html?version=v2211)」によると、商品の Facade はまず `productConverter` で変換します。そのあと、`productConfiguredPopulator` が、呼び出し側が指定した `ProductOption`(`BASIC`・`PRICE`・`GALLERY`・`STOCK`・`REFERENCES` など。[Javadoc](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/commercefacades/product/ProductOption.html))ごとの Populator を足します。だから足し先は 2 通りあります。
+
+- **いつも出したい:** 上のように `productConverter` に足す。
+- **特定のオプションのときだけ出したい:** `ProductOption` をキーにして足す([help]「[Converters and Populators](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/e1391e5265574bfbb56ca4c0573ba1dc/8b937ff886691014815fcd31ff1de47a.html?version=v2211)」の例を、商品の項目に置き換えたもの)。
+
+```xml
+<bean parent="configurablePopulatorModification">
+  <property name="target" ref="defaultProductConfiguredPopulator"/>
+  <property name="keyType" value="de.hybris.platform.commercefacades.product.ProductOption"/>
+  <property name="key" value="BASIC"/>
+  <property name="add" ref="warrantyPopulator"/>
+</bean>
+```
+
+OCC の商品 API が、`fields` に応じてどの `ProductOption` を指定するかは、[help] に書かれていませんでした(要確認)。迷ったら `productConverter` に足し、②の Populator が呼ばれているかをログで確かめます。
 
 ### ④ `fields` でどう出すか
 
@@ -306,7 +325,20 @@ $ curl ".../products/1934793?fields=code,noSuchField"      # → HTTP 400
 { "errors" : [ { "message" : "Incorrect field:'noSuchField'", "type" : "ConversionError" } ] }
 ```
 
-Spartacus の商品のエンドポイントは、`details` などのスコープごとに**項目名を直接並べている**(`core/occ/adapters/product/default-occ-product-config.ts:14-26`)。だから WsDTO に項目を足せば、フロントは `fields` の文字列に `warrantyMonths` を足すだけで受け取れる(23 章の段 1)。**`DEFAULT` レベルに含めたい**ときは FieldSetLevelMapping を書く。新しい WsDTO の場合の書き方は 24.7 にある。既存の `ProductWsDTO` のレベル定義に足す書き方は、公開資料で確かめられなかった(一般形・要確認)。
+Spartacus の商品のエンドポイントは、`details` などのスコープごとに**項目名を直接並べている**(`core/occ/adapters/product/default-occ-product-config.ts:14-26`)。だから WsDTO に項目を足せば、フロントは `fields` の文字列に `warrantyMonths` を足すだけで受け取れる(23 章の段 1)。**`DEFAULT` レベルに含めたい**ときは FieldSetLevelMapping を書く。新しい WsDTO の場合の書き方は 24.7 にある。既存の WsDTO のレベルに足すには、同じ `dtoClass` で `fieldSetLevelMapping` をもう 1 つ宣言します。[help] の「[Fields Configuration Format](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/e1391e5265574bfbb56ca4c0573ba1dc/730208af21004b9c92fe493121daac23.html?version=v2211)」は、同じクラスにマッピングが 2 つあれば値がマージされると説明しています。標準のレベル定義は `commercewebservices/web/webroot/WEB-INF/config/v2/dto-level-mappings-v2-spring.xml` にあります([help]「[DTO Mapping and Response Configuration](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/3476714bba0b4cb9b3eb58c270e44439/8c404c5886691014a48c88f4a49f9bf3.html?version=v2211)」)。
+
+```xml
+<!-- myocc/web/webroot/WEB-INF/config/myocc-web-spring.xml など。ProductWsDTO の例は公式資料に無く、UserWsDTO の例を置き換えたもの -->
+<bean parent="fieldSetLevelMapping" id="myProductWsDTOFieldSetLevelMapping">
+  <property name="dtoClass" value="de.hybris.platform.commercewebservicescommons.dto.product.ProductWsDTO"/>
+  <property name="levelMapping">
+    <map>
+      <entry key="DEFAULT" value="warrantyMonths"/>
+      <entry key="FULL" value="warrantyMonths"/>
+    </map>
+  </property>
+</bean>
+```
 
 ---
 
@@ -402,12 +434,14 @@ INSERT_UPDATE SolrIndexedProperty;solrIndexedType(identifier)[unique=true];name[
 ### 並び順を足す(#22)
 
 ```text
-# 一般形・要確認(公開の SAP 資料で該当する ImpEx を見つけられなかった)
+# 列名は Javadoc で確認。ImpEx の例そのものは公式資料に無い(ヘッダーの組み立ては一般形)
 INSERT_UPDATE SolrSort;indexedType(identifier)[unique=true];code[unique=true];useBoost
 ;electronicsProductType;warranty-desc;false
 INSERT_UPDATE SolrSortField;sort(indexedType(identifier),code)[unique=true];fieldName[unique=true];ascending[unique=true]
 ;electronicsProductType:warranty-desc;warrantyMonths;false
 ```
+
+根拠: 属性名は 2211 の Javadoc([SolrSortModel](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/solrfacetsearch/model/SolrSortModel.html): `code`・`name`・`useBoost`・`indexedType`・`fields`、[SolrSortFieldModel](https://help.sap.com/doc/cb16fb8fc9af43bd915b2adfeb7d33d9/2211.13/en-US/de/hybris/platform/solrfacetsearch/model/SolrSortFieldModel.html): `fieldName`・`ascending`・`sort`)。[help]「[Search and Navigation](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/7e47d40a176d48ba914b50957d003804/8aed7d0286691014be549caa231d5db0.html?version=v2211)」によれば、SolrSort は地域化された名前と SolrSortField の順序付きリストを持ち、最後に関連度スコアが自動で足されます。Adaptive Search を使っていると、同じ code の並び順が Adaptive Search 側の定義で上書きされます([help]「[Sorts Configuration](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/e1391e5265574bfbb56ca4c0573ba1dc/b2531b4fc4744f42a50d2bae2ec76c12.html?version=v2211)」)。
 
 Solr の設定を変えたあとは、インデックスを作り直す。並び順の表示名はフロントの翻訳で付ける(`sf/shared/components/list-navigation/sorting/sorting.component.ts:51`)。
 
@@ -448,7 +482,13 @@ ASM の `sap-commerce-cloud-user-id` は docs の一覧に入っていない。A
 
 ### 言語・通貨・ベースサイト(#71〜73, #80)
 
-フロントは起動時に、ベースサイトの言語・通貨の一覧と URL の構成(`urlEncodingAttributes`)を OCC から読んで設定を作る(`core/site-context/config/config-loader/site-context-config-initializer.ts:80-86`)。だから言語や通貨を増やす作業は、BaseStore の言語・通貨と、ローカライズされたデータ(商品名・価格)を ImpEx で入れるだけで、フロントの変更は要らない。BaseStore と BaseSite の ImpEx の列名は版で確かめる(一般形・要確認)。
+フロントは起動時に、ベースサイトの言語・通貨の一覧と URL の構成(`urlEncodingAttributes`)を OCC から読んで設定を作る(`core/site-context/config/config-loader/site-context-config-initializer.ts:80-86`)。だから言語や通貨を増やす作業は、BaseStore の言語・通貨と、ローカライズされたデータ(商品名・価格)を ImpEx で入れるだけで、フロントの変更は要らない。CMSSite のヘッダーは、[help]「[Upgrading B2C Accelerator from 2205 to 2211](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/75d4c3895cb346008545900bffe851ce/bbac567ceb144102b67dffbf9a6616a6.html?version=v2211)」に 2211 のものがあります(抜粋)。
+
+```text
+INSERT_UPDATE CMSSite;uid[unique=true];theme(code);channel(code);stores(uid);contentCatalogs(id);defaultCatalog(id);defaultLanguage(isoCode);urlPatterns;active;previewURL;startingPage(uid,$contentCV);urlEncodingAttributes
+```
+
+BaseStore の ImpEx のヘッダーは、[help] に完全な例がありませんでした。列名は 2211 の Javadoc の `BaseStoreModel`(`languages`・`currencies`・`defaultLanguage`・`defaultCurrency`・`deliveryCountries` など)に合わせます。Composable Storefront 側で URL に載せる値を足すときは、Backoffice の WCMS > Website > URL Encoding Attributes を使う、と案内されています([help]「[Automatic Multi-Site Configuration](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/eaef8c61b6d9477daf75bff9ac1b7eb4/9d2e339c2b094e4f99df1c2d7cc999a8.html?version=2211)」)。
 
 ---
 
@@ -481,8 +521,8 @@ curl -H "Authorization: Bearer <token>" "$B/users/current/loyalty?fields=DEFAULT
 | 層 | 置く拡張 | 書くもの | フロントと噛み合う点 | 公開資料での確認 |
 |---|---|---|---|---|
 | 型 | `mycore` | `*-items.xml`(既存型は `autocreate="false"`、CMS 部品は `SimpleCMSComponent` を継承) | ItemType の `code` = `typeCode` = `cmsComponents` のキー | SAP 公式サンプルで確認 |
-| 中身 | データ拡張 / Backoffice | ImpEx(部品、スロット、ページ、Restriction、商品参照、Solr、OAuth) | スロットの `position` = `layoutSlots` のスロット名、`label` = URL | 部品・スロット・ページ・Restriction・Solr のリダイレクト・OAuth は確認。商品参照と並び順は一般形 |
-| 変換 | `myfacades` / `myocc` | `*-beans.xml`(Data と WsDTO)、Populator、`modifyPopulatorList` | WsDTO の項目名 = フロントの `fields` に書く名前 | 書き方は確認。商品の Converter 名と DTO のパッケージは要確認 |
+| 中身 | データ拡張 / Backoffice | ImpEx(部品、スロット、ページ、Restriction、商品参照、Solr、OAuth) | スロットの `position` = `layoutSlots` のスロット名、`label` = URL | 部品・スロット・ページ・Restriction・Solr のリダイレクト・OAuth は確認。商品参照と並び順は列名を Javadoc で確認(ヘッダーの組み立ては一般形) |
+| 変換 | `myfacades` / `myocc` | `*-beans.xml`(Data と WsDTO)、Populator、`modifyPopulatorList` | WsDTO の項目名 = フロントの `fields` に書く名前 | 書き方と DTO のパッケージは確認。商品は `productConverter` と `ProductOption` ごとの Populator の 2 段(OCC がどのオプションを使うかは要確認) |
 | 窓口 | `myocc` | Controller、WsDTO、`fieldSetLevelMapping` | URL = フロントのエンドポイント設定、`users/{userId}` = `current` / `anonymous` | SAP 公式サンプルで確認 |
 | 設定 | `local.properties` / manifest | CORS、OAuth クライアント | `allowedHeaders` ⊇ フロントが送るヘッダー、`client_id` が一致 | Spartacus docs で確認(client_id の食い違いに注意) |
 

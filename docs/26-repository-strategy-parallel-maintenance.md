@@ -11,7 +11,14 @@
 > **根拠の取り方**:
 > - **CCv2 のリポジトリ構成**: SAP の公式サンプル [SAP-samples/cloud-commerce-sample-setup](https://github.com/SAP-samples/cloud-commerce-sample-setup) のコミット `546fe5b`(以下 `sample/`)と、SAP Learning の [Analyzing the Code Repository for the Build Process](https://learning.sap.com/courses/expanding-upon-technical-essentials-of-sap-commerce-cloud/examine-the-code-repository-connection-process-for-deployments_ad1539e5-2611-4de3-aea2-7b858bbc4455)
 > - **git の挙動**: 小さな hybris 風のリポジトリを 2 つ作って再現した実験スクリプト。[`tools/git-parallel-repo-experiment.sh`](../tools/git-parallel-repo-experiment.sh)(実験 J。方式 A)と [`tools/assemble-deploy-experiment.sh`](../tools/assemble-deploy-experiment.sh)(実験 K。方式 B。組み立て本体は [`tools/assemble-deploy.sh`](../tools/assemble-deploy.sh))。git 2.50.1 で実行し、出力をそのまま載せる
-> - **CCv2 の細部**(submodule を扱えるか、接続できるリポジトリの数、ビルドに使うブランチの指定)は help.sap.com を確かめられていない。そこに頼る記述は「要確認」と書く
+> - **CCv2 の公式ドキュメント**(help.sap.com、SAP Commerce Cloud in the Public Cloud v2211。2026-11-17 に `http.svc/pagecontent` で本文を取得。以下 [help])
+>   - [Project Customizations](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/36cc68d35f784dad9f70afeda5ef6239.html?version=v2211)
+>   - [Complex Project Repositories](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/0ce946a6cf14403dab57859950238e37.html?version=v2211)
+>   - [Code Repository Conventions](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/dca0bfe88429408380fedf316e9c6f14.html?version=v2211)
+>   - [General Rules for Paths](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/6b40de5762694346bf3b1e9494b2256b.html?version=v2211)
+>   - [Customization Directory Guidelines](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/be943987b7004f06abfd36e64db119f0.html?version=v2211)
+>   - [Manifest Components Reference](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/1be46286b36a4aa48205be5a96240672/3d562b85b37a460a92d32ec991459133.html?version=v2211)
+>   - [Creating a Build](https://help.sap.com/docs/SAP_COMMERCE_CLOUD_PUBLIC_CLOUD/0fa6bcf4736c46f78c248512391eb467/79763857d2264a189cb577fc90de0fea.html?version=v2211)
 
 ---
 
@@ -33,7 +40,14 @@
 
 ### 26.1 前提: 何がずれていて、誰がどのファイルを持つか
 
-**ずれているのはパスだけ。** CCv2 は、リポジトリ直下に `core-customize/`(必須)と `js-storefront/`(任意)を置き、それぞれに `manifest.json` を置く構成を求めます(SAP Learning の上記ページ。直下に 1 つの manifest を置く旧構成は「no longer recommended」)。サンプルも同じ形です(`sample/README.md:46-47`)。
+**ずれているのはパスだけ。** CCv2 は、リポジトリ直下に `core-customize/`(必須)と `js-storefront/`(任意)を置き、それぞれに `manifest.json` を置く構成を求めます。サンプルも同じ形です(`sample/README.md:46-47`)。公式ドキュメントで確かめた決まりは次のとおりです([help])。
+
+- **旧構成:** 直下に 1 つの `manifest.json` を置く構成は deprecated です。この構成では JS のストアフロント(Spartacus)を載せられません。2 つの構成を混ぜることもできません(Project Customizations)。
+- **フォルダ名:** フォルダ名を変える設定(rootFolder のようなもの)は見つかりませんでした。
+- **パス:** `manifest.json` に書くパスは `core-customize/`(または `js-storefront/`)からの相対です。`..` や `/` 始まりは使えません(General Rules for Paths)。
+- **拡張を探す範囲:** 拡張は名前だけで指定し、`core-customize/` の下を 10 階層まで探します(Customization Directory Guidelines)。
+
+つまり、保守の `bin/`・`config/` を直下に置いたまま、`core-customize/manifest.json` から `../bin` のように指すことはできません。保守のファイルは、どうしても `core-customize/` の下に入れる必要があります。これが、この章で 2 つの方式が要る理由です。
 
 | | 保守リポジトリ(変えない) | CCv2 での置き場所 |
 |---|---|---|
@@ -50,7 +64,7 @@
 | 移行 | `js-storefront/`、`core-customize/manifest.json`、移行だけで使う新しい拡張(例: `bin/custom/migocc/`) | 自由に変える。保守とは衝突しない |
 | 両方が変えたい | 既存の Facade や OCC 拡張、`localextensions.xml`、`*.properties` | 衝突点。できるだけ「保守へ依頼」か「manifest で足す」に寄せる |
 
-**拡張とプロパティの追加は、`manifest.json` 側でできる。** サンプルの `core-customize/manifest.json` は、`extensions` に拡張を並べ(`:4-7`)、同じファイルの `useConfig.extensions` で `hybris/config/localextensions.xml` も読み込んでいます(`:49-56`)。プロパティも `properties` に直接書けます(`:58` 以降)。storefront の addon の指定も `storefrontAddons` にあります(`:8-18`)。つまり、移行で要る拡張や設定の追加の多くは、保守の `localextensions.xml` や `local.properties` を触らずに、移行が持つ `manifest.json` に書けます。両方を併記したときの優先順位は確かめていません(要確認)。
+**拡張とプロパティの追加は、`manifest.json` 側でできる。** サンプルの `core-customize/manifest.json` は、`extensions` に拡張を並べ(`:4-7`)、同じファイルの `useConfig.extensions` で `hybris/config/localextensions.xml` も読み込んでいます(`:49-56`)。プロパティも `properties` に直接書けます(`:58` 以降)。storefront の addon の指定も `storefrontAddons` にあります(`:8-18`)。つまり、移行で要る拡張や設定の追加の多くは、保守の `localextensions.xml` や `local.properties` を触らずに、移行が持つ `manifest.json` に書けます。公式の Manifest Components Reference では、`useConfig` は「リポジトリにある設定を使い回す」もの、`extensions` は「有効にする拡張の一覧」(必須)、`properties` は「すべての aspect の local properties に入る値」と説明されています([help])。ただし、`useConfig` で読んだ `localextensions.xml` と `extensions` が同じ拡張を指していたとき、どちらが優先されるかは書かれていませんでした(要確認)。
 
 ---
 
@@ -165,12 +179,12 @@ rsync -a --delete --exclude .git out/ deploy/ && git -C deploy add -A && git -C 
 | 同じ行の衝突 | 両チームが同じ行を変えれば、どちらを採るかは人が決めるしかない(J7、K3) | 衝突点(26.1 の「両方が変えたい」)を減らす。変更は保守へ依頼して、保守のリリースで受け取る |
 | JSP・タグ・`web/src` の修正 | 取り込んでも、Spartacus の通り道(`/occ/v2`)では実行されない(25.1) | 保守リリースごとに台帳を出し、Angular へ移す。方式 A は 26.2 の `git log`。方式 B は `git -C <保守> log --no-merges <前回の DEPLOYED_FROM の保守コミット>..<今回> -- 'bin/custom/*/web/*' '*.jsp' '*.tag' 'config/*'` |
 | Backoffice で直したデータ | git に無い | リポジトリ戦略の外。ImpEx に起こしたものだけが届く |
-| CCv2 の仕様に頼る部分 | 確かめていない | submodule を CCv2 のビルドが扱えるか、保守リポジトリと移行リポジトリの両方をつなげるか、ビルドするブランチの指定。どちらの方式も CCv2 には 1 つのリポジトリしか見せないので、これらに頼らずに済む |
+| CCv2 につなぐリポジトリ | CCv2 が見るのは 1 つの Git リポジトリ(「Single Git repository as a source of project customization」[help] Complex Project Repositories)。ビルドは画面で「Git branch or tag」を指定する(Creating a Build) | 方式 A も B も、CCv2 には 1 つのリポジトリ(移行リポジトリ / デプロイ用リポジトリ)とそのブランチかタグを見せる。コミットの SHA を直接指定する方法は書かれていないので、リリースごとにタグを打つ |
 
 **取らないほうがよい形**
 
 - **履歴なしでファイルをコピーした移行リポジトリ。** 共通の祖先が無いので、あとから merge できない(`refusing to merge unrelated histories`)。方式 A は `subtree add` で、保守の全履歴を最初から持たせる。
-- **`git submodule` で保守リポジトリを `core-customize/hybris` に差し込む。** パスの違いは吸収できる。ただし、移行側が保守のファイルを変える場所が無い(submodule の中で変えると保守のリポジトリに commit することになる)。CCv2 のビルドが submodule を取りに行くかどうかも確かめていない(要確認)。
+- **`git submodule` で保守リポジトリを `core-customize/hybris` に差し込む。** CCv2 は submodule を扱えます。ビルドはリポジトリを `--recursive` で取得し、submodule は親リポジトリで登録したコミットのものが使われます。資格情報は、Cloud Portal に登録した親リポジトリのものが共通で使われます([help] Complex Project Repositories、Code Repository Conventions)。パスの違いも吸収できます。ただし、移行側が保守のファイルを変える場所がありません。submodule の中で変えると、保守のリポジトリに commit することになるからです。さらに、保守のリリースのたびに親リポジトリで submodule の参照を進める commit が要ります。そのため、使えるのは方式 B と同じ条件、つまり移行の変更が新しい拡張と `manifest.json` だけで済む場合に限られます。その条件に合うなら、方式 B の組み立てスクリプトの代わりに submodule を使う手もあります。
 
 ---
 

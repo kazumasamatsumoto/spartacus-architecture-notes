@@ -12,7 +12,8 @@
 > - **JSP 版**: [SAP/sap-commerce-cloud-open-payment-framework-sdk](https://github.com/SAP/sap-commerce-cloud-open-payment-framework-sdk) のコミット `7cd4c67`。以下 `opf/` は `core-customize/hybris/bin/custom/` を指す
 > - **Spartacus 版**: クローンの `integration-libs/opf/`(v2612.0.0)
 > - その他の Spartacus のパスは 22 章の略記(`core/` `sf/` `fl/`)に従う
-> - アクセラレータ本体の内部(タグクラスの実装、`beforeViewHandlersList` を回す仕組みなど)は確かめていない。そこに頼る記述は「一般形・要確認」と書く
+> - **アクセラレータの公式ドキュメント**(help.sap.com。2211 版のアクセラレータのガイドは公開されておらず、最新の 2205 版。2026-11-17 に `http.svc/pagecontent` で本文を取得。以下 [help]): [Storefront Web Application Deconstructed](https://help.sap.com/docs/SAP_COMMERCE/4c33bf189ab9409e84e589295c36d96e/8af03fda8669101491e4aac2acaeb2dd.html?version=2205)(`format:price` タグ、ログイン時のカート処理)、[addonsupport Extension](https://help.sap.com/docs/SAP_COMMERCE/4c33bf189ab9409e84e589295c36d96e/8abf96c9866910149fbeba7ee11df038.html?version=2205)(アドオンが BeforeViewHandler を足す書き方)
+> - アクセラレータ本体の Java の実装(タグクラス、`beforeViewHandlersList` を回すインターセプタ)は、ドキュメントにも説明が無い。そこに頼る記述は「一般形・要確認」と書く
 
 ---
 
@@ -56,7 +57,7 @@ OPF はこれを守っている。支払い方法の一覧はコントローラ�
 | 3 | `${ycommerce:sanitizeHTML(...)}` のような EL 関数(`opfb2bacceleratoraddon/.../opfPaymentPage.jsp:95`)、価格・画像・URL を作るタグ | TLD に登録した静的メソッド、タグクラス | 整形・URL は**フロント**(`cxUrl`、`MediaService`)。HTML の無害化は**バック**(入稿時)、エスケープは Angular が自動で行う | 25.4 |
 | 4 | `<spring:theme code="checkout.multi.paymentMethod.selectPaymentMethod"/>`(`opfPaymentMethodSelector.tag:13`、文言は `base_en.properties:18`) | Spring の MessageSource | **フロント**の i18n(`cxTranslate` と翻訳 JSON)。`base_*.properties` は移らない。キーも付け直しになる | `opf-checkout-payments.component.html:1-3` が `'opfCheckout.paymentOption' \| cxTranslate`、文言は `integration-libs/opf/checkout/assets/translations/en/opfCheckout.json` |
 | 5 | `@RequireHardLogIn`(`OPFPaymentCheckoutStepController.java:77`、`opfb2bacceleratoraddon/.../OPFB2BOrderController.java:59`)、JSP 側の `sec:authorize` | Spring の interceptor | **バックに必ず残す**(OCC Controller の `@Secured`、24.7)。フロントの `AuthGuard` はログイン画面への案内で、守りではない | `core/auth/user-auth/guards/auth.guard.ts:30-42` |
-| 6 | BeforeViewHandler(`OPFAcceleratorAddonBeforeViewHandler.java:33-38` はビュー名を addon 版に差し替える。登録は `opfacceleratoraddon-web-spring.xml:48-54`)、全ページ共通の Model 追加(`metaRobots`、パンくず、ヘッダーのカート) | `beforeViewHandlersList` に足した Bean | ビュー差し替えは**フロント**の `cmsComponents` 上書き(23.6)。robots・ページタイトルは**バック**の CMS ページ属性で、フロントの PageMetaResolver が `<head>` に書く。ヘッダーのカートはフロントの Facade が持っている | `core/cms/page/base-page-meta.resolver.ts:59-60` が `page.robots` を読む |
+| 6 | BeforeViewHandler(`OPFAcceleratorAddonBeforeViewHandler.java:33-38` はビュー名を addon 版に差し替える。登録は `opfacceleratoraddon-web-spring.xml:48-54`)、全ページ共通の Model 追加(`metaRobots`、パンくず、ヘッダーのカート) | `beforeViewHandlersList` に足した Bean。アドオンはハンドラを `beforeViewHandlerAdapter` で包み、`depends-on="beforeViewHandlersList"` の `listMergeDirective` でリストに足す([help] addonsupport Extension) | ビュー差し替えは**フロント**の `cmsComponents` 上書き(23.6)。robots・ページタイトルは**バック**の CMS ページ属性で、フロントの PageMetaResolver が `<head>` に書く。ヘッダーのカートはフロントの Facade が持っている | `core/cms/page/base-page-meta.resolver.ts:59-60` が `page.robots` を読む |
 | 7 | `Validator.validate(form, errors)`(`OPFAddressValidator.java:21, 50`、`OPFB2BOrderController.java:61-66`) | Spring の Validator | **バックに残す**。ただし `web/src` の Validator は動かないので、Facade か OCC の受け口へ移す。フロントには UX 用の写しを置く | `sf/shared/utils/validators/custom-form-validators.ts:37, 201`(フロントの写し)、`core/global-message/http-interceptors/handlers/bad-request/bad-request.handler.ts:22`(バックの 400 を画面に出す) |
 | 8 | タグの中の `<script>`(`opfPaymentMethodSelector.tag:32-89`)、`${resourcePath}/js/...` の読み込み | なし(ブラウザで動く JS) | Angular コンポーネントに書き直す。JS の直書きは移せない | 25.3 |
 
@@ -139,7 +140,7 @@ getActiveConfigurations(
 
 | 処理 | JSP でやっていたこと | Spartacus での担当 | 根拠 |
 |---|---|---|---|
-| 価格の表示 | `format:price` 系のタグが通貨と言語に合わせて整形(一般形・要確認) | **バック**が `formattedValue` を作り、フロントはそのまま出す | `core/model/product.model.ts:70`、`sf/cms-components/product/product-summary/product-summary.component.html:14` |
+| 価格の表示 | `<format:price priceData="${entry.basePrice}" displayFreeForZero="true"/>` は、Facade がサーバーで作った `${priceData.formattedValue}` を出すだけ。0 円で `displayFreeForZero` なら文言 `text.free` を出す([help] Storefront Web Application Deconstructed)。つまり整形は JSP ではなく Facade の仕事だった | **バック**が `formattedValue` を作り、フロントはそのまま出す | `core/model/product.model.ts:70`、`sf/cms-components/product/product-summary/product-summary.component.html:14` |
 | 合計・税・割引 | カート Data をそのまま表示 | **バック**。フロントはモデルに受けるだけで再計算しない | `fl/cart/base/root/models/cart.model.ts:63, 98`(`appliedOrderPromotions`、`totalPrice`) |
 | 数量の上限 | コントローラが在庫を見てフォームを制限 | **両方**。フロントは `stockLevel` を上限にする(UX)。バックはカートの検証 API で本当にチェックする | `fl/cart/base/components/add-to-cart/add-to-cart.component.ts:222-224`、`fl/cart/base/occ/config/default-occ-cart-config-factory.ts:31`(`validate`) |
 | 商品・カテゴリの URL | `c:url` やタグで組み立て | **フロント**。バックは code と名前だけ返す | `core/routing/configurable-routes/url-translation/url.pipe.ts:12-16`、13.1 (c) |

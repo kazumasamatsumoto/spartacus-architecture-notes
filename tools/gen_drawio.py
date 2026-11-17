@@ -888,10 +888,10 @@ for i,(t,col) in enumerate([
 for i,(t,col) in enumerate([
   ("A: 移行が既存の Facade・OCC 拡張を何か所も変える → 3-way merge が効く", BLUE),
   ("B: 移行の変更が新しい拡張と manifest でほぼ済む。リポジトリを完全に分けたい", BLUE),
-  ("取らない: 履歴なしのコピー(unrelated histories)/ submodule(移行が保守ファイルを変えられない。CCv2 で要確認)", RED),
+  ("取らない: 履歴なしのコピー(unrelated histories)。submodule は CCv2 で使えるが移行が保守ファイルを変えられない → B と同じ条件なら代わりに使える", RED),
 ]):
     d25.box(t, 1260, 430+i*64, 480, 54, *col, 10, "align=left;spacingLeft=6;")
-d25.text("CCv2 の細部(submodule、接続できるリポジトリ数、ビルドするブランチ)は要確認。A も B も CCv2 には 1 リポジトリだけを見せる", 1260, 640, 480, 50, 10)
+d25.text("CCv2(help.sap.com): 見るのは 1 リポジトリ、ビルドはブランチかタグを指定、submodule は --recursive で取得。core-customize/ は必須で .. は使えない", 1260, 640, 480, 50, 10)
 d26=D("26 フロントだけのコンポーネントカスタマイズ")
 d26.text("CMS の部品は「キー」で Angular 部品の対応表(cmsComponents)を引いて描かれる。キーの決まり方で 4 種類に分かれ、使える方法が変わる。27 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
 gA=d26.group("キーが決まり、部品が描かれるまで", 40, 70, 560, 760, "#f5f5f5", "#666666")
@@ -977,7 +977,7 @@ grid(d27, 1220, 110, [("",130),("electronics\n(アクセラレータ用)",190),(
  [("14 ページのキー",GREY),("44 種類",YEL),("63 種類",BLUE)],
  [("対応なし",GREY),("15",RED),("6",GREEN)],
 ], h=50)
-d27.box("アクセラレータの CMS のままだと描けないもの\n・スクリプトの部品(ASM・Personalization・ProfileTag)→ 機能ライブラリへ\n・同意の JSP → Spartacus の同意バナーへ\n・ページ固有の JSP・実装の無い部品 → 作る / 外す", 1220, 515, 520, 110, *RED, 10, "align=left;spacingLeft=6;")
+d27.box("アクセラレータの CMS のままだと描けないもの\n・スクリプトの部品: ASM → @spartacus/asm(外す)、Personalization → 部品は残し @spartacus/tracking で読む\n・同意の JSP → Spartacus の同意バナーへ\n・ページ固有の JSP・実装の無い部品 → 作る / 外す\n・personalizationaddon・selectivecartaddon はバックエンドに残す(help.sap.com)", 1220, 515, 520, 110, *RED, 10, "align=left;spacingLeft=6;")
 d27.box("旧 URL: suffix-url-matcher.ts:31-47 / product-details-url-matcher.ts:22-26\nベースサイト: site-context-config-initializer.ts:67, 100-106", 1220, 645, 520, 60, *GREY, 10, "align=left;spacingLeft=6;")
 d27.text("tools/cms-page-coverage.py を今のアクセラレータのサイトに流すのが最初の一歩", 1220, 725, 520, 40, 11, "fontStyle=1;")
 out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+'</mxfile>'
