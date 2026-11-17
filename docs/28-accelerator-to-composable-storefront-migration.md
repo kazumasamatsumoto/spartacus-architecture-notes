@@ -12,7 +12,13 @@
 > - **Spartacus のソース**: `spartacus/` の `b7b028f`(2612.0.0)。パスは `spartacus/` からの相対
 > - **CCv2 の構成**: SAP の公開サンプル [SAP-samples/cloud-commerce-sample-setup](https://github.com/SAP-samples/cloud-commerce-sample-setup) の `546fe5b`(`ccs/` と略す)
 > - **同じバックエンドでのアクセラレータ用 CMS と Spartacus 用 CMS の違い**: デモ OCC の `electronics`(アクセラレータ用)と `electronics-spa`(Spartacus 用)を、27 章の [`tools/cms-page-coverage.py`](../tools/cms-page-coverage.py) で同じ 14 ページずつ比べた(2026-11-17 実測)
-> - **SAP Commerce 本体のソースと help.sap.com は読めない**。アクセラレータ側の中の動き、CCv2 の細部は「要確認」と書く。手順の分け方は、上の根拠から組み立てた筆者の整理
+> - **SAP 公式ドキュメント(help.sap.com、Composable Storefront 2211)**: 2026-11-17 に、`https://help.sap.com/http.svc/pagecontent?deliverableInfo=1&deliverable_id=<id>&file_path=<topic>.html` で本文を取得した(以下 [help] と略す)
+>   - [FAQ](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/6c7b98dbe68f4a508cac17a207182f4c/36e63775a06d460c8f7ceb2368e96a13.html?version=2211)
+>   - [Spartacus Sample Data Extension / CMS Changes Specific to the composable storefront Project](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/edc7f3a95ac4424b9cc5077d86a62e36.html?version=2211)
+>   - [Installing SAP Commerce Cloud 2211-jdk21 for use with Composable Storefront](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/928ce101922944e3b546cf39d9831a4d.html?version=2211)
+>   - [Setting Up CORS](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/cfcf687ce2544bba9799aa6c8314ecd0/c7822c94d74c446f8ebd3721eacaacc9.html?version=2211)
+>   - [SmartEdit Integration](https://help.sap.com/docs/SAP_COMMERCE_COMPOSABLE_STOREFRONT/962112809f9a48f9b36aa05b208b3731/266db66bf8a7423193f30b5cacccd7ce.html?version=2211)
+> - **SAP Commerce 本体のソースは読めない**。アクセラレータの中の動きのうち、[help] にも書かれていないものは「要確認」と書く。手順の分け方は、上の根拠から組み立てた筆者の整理
 
 ---
 
@@ -26,7 +32,15 @@
 
 ただし「JSP を捨てる」は「JSP を読まない」ではありません。アクセラレータでは、画面の仕様が書類ではなく JSP の中にあることが多いからです。何を表示し、どの条件で出し分け、どの文言を使い、どこへ送信していたか。これを JSP 1 枚ずつ読み出してから Spartacus の部品と突き合わせないと、移行後に「前はあった表示」が黙って消えます。CMS から JSP の部品が 0 になるのは、この読み出しが終わった結果です(28.7)。
 
-進め方としては、**同じバックエンドに Spartacus 用のサイトをもう 1 つ並べ**、アクセラレータを動かしたまま作ります。SAP のデモ OCC も、`electronics`(アクセラレータ用)と `electronics-spa`(Spartacus 用)を同じバックエンドで並べています(28.4)。
+SAP の FAQ は、アクセラレータから移す**直接の道は無い**と書いています([help] FAQ)。技術も作りもまったく違うからです(テンプレートとライブラリ、組み込みとヘッドレス、JSP と Angular)。そのうえで、考えておくことを 3 つ挙げています。
+
+- 独自の機能には、Spartacus 用の API(OCC)が要る
+- アクセラレータのスタイルはそのまま持っていけない
+- 独自の CMS 部品には、Angular の部品を新しく作る必要がある
+
+作るときは、**同じバックエンドに Spartacus 用のサイトをもう 1 つ並べ**ます。SAP のサンプルデータ自身がこの形です。アクセラレータ用のコンテンツカタログを写して `-spa` のカタログを作り、そこを Spartacus 向けに書き換えています(28.6)。デモ OCC にも、`electronics` と `electronics-spa` が並んでいます。
+
+ただし、**お客さんに両方を同時に見せることは、SAP が推奨していません**(「複雑になるので、同時に動かすことは推奨しない」。[help] FAQ)。画面の一部だけを Spartacus に切り替える形は避け、サイト単位で一度に切り替えます(28.11)。
 
 ---
 
@@ -39,7 +53,8 @@
 | バックエンドの仕事 | 型・ImpEx・Populator・OCC を足す | ほとんど足さない。`web/src` にあったロジックを Facade へ下ろし、足りない OCC を足す(25 章) |
 | CMS | 新しい部品を 1 つ置く | ページごとに作り直す。ラベル、JSP の部品、スクリプトの部品(28.4) |
 | フロント | 部品を 1 つ作って登録する | 標準の部品をそのまま使い、足りない分だけ作る(27 章) |
-| 終わり方 | 部品が出たら終わり | URL を切り替え、アクセラレータの storefront 拡張を外して終わり |
+| 終わり方 | 部品が出たら終わり | サイト単位で一度に切り替え、アクセラレータの storefront 拡張を外して終わり |
+| SAP の公式の立場 | — | 直接の移行方法は無い。独自機能には API、スタイルは移せない、独自の CMS 部品は Angular で作り直す。両方を同時に動かすのは推奨しない([help] FAQ) |
 
 ---
 
@@ -88,9 +103,20 @@
 
 `manifest.json` では、アクセラレータの Web アプリ(`accstorefront` の aspect、320 行)と、`commercewebservices` を `/occ` に載せる設定(504-505 行)が同じ環境にあります。移行中はこの形のまま進めます。
 
-**CORS**: ブラウザが別の origin から OCC を呼ぶので、`corsfilter.commercewebservices.*` が要ります。サンプルでは `ccs/core-customize/manifest.json:446-458` に、許可する origin・ヘッダー・メソッドが並んでいます。サンプルの origin は `*` ですが、本番では Spartacus を配信する origin に絞ります。
+**CORS**: ブラウザが別の origin から OCC を呼ぶので、`corsfilter.commercewebservices.*` が要ります。
 
-**OAuth クライアント**: Spartacus の既定の `client_id` は `mobile_android_public` です(`core-libs/core/src/auth/user-auth/config/default-auth-config.ts:50`)。バックエンドに同じ名前のクライアントを作るか、フロントの設定を自社のクライアント名に合わせます(24.9)。
+- **CCv2 サンプル:** `ccs/core-customize/manifest.json:446-458` に、許可する origin・ヘッダー・メソッドが並んでいます。
+- **公式の例:** `allowedOriginPatterns=*` と `allowCredentials=true` を使います。2105 以降は `allowCredentials=true` と `allowedOrigins=*` を一緒に使えないからです([help] Setting Up CORS)。
+- **本番:** どちらの例のワイルドカードも開発用です。本番では、Spartacus を配信する origin に絞ります(同)。
+
+**公式のインストール手順で足す設定**([help] Installing … 2211-jdk21):
+
+- `spartacussampledata` に入っている `custom.properties` を使う
+- `authserver.oauthclientdetails.loginpageuri.allowed.hosts=<ストアフロントのホスト>`:Spartacus 側のログイン画面を使う場合
+- `cookies.SameSite.enabled=true`
+- 決済の模擬(`acceleratorservices.payment.sopmock.enabled=true`)はサンプルの店舗のための開発用で、本番では本物の決済代行とつなぐ
+
+**OAuth クライアント**: Spartacus の既定の `client_id` は `mobile_android_public` です(`core-libs/core/src/auth/user-auth/config/default-auth-config.ts:50`)。公式の手順では、このクライアントを ImpEx で登録します。`public=true`、`authorizedGrantTypes=authorization_code,refresh_token`、`registeredRedirectUri` と `loginPageUri` はストアフロントの URL です([help] Step 3: Importing OAuth Client Credentials)。自社のクライアント名を使うなら、フロントの設定もそれに合わせます(24.9)。
 
 **ベースサイト**: デモ OCC の `basesites` から、`electronics` と `electronics-spa` の値を抜き出しました(2026-11-17)。
 
@@ -139,7 +165,26 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 **テンプレート名はそのまま使える**: どちらのサイトでも、テンプレート名は同じでした(`LandingPage2Template`、`CartPageTemplate`、`AccountPageTemplate`、`ContentPage1Template` など)。Spartacus の `LayoutConfig` も、このテンプレート名でスロットの並びを決めています(`core-libs/storefront/recipes/config/layout-config.ts:55-130`)。アクセラレータで独自に作ったテンプレートには、`layoutSlots` を足します(22 章、M11)。
 
-**作り直し方**: SAP は、アクセラレータの電子機器サイトに対して Spartacus 用の CMS を `spartacussampledata` として配っています。デモの `electronics-spa` はこのデータです。中身の ImpEx は公開のソースでは読めませんでした。自社のサイトでは、このサンプルのページを見本に、ImpEx で新しいサイトの CMS を作るのが近道です(書き方は 24.4)。サンプルの ImpEx の場所と中身は要確認です。
+**作り直し方(SAP のサンプルデータがやっていること)**: [help] の「Spartacus Sample Data Extension」に手順が書かれています。サンプルデータの `spartacussampledata` は、アクセラレータの店舗と商品カタログを共有したまま、Spartacus 用のサイト(`electronics-spa` など)を新しく作ります。その手順は次のとおりです。
+
+1. 新しいコンテンツカタログ `<店舗>-spaContentCatalog` を作る(`import/contentCatalogs/` の `catalog.impex`)
+2. アクセラレータの `<店舗>ContentCatalog:Staged` を、新しいカタログの Staged へ**同期で写す**(`sync.impex`)
+3. Spartacus で使わないページ・スロット・部品を消す(`cleaning.impex`)
+4. Spartacus 向けの変更を ImpEx で入れ、Staged から Online へ同期する
+
+4 で入れる変更は、28.6 の実測とそのまま一致します。
+
+| 変更 | 内容 |
+|---|---|
+| `JspIncludeComponent` → `CMSFlexComponent` | Angular のアプリで JSP を差し込む部品は意味が無いため。ただし後方互換のため Spartacus は `JspIncludeComponent` も扱う |
+| ページのラベルを `/` 始まりに | ラベルがコンテンツページの URL になるため(例: `UPDATE ContentPage;…;label` で `login` → `/login`) |
+| ヘッダーのスロットを足す | 全テンプレートに `SiteContextSlot`(言語・通貨の部品)、`SiteLinks`、`BottomHeaderSlot`(パンくずをここへ移す) |
+| ミニカートのスロット | `OrderComponent` を外す |
+| 新しいページ | `sale`・`help`・`contactUs`・`forgotPassword`・`resetPassword`・`register` |
+| 商品詳細を CMS で組む | `ProductSummarySlot` に `ProductIntroComponent`・`ProductImagesComponent`・`ProductSummaryComponent`・`VariantSelector`・`AddToCart` を置く |
+| その他 | 404 ページの中身、マイアカウントのナビにサインアウト、`SearchBoxComponent` の設定、チェックアウトまわりの CMS |
+
+自社のサイトでも、同じ形がそのまま移行の手順になります。自社のアクセラレータのコンテンツカタログを `-spa` のカタログへ同期で写し、28.7 で読んだ JSP の仕様に沿って、消す・置き換える・足すを ImpEx で書きます。サンプルの ImpEx は、[help] の SAP Commerce Cloud Sample Repository の Release ページから入手するよう案内されています(本ノートでは中身を読んでいない)。
 
 ---
 
@@ -283,17 +328,22 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 
 **リポジトリ**: 保守チームの構成を変えずに並行させる方法は 26 章です(方式 A: `git subtree`、方式 B: デプロイのたびに組み立てる)。
 
-**ログインとカート**: アクセラレータは Web アプリのセッションで、Spartacus は OAuth のトークンで、ログインを持ちます。そのため、2 つの画面の間でログインはつながらないと考えておきます。会員のカートは OCC の `users/{userId}/carts` で取れるので、どちらでログインしても同じものが見えるはずです。匿名のカートは、アクセラレータではセッションに、Spartacus ではブラウザに識別子が残ります。こちらは引き継がれないと考えておきます。どちらも要確認です。「URL の一部だけを Spartacus に切り替える」ときは、ここが一番の問題になります。
+**ログインとカート**(画面ごとに切り替える場合だけの問題): アクセラレータは Web アプリのセッションで、Spartacus は OAuth のトークンで、ログインを持ちます。そのため、2 つの画面の間でログインはつながらないと考えておきます。会員のカートは OCC の `users/{userId}/carts` で取れるので、どちらでログインしても同じものが見えるはずです。匿名のカートは、アクセラレータではセッションに、Spartacus ではブラウザに識別子が残ります。こちらは引き継がれないと考えておきます。どちらも要確認です。「URL の一部だけを Spartacus に切り替える」ときは、ここが一番の問題になります。
 
 **切り替えの単位**:
 
 | 単位 | 形 | 注意 |
 |---|---|---|
-| サイト全体を一度に | ドメインの向き先を Spartacus に変える | ログインとカートの問題が出ない。準備期間が長い |
-| ドメイン・国ごと | 国別のサイトを 1 つずつ切り替える | ベースサイトが分かれていれば自然に分けられる |
-| 画面(パス)ごと | 前段の Web サーバーで、パスごとに振り分ける | 画面をまたぐとログインとカートが切れる。チェックアウトを途中で切るのは避ける |
+| サイト全体を一度に | ドメインの向き先を Spartacus に変える | 推奨。ログインとカートの問題が出ない。準備期間が長い |
+| ドメイン・国ごと | 国別のサイトを 1 つずつ切り替える | 1 つのサイトの中では一度に切り替えるので、これも筋がよい。ベースサイトが分かれていれば自然に分けられる |
+| 画面(パス)ごと | 前段の Web サーバーで、パスごとに振り分ける | **SAP は、アクセラレータと Composable Storefront を同時に動かすことを推奨していない**([help] FAQ)。画面をまたぐとログインとカートが切れる。取るなら例外として、影響を調べてから |
 
-**SmartEdit**: Spartacus 側には `@spartacus/smartedit` を入れます。既定のプレビューのルートは `cx-preview`、既定の `allowOrigin` は `localhost:9002` です(`feature-libs/smartedit/root/config/default-smart-edit-config.ts:11-12`)。この 2 つを、自社の SmartEdit とストアフロントの URL に合わせます。SmartEdit 側でストアフロントを許可する設定は、要確認です。
+**SmartEdit**: Spartacus 側には `@spartacus/smartedit` を入れます(`ng add @spartacus/smartedit`)。既定のプレビューのルートは `cx-preview`、既定の `allowOrigin` は `localhost:9002` です(`feature-libs/smartedit/root/config/default-smart-edit-config.ts:11-12`)。この 2 つを、自社の SmartEdit とストアフロントの URL に合わせます。バックエンド側の手順は 2 つです([help] SmartEdit Integration)。
+
+- Backoffice の WCMS > Website > 自社のサイト > WCMS Properties で、**WCMS Cockpit Preview URL** を Spartacus のサイトの URL にする
+- SmartEdit の Settings > Configuration Editor で、`whiteListedStorefronts` に Spartacus の URL を足す
+
+前提として、SAP Commerce Cloud 2105 以降で、`spartacussampledata` が入っている必要があります。
 
 **最後に外すもの**: 切り替えが終わったら、`manifest.json` からアクセラレータの Web アプリ(`accstorefront` の aspect、`storefrontAddons`)を外します。`localextensions.xml` からは `yacceleratorstorefront` とアドオンの拡張を外します。Facade・Service・型の拡張は残します。
 
@@ -329,7 +379,9 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 | JSP はどう扱うか | 捨てる前に読む。JSP 1 枚ごとに表示・出し分け・文言・操作・JS・子を書き出し、Spartacus の部品と突き合わせる。CMS に出る `JspIncludeComponent` は一部で、ページテンプレート・部品・タグ・アドオンの JSP も対象 |
 | CMS で作り直すもの | ページのラベル(URL の形に)、JSP の部品(Flex に)、スクリプトの部品(外す)。テンプレート名はそのまま使える。ただしアクセラレータのスロットが Spartacus のレイアウトに無いことがある(カートの `CenterLeftContentSlot`・`BottomContentSlot`) |
 | 旧 URL | `…/p/<コード>` と `…/c/<コード>` は既定で受け付ける。作るリンクを旧形式にするなら `paths` を変える |
-| 切り替え | 同じバックエンドに 2 つのサイトを並べて作る。画面ごとに切り替えると、ログインと匿名のカートが切れる(要確認) |
+| 公式の立場 | 直接の移行方法は無い。独自機能には API、スタイルは移せない、独自の CMS 部品は Angular で作り直す([help] FAQ) |
+| CMS の作り直し方 | SAP のサンプルデータと同じ形: アクセラレータのコンテンツカタログを `-spa` のカタログへ同期で写し、`cleaning.impex` で消し、JSP → Flex、ラベルを `/` 始まり、ヘッダーのスロットなどを ImpEx で入れる |
+| 切り替え | 作るときは同じバックエンドに 2 つのサイトを並べる。お客さんに見せるのはサイト単位で一度に切り替える。両方を同時に動かすのは SAP が推奨していない([help] FAQ) |
 
 ---
 
