@@ -950,14 +950,14 @@ m3=d27.box("差分だけ作る\nCMS・部品・OCC", 390, 230, 150, 54, *GREEN, 
 d27.edge(m1,m2); d27.edge(m2,m3)
 d27.box("残る: Facade・Service・型・商品/注文データ\n(OCC から使い回す)", 60, 320, 480, 54, *GREEN, 11)
 d27.box("作り直す: CMS の中身\nラベル・JSP の部品・スクリプトの部品", 60, 390, 480, 54, *YEL, 11)
-d27.box("捨てる: storefront の Web 拡張\nJSP・タグ・ページコントローラ・web/src(ヘッドレスでは実行されない。25 章)", 60, 460, 480, 64, *RED, 11)
+d27.box("読んでから捨てる: storefront の Web 拡張\nJSP・タグ・ページコントローラ・web/src(ヘッドレスでは実行されない。25 章)\n画面の仕様は JSP の中にある → 1 枚ずつ仕様カードにしてから(28.7)", 60, 460, 480, 64, *RED, 11)
 d27.box("進め方: 同じバックエンドに Spartacus 用のサイトを並べ、アクセラレータを動かしたまま作る(デモも electronics と electronics-spa を並べている)", 60, 545, 480, 70, *BLUE, 11)
 d27.text("根拠: ccs(546fe5b)localextensions.xml:54, 78, 240, 259 / manifest.json:8-17, 320, 446-458, 504-505", 60, 640, 480, 40, 10)
 gB=d27.group("段階 0〜7", 600, 70, 560, 760, "#f5f5f5", "#666666")
-steps=[("0 棚卸し: 画面と URL・CMS ページ・部品のキー・web/src のロジック・アドオン・外部スクリプト", GREY),
+steps=[("0 棚卸し: 画面と URL・CMS ページ・部品のキー・JSP とタグの一覧・web/src のロジック・アドオン・外部スクリプト", GREY),
 ("1 バックエンド: /occ・OAuth クライアント・CORS・Spartacus 用ベースサイト(urlPatterns が合わないと起動しない)", ORANGE),
 ("2 アプリ: ng add、baseSite と urlParameters、CCv2 の js-storefront/manifest.json", BLUE),
-("3 CMS: ラベルを URL の形に、JSP の部品を Flex に。テンプレート名はそのまま使える", YEL),
+("3 JSP を読む → CMS: JSP 1 枚ずつ表示・出し分け・文言・操作・JS を書き出してから、ラベルを URL の形に、JSP の部品を Flex に", YEL),
 ("4 部品: 対応なしを仕分けて、作る・割り当てる・外す(27 章)", YEL),
 ("5 ロジック: web/src → Facade → OCC → Angular の写し(13・25 章)", GREEN),
 ("6 URL と SEO: …/p/<コード>・…/c/<コード> は既定で受ける。作るリンクは paths。301 と SSR", PURP),

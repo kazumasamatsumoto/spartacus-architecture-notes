@@ -24,6 +24,8 @@
 
 もう 1 つの違いは、**捨てるものと残すものが分かれる**ことです。残るのは Facade・Service・型・商品データ・注文データで、Spartacus もこれを OCC 経由で使います。捨てるのは storefront の Web 拡張(JSP、タグ、ページコントローラ、`web/src`)です。ヘッドレスではこれらが一度も実行されません(25 章)。CMS の中身はその中間で、多くを作り直します。
 
+ただし「JSP を捨てる」は「JSP を読まない」ではありません。アクセラレータでは、画面の仕様が書類ではなく JSP の中にあることが多いからです。何を表示し、どの条件で出し分け、どの文言を使い、どこへ送信していたか。これを JSP 1 枚ずつ読み出してから Spartacus の部品と突き合わせないと、移行後に「前はあった表示」が黙って消えます。CMS から JSP の部品が 0 になるのは、この読み出しが終わった結果です(28.7)。
+
 進め方としては、**同じバックエンドに Spartacus 用のサイトをもう 1 つ並べ**、アクセラレータを動かしたまま作ります。SAP のデモ OCC も、`electronics`(アクセラレータ用)と `electronics-spa`(Spartacus 用)を同じバックエンドで並べています(28.4)。
 
 ---
@@ -48,11 +50,11 @@
 | 0 棚卸し | 画面と URL、CMS のページと部品、`web/src` のロジック、アドオン、外部スクリプトを一覧にする | 移行台帳 | 28.3 |
 | 1 バックエンドを OCC で開く | `/occ` の Web アプリ、OAuth クライアント、CORS、Spartacus 用のベースサイト | `basesites` が新しいサイトを返す | 28.4 |
 | 2 Spartacus アプリを作る | `ng add @spartacus/schematics`、ベースサイトと URL の形、CCv2 の `js-storefront/` | 空のホームが出る | 28.5 |
-| 3 CMS を Spartacus 向けにする | ページのラベル、JSP の部品を Flex へ、テンプレートとスロット | `cms/pages` が全ページで 200 を返す | 28.6 |
-| 4 部品を埋める | 対応の無いキーを仕分けて、作る・割り当てる・外す | 対応なしが 0 件 | 28.7 |
-| 5 ロジックを移す | ページコントローラ・Validator・タグにあった処理を、Facade と OCC と Angular へ | 画面ごとの移植チケット | 28.8 |
-| 6 URL と SEO | 商品・カテゴリ・コンテンツの URL、リダイレクト、SSR | 旧 URL が全部どこかに着く | 28.9 |
-| 7 並行稼働と切り替え | リポジトリ、ログインとカート、SmartEdit、切り替えの単位、storefront 拡張を外す | 本番の切り替え | 28.10 |
+| 3 JSP を読み、CMS を Spartacus 向けにする | JSP 1 枚ずつ表示・出し分け・文言・操作・JS を書き出す。そのうえでページのラベル、JSP の部品を Flex へ、テンプレートとスロット | JSP ごとの仕様カード。`cms/pages` が全ページで 200 を返す | 28.6・28.7 |
+| 4 部品を埋める | 対応の無いキーを仕分けて、作る・割り当てる・外す | 対応なしが 0 件 | 28.8 |
+| 5 ロジックを移す | ページコントローラ・Validator・タグにあった処理を、Facade と OCC と Angular へ | 画面ごとの移植チケット | 28.9 |
+| 6 URL と SEO | 商品・カテゴリ・コンテンツの URL、リダイレクト、SSR | 旧 URL が全部どこかに着く | 28.10 |
+| 7 並行稼働と切り替え | リポジトリ、ログインとカート、SmartEdit、切り替えの単位、storefront 拡張を外す | 本番の切り替え | 28.11 |
 
 段階 0〜2 は順番どおりに進めます。段階 3〜6 は画面ごとに回します(ホーム → 商品一覧 → 商品詳細 → カート → ログイン → チェックアウト → マイアカウント、など)。段階 7 のリポジトリの準備(26 章)は、段階 1 より前に決めておきます。
 
@@ -70,6 +72,7 @@
 | `web/src` のロジック | ページコントローラ・BeforeViewHandler・Validator・タグ・EL 関数の呼び出し(25.1 の 8 つの形) |
 | アドオン | `localextensions.xml` と CCv2 の `manifest.json` の `storefrontAddons`(`ccs/core-customize/manifest.json:8-17`)。アドオンの JSP 部分は Spartacus では動かない |
 | 外部スクリプト | 分析タグ、同意バナー、決済のスクリプト。アクセラレータでは JSP に直書きされていることが多い |
+| JSP・タグの一覧 | ページテンプレートの JSP、部品の JSP、`JspIncludeComponent` が指す JSP、タグ。storefront とアドオンの両方。読み方は 28.7 |
 
 この段階で、**同じ名前の機能が Spartacus の機能ライブラリにあるか**も見ておきます。`spartacus/feature-libs/` と `spartacus/integration-libs/` のディレクトリ名が、そのまま機能の一覧です(`asm`、`cart`、`checkout`、`order`、`organization`、`storefinder`、`smartedit`、`opf`、`cdc` など)。アドオン 1 つが、機能ライブラリ 1 つと OCC の拡張 1 つに置き換わる、というのが基本の形です。どのアドオンがどのライブラリに対応するかは、公開のソースからは確かめられませんでした。要確認です。
 
@@ -131,7 +134,7 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 この表から、作り直すものが 3 つ分かります。
 
 1. **ページのラベル**: Spartacus は、コンテンツページを URL のパスそのまま(`/my-account/address-book` など)で取りにいきます(3 章・4 章)。アクセラレータの CMS はラベルが `address-book` です。そのため、`pageLabelOrId=/my-account/address-book` で取ると `CMSItemNotFoundError` が返ります(実測)。`/cart` や `/login` はアクセラレータ側でも取れましたが、マイアカウントの下のページは取れませんでした。ラベルを URL の形にそろえるか、Spartacus のルートの `paths` をアクセラレータのラベルに合わせるかの、どちらかが要ります。
-2. **JSP の部品を Flex へ**: アクセラレータの CMS は `JspIncludeComponent` で JSP を差し込んでいます。Spartacus 用の CMS では、同じ場所が `CMSFlexComponent` になっています(上の表で JSP が 0、Flex が増えている)。Spartacus は `JspIncludeComponent` の uid をキーに引くので(27 章)、作り直さなくても描ける部品があります。ただ、対応表に無い uid もあります(28.7)。
+2. **JSP の部品を Flex へ**: 表の「JSP 0」は SAP がサンプルで作り終えた結果で、自社のサイトでは JSP を読んでから置き換えます(28.7)。アクセラレータの CMS は `JspIncludeComponent` で JSP を差し込んでいます。Spartacus 用の CMS では、同じ場所が `CMSFlexComponent` になっています(上の表で JSP が 0、Flex が増えている)。Spartacus は `JspIncludeComponent` の uid をキーに引くので(27 章)、作り直さなくても描ける部品があります。ただ、対応表に無い uid もあります(28.8)。
 3. **部品の数が増える**: Spartacus 用のページは部品が多くなっています。アクセラレータでは JSP 1 枚が描いていた範囲を、Spartacus では複数の部品に分けて CMS に置くからです。カートは 22 個から 37 個に増えています。
 
 **テンプレート名はそのまま使える**: どちらのサイトでも、テンプレート名は同じでした(`LandingPage2Template`、`CartPageTemplate`、`AccountPageTemplate`、`ContentPage1Template` など)。Spartacus の `LayoutConfig` も、このテンプレート名でスロットの並びを決めています(`core-libs/storefront/recipes/config/layout-config.ts:55-130`)。アクセラレータで独自に作ったテンプレートには、`layoutSlots` を足します(22 章、M11)。
@@ -140,7 +143,88 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.7 段階 4: 対応の無い部品を埋める(実測)
+### 28.7 JSP を 0 にする前に: JSP の中身を読む
+
+CMS の部品を Flex に付け替えるだけなら、ImpEx を書けば JSP の数は 0 になります。しかし、それでは JSP が担っていた仕様が引き継がれたかどうか分かりません。読まなければならない理由は 3 つあります。
+
+**理由 1: CMS の数字に出る JSP は一部だけ**
+
+28.6 の表で数えたのは `JspIncludeComponent` だけです。実際には、次の JSP も画面を作っています。
+
+- ページテンプレートの JSP
+- 普通の部品の型ごとの JSP
+- タグ(`.tag`)
+- アドオンが足したり差し替えたりした JSP
+
+これらは CMS には出てきません。たとえば OPF のアドオンは、カートページ全体の JSP を自分のもので置き換えています。
+
+- **置き換えている JSP:** `opfacceleratoraddon/acceleratoraddon/web/webroot/WEB-INF/views/responsive/pages/cart/cartPage.jsp`(opf SDK `7cd4c67`)
+- **中で使っているタグ:** `<cart:cartValidation/>`、`<cart:cartPickupValidation/>`(14-15 行)
+- **書いているもの:** ヘルプのポップアップと、その文言とサニタイズ(19-28 行)
+
+**理由 2: 名前で対応が引けても、中身が同じとは限らない**
+
+OCC は、`JspIncludeComponent` ごとに、どの JSP を使うかを `page` 属性で返します。デモの `electronics` の値は次のとおりです(`fields=FULL`、2026-11-17)。
+
+| uid | `page` |
+|---|---|
+| `CartComponent` | `/WEB-INF/views/addons/selectivecartsplitlistaddon/responsive/pages/cart/cartDisplay.jsp` |
+| `CartTotalsComponent` | `cartTotalsDisplay.jsp` |
+| `CheckoutComponent` | `checkoutDisplay.jsp` |
+| `PromotionsComponent` | `/WEB-INF/views/responsive/pages/cart/cartPromotionsDisplay.jsp` |
+| `ReturningCustomerLoginComponent` | `accountReturningCustomerLogin.jsp` |
+| `UpdateProfileComponent` | `accountProfileEditPage.jsp` |
+| `CookieNotificationComponent` | `/WEB-INF/views/responsive/pages/consent/cookienotification.jsp` |
+
+`CartComponent` は、Spartacus の対応表で名前が引ける部品でした(28.8)。しかし実際に描いていたのは、アドオン(`selectivecartsplitlistaddon`)が差し替えた JSP です。Spartacus 側にも「あとで買う」に当たる機能があり、設定で有効にします(`feature-libs/cart/base/components/cart-page-layout-handler.ts:63-66` の `isSelectiveCartEnabled`)。とはいえ、アドオンの JSP が何を表示していたかを読まないと、どちらが同じ仕様なのか判断できません。
+
+**理由 3: JSP がスロットの出し分けまで決めていた**
+
+`cartPage.jsp` は、カートが空かどうかで出すスロットを切り替えています(41-59 行)。空でなければ `CenterLeftContentSlot`・`CenterRightContentSlot`・`BottomContentSlot` を出し、空なら `EmptyCartMiddleContent` を出します。
+
+Spartacus では、この出し分けを `CartPageLayoutHandler` が受け持っています(`feature-libs/cart/base/components/cart-page-layout-handler.ts:33-56`)。ただし、Spartacus のカートページが並べるスロットは `TopContent`・`CenterRightContentSlot`・`EmptyCartMiddleContent` の 3 つだけです(`core-libs/storefront/recipes/config/layout-config.ts:109-111`)。アクセラレータで `CenterLeftContentSlot`(プロモーション)や `BottomContentSlot`(チェックアウトボタン)に置いた部品は、対応表で引けたとしても、**スロットごと描かれません**。
+
+**JSP 1 枚から書き出すもの**
+
+| 観点 | JSP での書き方(OPF のアドオンの実物) | Spartacus での行き先 |
+|---|---|---|
+| 表示する値と出どころ | `${cartData.code}`(`cartPage.jsp:25`)。出どころは 3 つある: コントローラが `model` に入れた値、CMS の属性(`${component.…}`)、タグや EL 関数の中の Java | OCC の `fields` にあるか確かめる。無ければ OCC を足す(24.6)。コントローラの値は 25 章 |
+| 出し分け | `<c:if test="${empty cartData.rootGroups}">`(`cartPage.jsp:55`) | 部品のテンプレートの条件、レイアウトのハンドラ、CMS の Restriction |
+| 文言 | `<spring:theme code="basket.page.cartHelpContent">`(`cartPage.jsp:26`) | Spartacus の i18n キーへ(01-8 章)。properties のキーと訳文を一覧にする |
+| HTML の扱い | `ycommerce:sanitizeHTML`(`cartPage.jsp:27`) | CMS の HTML を描く部品の扱い(25 章) |
+| 子の取り込み | `<cms:pageSlot>`・`<cms:component>`(36-58 行)、タグ `<cart:cartValidation/>`(14 行) | タグの中も読む。カートの検証は OCC の cart validate と Spartacus の検証の仕組みに対応させる |
+| 操作と送信先 | `<form:form … action="${paymentFormUrl}" method="POST">`(`opfPaymentPage.jsp:39`) | 送信先のコントローラが何をするかを読み、OCC のどのリソースに当たるかを決める(12 章) |
+| JS | `<script src="${resourcePath}/js/opfacceleratoraddon.js">`(`opfctascriptcomponent.jsp:1`)、`js-cart-help` のような JS 用のクラス(`cartPage.jsp:20`) | アクセラレータの JS が何をしていたかを読み、Angular の部品に移す |
+
+結果は、JSP 1 枚につき 1 枚の**仕様カード**にまとめます。項目は、表示項目と出どころ、出し分けの条件、文言キー、操作と送信先、JS、取り込む子の 6 つです。そのカードを、Spartacus の対応する部品のテンプレート(`*.component.html`)と並べます。各行を次の 5 つに振り分けます。
+
+1. 同じ
+2. Spartacus にある(設定で有効にする)
+3. OCC を足す
+4. フロントを足す
+5. やめる(業務と合意する)
+
+ソースを読むだけでは足りない部分もあります。動いているアクセラレータの画面を、ログイン状態・カートの中身・権限を変えながら操作し、出し分けを実際に確かめます。
+
+**一覧を作るコマンド**(storefront 拡張とアドオンの `web/webroot/WEB-INF` に向けて流す。OPF のアドオンで動くことを確かめた)
+
+```bash
+W=<拡張>/web/webroot/WEB-INF          # アドオンなら <アドオン>/acceleratoraddon/web/webroot/WEB-INF
+# 文言キー
+grep -rhoE 'code="[^"]+"' $W --include='*.jsp' --include='*.tag' | sort | uniq -c
+# 表示に使っている値の根(fn・not・ycommerce などの関数は除いて読む)
+grep -rhoE '\$\{[a-zA-Z]+(\.[a-zA-Z]+)*' $W --include='*.jsp' --include='*.tag' | sort | uniq -c | sort -rn
+# 送信先と JS
+grep -rnE '<form:form|action="|\.js"' $W --include='*.jsp' --include='*.tag'
+# 使っているタグ(タグの中も読む)
+grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | uniq -c | sort -rn
+```
+
+`JspIncludeComponent` の JSP のパスは、OCC の `cms/pages?…&fields=FULL` の `page` 属性から取れます。普通の部品の型とページテンプレートが、それぞれどの JSP で描かれるかは、アクセラレータ本体の規則によります。公開のソースでは確かめられなかったので、要確認です。
+
+---
+
+### 28.8 段階 4: 対応の無い部品を埋める(実測)
 
 27 章のスクリプトを、アクセラレータ用の `electronics` の 14 ページに流しました。対象はホーム・カート・ログイン・アドレス帳・プロフィール変更・FAQ・注文履歴・支払い情報・チェックアウトのログイン・注文完了・検索結果なし・404・商品詳細・カテゴリです。Spartacus 用の `electronics-spa` の同じページとも比べました。
 
@@ -164,7 +248,7 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.8 段階 5: ページコントローラと JSP のロジックを移す
+### 28.9 段階 5: ページコントローラと JSP のロジックを移す
 
 25 章の手順を画面ごとに回します。
 
@@ -176,7 +260,7 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.9 段階 6: URL と SEO
+### 28.10 段階 6: URL と SEO
 
 **Spartacus の既定の URL**: 商品詳細は `product/:productCode/:name`、カテゴリは `category/:categoryCode` です(`core-libs/storefront/cms-structure/routing/default-routing-config.ts:62-72`)。アクセラレータとは形が違います。
 
@@ -195,7 +279,7 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.10 段階 7: 並行稼働と切り替え
+### 28.11 段階 7: 並行稼働と切り替え
 
 **リポジトリ**: 保守チームの構成を変えずに並行させる方法は 26 章です(方式 A: `git subtree`、方式 B: デプロイのたびに組み立てる)。
 
@@ -215,12 +299,15 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.11 1 画面ぶんのチケットの書き方
+### 28.12 1 画面ぶんのチケットの書き方
 
 段階 3〜6 は、画面ごとに次のチケットで回すと漏れが少なくなります。
 
 ```text
 画面: カート(旧 URL /cart、Spartacus ルート cart)
+[JSP]   cartPage.jsp(空カートでスロットを出し分け)、cartDisplay.jsp(selectivecartsplitlistaddon が差し替え)、
+        cartTotalsDisplay.jsp、checkoutDisplay.jsp を読み、仕様カードを作る。
+        CenterLeftContentSlot・BottomContentSlot は Spartacus のレイアウトに無い → 置き場所を決める
 [CMS]   ページ uid=cartPage、ラベル cart → /cart。テンプレート CartPageTemplate
         JSP の部品 7: 対応表で引ける 2(CartComponent・CartTotalsComponent)/ 対応なし 3(Checkout・Promotions・PotentialPromotions)/ 同意の 2 は Spartacus の部品へ
 [部品]  対応なし: CartSuggestionComponent(使っていないので外す)、SaveForLaterCMSComponent(作る)
@@ -231,7 +318,7 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 
 ---
 
-### 28.12 まとめ
+### 28.13 まとめ
 
 | 問い | 答え |
 |---|---|
@@ -239,7 +326,8 @@ Spartacus は、ベースサイトを設定に固定していないとき、起�
 | 何が残り、何を捨てるか | Facade・Service・型・データは残る。storefront の Web 拡張(JSP・タグ・`web/src`)は捨てる。CMS の中身は作り直す |
 | 最初の手順 | 棚卸し。27 章のスクリプトを**今のアクセラレータのサイト**に流す(デモでは 44 種類中 15 が対応なし) |
 | バックエンドで最初にやること | `/occ`・OAuth クライアント・CORS。Spartacus 用のベースサイトを作り、配信する URL に合う `urlPatterns` を入れる(合わないと起動しない) |
-| CMS で作り直すもの | ページのラベル(URL の形に)、JSP の部品(Flex に)、スクリプトの部品(外す)。テンプレート名はそのまま使える |
+| JSP はどう扱うか | 捨てる前に読む。JSP 1 枚ごとに表示・出し分け・文言・操作・JS・子を書き出し、Spartacus の部品と突き合わせる。CMS に出る `JspIncludeComponent` は一部で、ページテンプレート・部品・タグ・アドオンの JSP も対象 |
+| CMS で作り直すもの | ページのラベル(URL の形に)、JSP の部品(Flex に)、スクリプトの部品(外す)。テンプレート名はそのまま使える。ただしアクセラレータのスロットが Spartacus のレイアウトに無いことがある(カートの `CenterLeftContentSlot`・`BottomContentSlot`) |
 | 旧 URL | `…/p/<コード>` と `…/c/<コード>` は既定で受け付ける。作るリンクを旧形式にするなら `paths` を変える |
 | 切り替え | 同じバックエンドに 2 つのサイトを並べて作る。画面ごとに切り替えると、ログインと匿名のカートが切れる(要確認) |
 

@@ -59,7 +59,7 @@
 - [25. JSP やタグの Java 呼び出しと、フロント / バックの責務](25-jsp-java-calls-and-responsibilities.md) — アクセラレータの Web 拡張(ページコントローラ・BeforeViewHandler・Validator・JSP・タグ・EL 関数)はヘッドレスでは実行されない。ビュー層から Java を呼ぶ 8 つの形の行き先、OPF の JSP 版と Spartacus 版の比較、責務を決める 6 つの問い、両方に置くもの(正はバック、写しはフロント)、棚卸しの grep
 - [26. 並行開発のリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) — 保守チームは現行構成(直下に bin/・config/)を変えず、移行チームは core-customize/・js-storefront/ で開発する。パスの違いを移行側だけで吸収する 2 方式(A: 移行リポジトリへ `git subtree` で取り込む、B: merge せずデプロイのたびに組み立てる)、git の実験 J・K、どちらでも残るもの(同じ行の衝突、JSP の移植)
 - [27. フロントだけのコンポーネントカスタマイズ一覧](27-frontend-component-customization-catalog.md) — CMS の部品はキー(typeCode / Flex は flexType / JSP インクルードは uid)で Angular 部品を引く。標準・Flex・JSP インクルード・対応なしの 4 種類、方法 M1〜M14、機能別の一覧、デモ 24 ページの実測(対応なし 6 件)。付録に Spartacus の対応 258 行の全件表([extras/27-cms-component-mappings.md](extras/27-cms-component-mappings.md))
-- [28. アクセラレータからの移行手順](28-accelerator-to-composable-storefront-migration.md) — 新規開発(型から積む)と逆に、今あるページを OCC で測ってから差分を作る。段階 0〜7(棚卸し・OCC とベースサイト・アプリ・CMS・部品・ロジック・URL・並行と切り替え)、同じバックエンドのアクセラレータ用サイトと Spartacus 用サイトの実測比較(対応なし 15 対 6)、旧 URL `…/p/<コード>` は既定で受ける、1 画面ぶんのチケットの書き方
+- [28. アクセラレータからの移行手順](28-accelerator-to-composable-storefront-migration.md) — 新規開発(型から積む)と逆に、今あるページを OCC で測ってから差分を作る。段階 0〜7(棚卸し・OCC とベースサイト・アプリ・CMS・部品・ロジック・URL・並行と切り替え)、JSP を捨てる前に読む手順(仕様カード・一覧を作る grep・アドオンの差し替えとスロットの出し分け)、同じバックエンドのアクセラレータ用サイトと Spartacus 用サイトの実測比較(対応なし 15 対 6)、旧 URL `…/p/<コード>` は既定で受ける、1 画面ぶんのチケットの書き方
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
