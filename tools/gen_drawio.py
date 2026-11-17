@@ -980,6 +980,36 @@ grid(d27, 1220, 110, [("",130),("electronics\n(アクセラレータ用)",190),(
 d27.box("アクセラレータの CMS のままだと描けないもの\n・スクリプトの部品: ASM → @spartacus/asm(外す)、Personalization → 部品は残し @spartacus/tracking で読む\n・同意の JSP → Spartacus の同意バナーへ\n・ページ固有の JSP・実装の無い部品 → 作る / 外す\n・personalizationaddon・selectivecartaddon はバックエンドに残す(help.sap.com)", 1220, 515, 520, 110, *RED, 10, "align=left;spacingLeft=6;")
 d27.box("旧 URL: suffix-url-matcher.ts:31-47 / product-details-url-matcher.ts:22-26\nベースサイト: site-context-config-initializer.ts:67, 100-106", 1220, 645, 520, 60, *GREY, 10, "align=left;spacingLeft=6;")
 d27.text("tools/cms-page-coverage.py を今のアクセラレータのサイトに流すのが最初の一歩", 1220, 725, 520, 40, 11, "fontStyle=1;")
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+'</mxfile>'
+# ---------- 28. customization types x methods (ch.29) ----------
+d28=D("28 カスタマイズの種類 × 方法")
+d28.text("何を変えるか(14 種類)× どう変えるか(9 つの方法): ● = その方法で変えられる。29 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+meths=[("H1\nCMS データ",GREY),("H2\n設定",BLUE),("H3\nスタイル",BLUE),("H4\n差し込み",BLUE),("H5\nDI 置き換え",GREEN),("H6\nDI 追加",GREEN),("H7\nAngular 標準",GREEN),("H8\nイベント・状態",GREEN),("H9\nバックエンド",ORANGE)]
+kinds=[("K1 見at目",[2,3]),("K2 ページの中の配置",[1,2,6]),("K3 部品(CMS コンポーネント)",[1,2,6,9]),("K4 既存の画面への差し込み",[4]),
+("K5 ダイアログ",[2]),("K6 文言・翻訳・言語",[1,2]),("K7 URL・ルーティング",[1,2,7]),("K8 サイト・言語・通貨",[1,2]),
+("K9 SEO・メタ情報",[1,2,6]),("K10 取ってくる項目・量",[2,9]),("K11 データの形",[6]),("K12 処理・通信",[2,5,6,7]),
+("K13 状態・イベント",[2,8]),("K14 機能の有無・切り替え",[2,7])]
+kinds[0]=("K1 見た目",[2,3])
+gA=d28.group("種類 × 方法", 40, 70, 1140, 900, "#f5f5f5", "#666666")
+rows=[]
+for name,ms in kinds:
+    r=[(name,GREY)]
+    for j,(m,col) in enumerate(meths):
+        r.append(("●",col) if (j+1) in ms else NA)
+    rows.append(r)
+grid(d28, 60, 110, [("",250)]+[(m,92) for m,_ in meths], rows, h=46, gap=6, hh=50)
+d28.text("灰 = フロントのコードを触らない / 青 = 設定・見た目(段 1〜2)/ 緑 = DI と Angular(段 3〜5)/ 橙 = バックエンド", 60, 920, 1100, 30, 11)
+gB=d28.group("選び方: 浅い方法から試す", 1220, 70, 560, 900, "#fff7e6", "#d79b00")
+flow=[("API が返しているか? いいえ → H9(24 章)",ORANGE),("CMS のデータで変わるか? → H1",GREY),("設定のキーがあるか?(29.2・22 章)→ H2",BLUE),
+("見た目だけか? → H3",BLUE),("既存の画面に足すだけか?(cxOutlet の印)→ H4",BLUE),("部品ごと替えるか? → H2 の cmsComponents(27 章)",BLUE),
+("データの形か? → H6 Normalizer / Serializer",GREEN),("処理: 選ばれる仕組み → H6 / 1 クラス → H5 / HTTP 全体 → H7 / 反応 → H8",GREEN)]
+prev=None
+for i,(t,col) in enumerate(flow):
+    b=d28.box(t, 1240, 110+i*80, 520, 58, *col, 11, "align=left;spacingLeft=6;")
+    if prev: d28.edge(prev,b)
+    prev=b
+d28.box("H2 設定: provideConfig の断片を 1 つの Config に深くマージ(config-providers.ts:18, 55)\nH5: 抽象クラスがそのまま注入トークン(product.adapter.ts:11)\nH6: 全部順に使う(Normalizer)か、hasMatch / getPriority で 1 つ選ぶ(applicable.ts:32-44)", 1240, 760, 520, 100, *GREY, 10, "align=left;spacingLeft=6;")
+d28.text("バージョンアップの手間: H1 < H2 < H3・H4 < H6 < H5", 1240, 880, 520, 30, 11, "fontStyle=1;")
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+d28.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

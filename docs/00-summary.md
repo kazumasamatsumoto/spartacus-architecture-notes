@@ -44,6 +44,7 @@
 | 25 保守と移行を並行させるリポジトリ戦略 | 保守は構成を変えない。左: 方式 A(移行リポジトリへ git subtree で取り込み、format-patch で返す)。中: 方式 B(merge せず組み立て、overlay.lock で保守の変更を検出)。右: どちらでも残るものと選び方(26 章) | [page25.png](diagrams/page25.png) / [svg](diagrams/page25.svg) |
 | 26 フロントだけのコンポーネントカスタマイズ | 左: 部品のキーの決まり方(typeCode / flexType / uid)と対応表の引き方、種類 A〜D。中: 方法 M1〜M14 と使える種類。右: デモ 24 ページの実測と対応なし 6 件(27 章) | [page26.png](diagrams/page26.png) / [svg](diagrams/page26.svg) |
 | 27 アクセラレータからの移行手順 | 左: 新規開発(型から積む)と移行(測ってから差分を作る)の違い、残す・作り直す・捨てるもの。中: 段階 0〜7。右: 同じバックエンドの electronics と electronics-spa の実測(28 章) | [page27.png](diagrams/page27.png) / [svg](diagrams/page27.svg) |
+| 28 カスタマイズの種類 × 方法 | 左: 何を変えるか 14 種類 × どう変えるか 9 つの方法の対応(●)。右: 浅い方法から試す選び方と、設定・DI の置き換え・DI の追加の仕組み(29 章) | [page28.png](diagrams/page28.png) / [svg](diagrams/page28.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

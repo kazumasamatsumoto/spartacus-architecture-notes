@@ -338,4 +338,4 @@ a11y の例と同じく、手順は定義ファイルに書き、プロンプト
 
 ---
 
-[目次](README.md) | ← [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md) | [付録](appendix.md) →
+[目次](README.md) | ← [29. カスタマイズの種類と方法の総覧: 何を変えるか × どう変えるか](29-customization-types-and-methods.md) | [付録](appendix.md) →

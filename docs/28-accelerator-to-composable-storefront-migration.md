@@ -414,4 +414,4 @@ grep -rhoE '<[a-z-]+:[a-zA-Z]+' $W --include='*.jsp' --include='*.tag' | sort | 
 
 ---
 
-[目次](README.md) | ← [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md) | [番外. サブエージェントとスキルの分け方](extra-agent-split-patterns.md) →
+[目次](README.md) | ← [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md) | [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) →
