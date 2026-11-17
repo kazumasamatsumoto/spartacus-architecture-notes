@@ -140,5 +140,5 @@
 - [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md)
 - [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md)
 - [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md)
-- [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html))
+- [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html)。実例: SAP/spartacus の `.claude/`)
 - [付録](appendix.md)

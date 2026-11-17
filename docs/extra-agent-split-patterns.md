@@ -1,10 +1,10 @@
 # 番外. サブエージェントとスキルの分け方: 23 パターンの地図
 
-> **この章が答える問い**: サブエージェント開発で、エージェントやスキルを何の単位で分けるか(機能グループ別か、職能別か、工程別か…)。粒度をどう決めるか
+> **この章が答える問い**: サブエージェント開発で、エージェントやスキルを何の単位で分けるか(機能グループ別か、職能別か、工程別か…)。粒度をどう決めるか。実際のリポジトリ(SAP/spartacus の `.claude/`)ではどう分けているか
 
 > **位置づけ**: Spartacus の調査そのものではない番外編。25 章で「フロントとバックの責務」を分けたのと同じ考え方を、エージェントとスキルの分け方に当てはめる
 
-> **根拠の取り方**: 点数(1〜5)は筆者がパターンの性質から付けた目安で、測定値ではない。散布図で軸を切り替えて見られる対話版は [extras/agent-split-map.html](extras/agent-split-map.html)(ダウンロードしてブラウザで開く)
+> **根拠の取り方**: 点数(1〜5)は筆者がパターンの性質から付けた目安で、測定値ではない。散布図で軸を切り替えて見られる対話版は [extras/agent-split-map.html](extras/agent-split-map.html)(ダウンロードしてブラウザで開く)。実例の節は SAP/spartacus `develop` 7aaf80c940(2026-11-16)の `.claude/` を `spartacus/.claude/<path>:<行>` で引用する
 
 ### 先に話し言葉で: エージェントを分ける理由は 3 つだけ
 
@@ -193,6 +193,137 @@
 | イベント・タイミング別 | ● |  |  |  |  |  |  | ● |  |
 | 利用者・ペルソナ別 |  |  | ● |  |  |  | ○ |  |  |
 | 成果物別 |  | ○ |  |  | ● | ● |  |  |  |
+
+### 実例: SAP/spartacus の `.claude/` をパターンに当てはめる
+
+Spartacus 本体のリポジトリには、ライブラリを開発する SAP の人向けの Claude Code 設定が入っている。中身は少ないが、上の地図のいくつかのパターンがそのまま使われている。アプリを作る人向けの `@spartacus/skills`(`core-libs/skills/`)とは別物である。
+
+#### 何が入っているか
+
+| ファイル | 種類 | 中身 | 当てはまるパターン |
+|---|---|---|---|
+| `CLAUDE.md` | 常に読まれる説明 | ディレクトリの地図、テストの実行方法、テストの書き方の決まり(`spartacus/.claude/CLAUDE.md:7-50`) | S2 規約 + S7 カタログ |
+| `settings.json` | 権限 | 読む操作・作業ブランチの操作は許可、`rm` `xargs` `git reset --hard` 強制 push `gh api` は禁止(`settings.json:3-61`) | A6 の土台 |
+| `skills/a11y` | スキル | Jira から a11y チケットを集め、1 件ずつエージェントに直させ、PR を作る | S8 ワークフロー |
+| `skills/pr-body` | スキル | PR 本文の型(1 行目 `Closes: <Jira>`、平易な要約、リンクなし)(`skills/pr-body/SKILL.md:21-44`) | S6 テンプレート |
+| `skills/schematics`, `skills/ssr` | スキル | 置き場所の表とテストのコマンドだけ(`skills/schematics/SKILL.md:10-35`、`skills/ssr/SKILL.md:10-26`) | S1 手順 + S7 カタログ(薄い) |
+| `agents/a11y-developer` | エージェント | a11y チケット 1 件を直して push するまで | A7 fan-out の作業役 + A6 + A8 |
+| `agents/code-reviewer` | エージェント | 差分を読んで 3 段階で指摘する(`agents/code-reviewer.md:10-28`) | A5 批評役 |
+
+#### 中心の形: 指揮役スキル + worktree で分けた作業役
+
+```
+a11y スキル(指揮役 = メインのエージェント)
+ 1. Jira を JQL で検索して一覧を表にする
+ 2. チケットごとに a11y-developer を並列起動 ──┬─ worktree A: 読む → 直す → commit → push
+    (プロンプトはチケット番号と件名だけ)      ├─ worktree B: …
+                                               └─ worktree C: …
+ 3. push されたブランチを fetch → pr-body スキルで本文 → gh pr create
+ 4. 成功した分だけ worktree と一時ブランチを消す。失敗した分は残す
+ 5. エージェントごとのトークン数と費用を表にする
+```
+
+この形は、上の表の A10(オーケストレーター + 専門ワーカー)と A7(データ分割)の組み合わせである。分け方の判断は、冒頭の「分ける理由は 3 つだけ」に沿っている。
+
+| 分ける理由 | a11y での現れ方 | 根拠 |
+|---|---|---|
+| 親の文脈を汚さない | チケットの読み込みと修正は作業役の中で終わる。指揮役が受け取るのはブランチ名・PR タイトル案・フラグ名・トークン数だけ | `agents/a11y-developer.md:115-126` |
+| 並列で速くする | チケットごとに 1 エージェント。`isolation: worktree` なので、同時に動いても作業ツリーとブランチ(`a11y/<key>`)がぶつからない | `agents/a11y-developer.md:4-6`、`skills/a11y/SKILL.md:63-67` |
+| 権限・視点を分ける | 作業役は `gh` を使わず push まで。PR の作成と片付けは指揮役だけが行う。作業役は `model: sonnet`、道具も編集系と Jira 取得だけに絞る | `agents/a11y-developer.md:4-6`、`:13-15` |
+
+#### 引き継ぎを少なくする工夫
+
+エージェント同士は要約でしか話せないので、境界をまたぐ情報を意図的に減らしている。
+
+| 工夫 | 中身 | 根拠 |
+|---|---|---|
+| 手順は定義ファイルに 1 回だけ書く | 起動プロンプトはチケット番号と件名だけ。自律性の約束・機能フラグの規則・push の書き方をプロンプトへ写すのは禁止 | `skills/a11y/SKILL.md:9-14`、`:69-77` |
+| 戻り値を決めておく | 作業役が返す項目を列挙し、PR の URL と本文は返さない(指揮役が持つ) | `agents/a11y-developer.md:115-126` |
+| 受け渡しは git で行う | 成果物は push されたブランチ。指揮役は `git fetch` して差分から本文を作るので、作業役の要約に頼らない | `skills/a11y/SKILL.md:89-103` |
+| スキルを部品として呼ぶ | PR 本文は指揮役が `pr-body` スキルで作る。人が単独で使う同じスキルをワークフローの中でも使う | `skills/a11y/SKILL.md:95-103` |
+
+#### 「確認なしで最後まで流す」ための権限設計
+
+作業役も指揮役も「基本は確認なしで進め、止まるのは公開 API を壊す・セキュリティに関わる・他人の作業を消すときだけ」と決めている(`agents/a11y-developer.md:17-30`、`skills/a11y/SKILL.md:36-44`)。それを支えるのが `settings.json` で、次の 3 つを組み合わせている。
+
+- 普段の操作を許可リストに入れる
+- 取り返しのつかない操作は禁止リストに入れる
+- コマンドの書き方を許可ルールに合う形に固定する
+
+push は `git push -u origin HEAD` の形に固定し(`agents/a11y-developer.md:98-106`)、`gh pr create` は 1 行で書く。理由は「`\` で改行すると許可ルールの `*` が改行をまたがず、確認を求められる」と書かれている(`skills/a11y/SKILL.md:105-115`)。
+
+機能フラグの規則も手順スキルの役目を兼ねている。テンプレートは `*cxFeature` で新旧を切り替え、スタイルは `forFeature` mixin と `useFeatureStyles` で囲む(`agents/a11y-developer.md:45-89`)。どれも Spartacus の後方互換の作法で、作業役が勝手に互換性を壊さないための決まりになっている。
+
+#### 薄いスキルは「いつ読まれるか」を `description` で決める
+
+schematics と ssr の本文は 30 行ほどしかない。中身より `description` が大事で、「schematics」「ng add」「ng update」「hydration」「npm run test:ssr」など、きっかけになる言葉を多めに並べている(`skills/schematics/SKILL.md:3`、`skills/ssr/SKILL.md:3`)。
+
+S7 カタログを小さく、必要な時だけ読ませる使い方である。反対に、a11y の `SKILL.md` には frontmatter(`name` / `description`)がない(`skills/a11y/SKILL.md:1`)。自動では選ばれず、`/a11y` と明示して呼ぶ前提だと読める。
+
+#### 読んでいて見つけた食い違い
+
+| 箇所 | 内容 |
+|---|---|
+| 片付けの一括削除 | `xargs` を使う(`skills/a11y/SKILL.md:145`)が、`settings.json:48` で `xargs` は禁止。ここだけは止まるはず |
+| 許可ルールの書き方 | スキルは `Bash(GH_TOKEN=* GH_HOST=* gh *)` に合うと書く(`:22`、`:107`)が、実際のルールは `gh pr *`(`settings.json:37`)。`gh pr create` はどちらにも合うので動作には影響しない |
+| 資格情報 | push 用のトークンを `/tmp/creds` に平文で書く(`skills/a11y/SKILL.md:24-34`)。`chmod 600` はするが、共有マシンでは注意 |
+| 社内前提 | Jira は社内の `sap-jira` MCP(`settings.json:64`)、a11y 基準と Jira の URL も社内向け。Jira への書き込みは MCP が読み取り専用のためコメントアウト(`skills/a11y/SKILL.md:79-82`) |
+
+教訓としては、スキルの手順と `settings.json` を別々に直すと食い違う、ということである。手順に書いたコマンドが許可リストで通るかは、まとめて確かめたい。
+
+#### 自分のプロジェクトに写す例: hybris 取り込みの移植を fan-out する
+
+[composable-migration-sandbox](https://github.com/kazumasamatsumoto/composable-migration-sandbox)(26 章の方式 A を試すリポジトリ)では、`scripts/sync-hybris.sh` が取り込みのたびに `sync-ledger/*.md` を作り、保守が変えたファイルを「移植」「OCC」「manifest」などに分ける。この記録の「移植」の行を a11y のチケット一覧と同じように扱えば、同じ形にできる。以下は雛形で、実行はしていない。
+
+```
+.claude/
+├── settings.json                 # git push / gh pr は許可、強制 push・rm は禁止
+├── skills/
+│   ├── hybris-port/SKILL.md      # 指揮役(S8): 取り込み記録 → 1 行 1 エージェント → PR
+│   └── pr-body/SKILL.md          # 本文の型(S6): 取り込み記録の行と保守のコミットを書く
+└── agents/
+    ├── jsp-porter.md             # 作業役(A7 + A6): JSP 1 つを Angular に移して push
+    └── code-reviewer.md          # 批評役(A5): 旧 JSP と新コンポーネントの振る舞いを突き合わせる
+```
+
+`agents/jsp-porter.md`(作業役):
+
+```markdown
+---
+name: jsp-porter
+description: Ports ONE accelerator JSP listed in a sync-ledger row to the Spartacus app under js-storefront/, then commits and pushes. Spawned once per row by the hybris-port skill. Give it exactly one ledger file and one JSP path.
+tools: Bash, Read, Edit, Write, Grep, Glob
+isolation: worktree
+model: sonnet
+---
+
+あなたは取り込み記録の「移植」の 1 行だけを担当する。worktree の中だけで作業する。
+
+1. 渡された JSP を読み、28.7 の仕様カード(表示する項目・条件・リンク・呼ぶ Facade)を作る
+2. 対応する CMS の部品の typeCode / flexType / uid を決め、27 章の M1〜M14 から方法を選ぶ
+3. js-storefront/ に実装する。保守のファイル(core-customize/hybris/bin/custom/shop/...)は変えない
+4. `port: <JSP 名> (hybris <sha>)` でコミットし、`git push -u origin HEAD` する
+5. 返すのは: ブランチ名 / 仕様カード / 選んだ方法 / OCC に足りない項目(あれば)
+PR は作らない。gh は使わない。
+```
+
+`skills/hybris-port/SKILL.md`(指揮役)の要点:
+
+```markdown
+---
+name: hybris-port
+description: Use after scripts/sync-hybris.sh created a sync ledger. Dispatches one jsp-porter per 移植 row, then opens PRs.
+---
+
+1. 最新の sync-ledger/*.md を読み、区分が「移植」の行だけを表にする
+2. 1 行につき jsp-porter を 1 つ、同じメッセージで並列に起動する。プロンプトは記録のパスと JSP のパスだけ
+3. 「OCC に足りない項目」が返ってきた行は、PR 本文に書き、バックエンドの作業として別に起票する
+4. push されたブランチごとに pr-body で本文を作り、`gh pr create --base main` する
+5. 成功した worktree だけを片付ける
+```
+
+a11y の例と同じく、手順は定義ファイルに書き、プロンプトにはパスだけを渡す。成果物は push されたブランチで受け取る。片付けのコマンドが `settings.json` の禁止リストに当たらないかは、最初に確かめておく。
+
 
 ### 規模別の組み合わせ例
 
