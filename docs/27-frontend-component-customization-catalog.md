@@ -220,4 +220,4 @@ export class StoreInfoComponent {
 
 ---
 
-[目次](README.md) | ← [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) | [番外. サブエージェントとスキルの分け方](extra-agent-split-patterns.md) →
+[目次](README.md) | ← [26. 保守の構成を変えずに、移行を並行させるリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) | [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md) →

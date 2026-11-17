@@ -937,6 +937,49 @@ for i,t in enumerate(["CheckoutComponent(カート)→ ProceedToCheckout と役�
 "OrderConfirmationContinueButtonComponent(注文完了)→ 遅延ロード一覧にだけ名前"]):
     d26.box(t, 1260, 330+i*56, 480, 46, *RED, 10, "align=left;spacingLeft=6;")
 d26.text("自分のサイトの CMS がアクセラレータのままなら、タブやアドレス帳などが JspIncludeComponent(C)で来ることがある", 1260, 620, 480, 50, 10)
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+'</mxfile>'
+d27=D("27 アクセラレータからの移行手順")
+d27.text("動いているアクセラレータ(JSP)サイトを Composable Storefront へ移す: 新規開発と向きが逆。測ってから差分を作る。28 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d27.group("新規開発と移行の違い", 40, 70, 520, 760, "#f5f5f5", "#666666")
+d27.text("新しい部品(11・14・24 章): 下から積む", 60, 100, 480, 20, 11, "fontStyle=1;")
+n1=d27.box("型 items.xml", 60, 130, 110, 44, *ORANGE, 10); n2=d27.box("中身 ImpEx", 180, 130, 110, 44, *ORANGE, 10)
+n3=d27.box("OCC で出す", 300, 130, 110, 44, *ORANGE, 10); n4=d27.box("フロントで描く", 420, 130, 120, 44, *BLUE, 10)
+d27.edge(n1,n2); d27.edge(n2,n3); d27.edge(n3,n4)
+d27.text("移行(この章): 全部あるので、先に測る", 60, 200, 480, 20, 11, "fontStyle=1;")
+m1=d27.box("棚卸し\n画面・URL・CMS・web/src", 60, 230, 150, 54, *GREY, 10); m2=d27.box("OCC で測る\n部品のキーと対応", 225, 230, 150, 54, *YEL, 10)
+m3=d27.box("差分だけ作る\nCMS・部品・OCC", 390, 230, 150, 54, *GREEN, 10)
+d27.edge(m1,m2); d27.edge(m2,m3)
+d27.box("残る: Facade・Service・型・商品/注文データ\n(OCC から使い回す)", 60, 320, 480, 54, *GREEN, 11)
+d27.box("作り直す: CMS の中身\nラベル・JSP の部品・スクリプトの部品", 60, 390, 480, 54, *YEL, 11)
+d27.box("捨てる: storefront の Web 拡張\nJSP・タグ・ページコントローラ・web/src(ヘッドレスでは実行されない。25 章)", 60, 460, 480, 64, *RED, 11)
+d27.box("進め方: 同じバックエンドに Spartacus 用のサイトを並べ、アクセラレータを動かしたまま作る(デモも electronics と electronics-spa を並べている)", 60, 545, 480, 70, *BLUE, 11)
+d27.text("根拠: ccs(546fe5b)localextensions.xml:54, 78, 240, 259 / manifest.json:8-17, 320, 446-458, 504-505", 60, 640, 480, 40, 10)
+gB=d27.group("段階 0〜7", 600, 70, 560, 760, "#f5f5f5", "#666666")
+steps=[("0 棚卸し: 画面と URL・CMS ページ・部品のキー・web/src のロジック・アドオン・外部スクリプト", GREY),
+("1 バックエンド: /occ・OAuth クライアント・CORS・Spartacus 用ベースサイト(urlPatterns が合わないと起動しない)", ORANGE),
+("2 アプリ: ng add、baseSite と urlParameters、CCv2 の js-storefront/manifest.json", BLUE),
+("3 CMS: ラベルを URL の形に、JSP の部品を Flex に。テンプレート名はそのまま使える", YEL),
+("4 部品: 対応なしを仕分けて、作る・割り当てる・外す(27 章)", YEL),
+("5 ロジック: web/src → Facade → OCC → Angular の写し(13・25 章)", GREEN),
+("6 URL と SEO: …/p/<コード>・…/c/<コード> は既定で受ける。作るリンクは paths。301 と SSR", PURP),
+("7 並行と切り替え: リポジトリ(26 章)・ログインとカート・SmartEdit・最後に storefront 拡張を外す", RED)]
+prev=None
+for i,(t,col) in enumerate(steps):
+    b=d27.box(t, 620, 110+i*82, 520, 64, *col, 11, "align=left;spacingLeft=6;")
+    if prev: d27.edge(prev,b)
+    prev=b
+d27.text("0〜2 は順番に。3〜6 は画面ごとに回す(ホーム → 一覧 → 詳細 → カート → ログイン → チェックアウト → マイアカウント)", 620, 770, 520, 40, 10)
+gC=d27.group("デモ OCC の実測(2026-11-17): 同じバックエンドの 2 サイト", 1200, 70, 560, 760, "#fff7e6", "#d79b00")
+grid(d27, 1220, 110, [("",130),("electronics\n(アクセラレータ用)",190),("electronics-spa\n(Spartacus 用)",190)], [
+ [("urlEncoding",GREY),("storefront, language",YEL),("+ currency",BLUE)],
+ [("カートのラベル",GREY),("cart",YEL),("/cart",BLUE)],
+ [("アドレス帳",GREY),("address-book\n(/my-account/… は 404)",RED),("/my-account/address-book",BLUE)],
+ [("カートの部品",GREY),("22(JSP 7・Flex 0)",YEL),("37(JSP 0・Flex 20)",BLUE)],
+ [("14 ページのキー",GREY),("44 種類",YEL),("63 種類",BLUE)],
+ [("対応なし",GREY),("15",RED),("6",GREEN)],
+], h=50)
+d27.box("アクセラレータの CMS のままだと描けないもの\n・スクリプトの部品(ASM・Personalization・ProfileTag)→ 機能ライブラリへ\n・同意の JSP → Spartacus の同意バナーへ\n・ページ固有の JSP・実装の無い部品 → 作る / 外す", 1220, 515, 520, 110, *RED, 10, "align=left;spacingLeft=6;")
+d27.box("旧 URL: suffix-url-matcher.ts:31-47 / product-details-url-matcher.ts:22-26\nベースサイト: site-context-config-initializer.ts:67, 100-106", 1220, 645, 520, 60, *GREY, 10, "align=left;spacingLeft=6;")
+d27.text("tools/cms-page-coverage.py を今のアクセラレータのサイトに流すのが最初の一歩", 1220, 725, 520, 40, 11, "fontStyle=1;")
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

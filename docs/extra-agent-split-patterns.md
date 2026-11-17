@@ -207,4 +207,4 @@
 
 ---
 
-[目次](README.md) | ← [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md) | [付録](appendix.md) →
+[目次](README.md) | ← [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md) | [付録](appendix.md) →
