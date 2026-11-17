@@ -1,0 +1,11 @@
+// H3 スタイル: 本体のスタイルは CSS 変数で色を決めている。変数を上書きするだけ
+// (styles.scss の最後で読み込む)
+//
+// :root ではなく cx-storefront に書く。デモアプリは機能フラグ a11yPrimaryColorContrast を
+// 有効にしており、app-root に付くクラスが --cx-color-primary を !important で決める
+// (core-libs/styles/scss/root.scss:66-70)。:root に書いても app-root より下には届かない。
+// その内側の cx-storefront で定義し直せば、子孫はそちらを継承する
+cx-storefront {
+  --cx-color-primary: #7b2cbf;
+  --cx-color-primary-accent: #5a189a;
+}

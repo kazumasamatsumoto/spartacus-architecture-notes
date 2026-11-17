@@ -8,7 +8,7 @@
 
 > **位置づけ**: 3 つの章を横につなぐ**地図**である。22 章は「要件 → どの段か」の索引(100 件)、23 章は段ごとの書き方と書く場所、27 章は CMS の部品だけを詳しく扱う(M1〜M14)。この章は、拡張点を「何を変えるか」と「どの仕組みで変えるか」の 2 つの軸で並べ直し、各行から詳しい章へ戻れるようにする
 
-> **根拠の取り方**: クローン(`core-libs/core/package.json` の version 221121.20.0)の、設定のクラス・トークン・抽象クラスの**定義**の行を引用する。パスは 22 章と同じく略す: `core/` = `core-libs/core/src/`、`sf/` = `core-libs/storefront/`、`styles/` = `core-libs/styles/`、`setup/` = `core-libs/setup/`、`fl/` = `feature-libs/`。コード例は書き方の形を示すもので、この章のために実行はしていない(23 章と同じ扱い)
+> **根拠の取り方**: クローン(`core-libs/core/package.json` の version 221121.20.0)の、設定のクラス・トークン・抽象クラスの**定義**の行を引用する。パスは 22 章と同じく略す: `core/` = `core-libs/core/src/`、`sf/` = `core-libs/storefront/`、`styles/` = `core-libs/styles/`、`setup/` = `core-libs/setup/`、`fl/` = `feature-libs/`。29.6 のサンプルは、クローンのデモアプリ `projects/storefrontapp` に組み込み、デモの OCC につないで画面とコンソールで動作を確かめた(2026-11-17)。それ以外のコード例は書き方の形を示すもので、実行していない
 
 ---
 
@@ -149,6 +149,7 @@ Spartacus で変えられるものは多い。見た目、部品の並び、部�
 | 変えたいもの | 方法 | 書くもの | 定義 | 段 | 詳しくは |
 |---|---|---|---|---|---|
 | タイトル・description・robots・canonical をページの種類ごとに | H6 | `PageMetaResolver` を継承し、`pageType` / `pageTemplate` を決めて足す。点数の高い方が使われる | `core/cms/page/page-meta.resolver.ts:17, 47-53`、本体の登録例 `core/product/product.module.ts:18, 23` | 5 | 22.8 |
+| 本体のリゾルバの一部だけ変える(タイトルに印を付けるなど) | H5 | 本体のリゾルバ(例 `ProductPageMetaResolver`)を継承し、クラスのトークンを置き換える | `core/product/product.module.ts:17-21` | 5 | 29.6 |
 | SEO の設定(構造化データなど) | H2 | `SeoConfig` | `sf/cms-structure/seo/config/seo.config.ts:14` | 1 | — |
 | CMS で持っているタイトル・description | H1 | CMS ページの属性 | — | 0 | — |
 
@@ -292,7 +293,75 @@ CMS のデータで変わるか? ── はい → H1(フロントは触らな�
 
 ---
 
-### 29.6 まとめ
+### 29.6 サンプル実装: 本物の Spartacus で動かす
+
+H2〜H8 を 1 つずつ実装したサンプルを [playground/customization-samples](../playground/customization-samples/) に置いた。SAP/spartacus のクローンに入っているデモアプリへ `apply.sh` で組み込み、デモの OCC(electronics-spa)につないで、全部が効くことを確かめた。2211 以降の `@spartacus/*` は公開 npm に無い(SAP のレジストリで配布)ため、クローンのソースのまま動かしている。
+
+![サンプルを入れた商品詳細ページ](../playground/customization-samples/screenshot-pdp.jpg)
+
+1 枚の商品詳細ページに、次の 5 つが同時に出ている。
+
+- 紫の色(H3)
+- 商品名の下の自作部品(K3)
+- バッジ(H6)
+- 数量の上の 1 行(H4)
+- カートの件数
+
+タブのタイトルには `[H5 meta]` が付き、URL は `/item/358639`(H2)になっている。
+
+#### 全部を登録するモジュール
+
+```ts
+// samples/samples.module.ts(抜粋)
+@NgModule({
+  imports: [RouterModule.forChild([{ path: 'sample/hello', component: SampleHelloPageComponent }])], // H7
+  providers: [
+    ...sampleConfigProviders,                                                        // H2 URL・文言
+    provideConfig(<CmsConfig>{
+      cmsComponents: { ProductIntroComponent: { component: SampleProductIntroComponent } }, // K3
+    }),
+    provideOutlet({ id: 'ProductAddToCartComponent', position: OutletPosition.BEFORE,
+                    component: SampleShippingNoteComponent }),                        // H4
+    { provide: ProductAdapter, useClass: SampleProductAdapter },                     // H5
+    { provide: ProductPageMetaResolver, useExisting: SampleProductPageMetaResolver }, // H5
+    { provide: PRODUCT_NORMALIZER, useClass: SampleProductNormalizer, multi: true }, // H6
+    { provide: HTTP_INTERCEPTORS, useClass: SampleTimingInterceptor, multi: true },  // H7
+    provideAppInitializer(() => inject(SampleCartAddedMessageService).start()),      // H8
+  ],
+})
+export class SamplesModule {}
+```
+
+#### 方法ごとの中身
+
+| 方法 | 書いたもの(要点) | 画面・コンソールで確かめたこと |
+|---|---|---|
+| H2 設定 | `routing.routes.product.paths: ['item/:productCode/:name', 'item/:productCode']`、`i18n.resources.en.product.addToCart.addToCart` | `/item/358639` で商品ページが開き、作られるリンクも `/item/...` になる。ボタンが「Add To Cart (Sample)」になる(大文字は本体の CSS) |
+| H3 スタイル | `cx-storefront { --cx-color-primary: #7b2cbf; }` | ボタン、リンク、カートが紫になる |
+| H4 差し込み | 上の `provideOutlet`。名前は部品のキー | 数量の上に「[H4 outlet] …」が出る |
+| K3(H2 の `cmsComponents`) | `CurrentProductService.getProduct()` を `async` で描く standalone の部品 | 商品名の下が自作の表示になる |
+| H6 追加 | `convert(source, target)` で `price.value` から `target.sampleBadge` を作る。`declare module '@spartacus/core'` で `Product` に型を足す | 自作の部品にバッジが出る(Normalizer → 状態 → 部品の順に流れる) |
+| H5 置き換え(メタ) | `ProductPageMetaResolver` を継承して `resolveTitle()` だけ替える | タブのタイトルが `[H5 meta] DSC-N1 \| Digital Compacts \| Sony` になる |
+| H5 置き換え(Adapter) | `OccProductAdapter` を継承して `load()` と `loadMany()` で記録 | 商品詳細ページで `[H5 adapter] loadMany 346944:attributes` が出る |
+| H7 インターセプター | `next.handle(req).pipe(finalize(...))` で所要時間を記録 | `[H7 interceptor] GET /occ/v2/electronics-spa/products/358639 522ms` などが OCC の呼び出しごとに出る |
+| H7 ルート | `RouterModule.forChild` で `sample/hello` | `/electronics-spa/en/USD/sample/hello` が開く。サイトの接頭辞は Spartacus が処理する |
+| H8 イベント | `eventService.get(CartAddEntrySuccessEvent)` → `GlobalMessageService.add(...)` | カートに追加すると「[H8 event] 346944 x1 added」が出る(確認メッセージは 3 秒で消える) |
+
+H5 のメタ情報の例は、置き換えが multi provider にも効く例になっている。本体は `PageMetaResolver` の multi に `useExisting: ProductPageMetaResolver` で登録している(`core/product/product.module.ts:17-21`)。そのため、クラスのトークンを置き換えると、multi の中身も自作になる。
+
+#### 動かして分かった落とし穴
+
+ソースを読むだけでは気づかず、動かして初めて分かったことが 3 つある。どれも「書いたのに効かない」形で現れる。
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `routing` の設定が効かず、`/item/...` が Not Found | デモアプリは `AppModule` 自身の `providers: [privateProviders]` で `product.paths` を決めている(`projects/storefrontapp/src/app/private/private.providers.ts:36-39`)。モジュール自身の providers は imports したモジュールより後に並ぶので、`SamplesModule` の設定が負ける | 同じキーを書くなら、最後に並ぶ場所(`AppModule` の `providers` の最後)に書く。設定が効かないときは、まず同じキーを書いている場所を探す(23.4) |
+| `:root` で `--cx-color-primary` を変えても色が変わらない | 機能フラグ `a11yPrimaryColorContrast` が有効だと、`app-root` に付くクラスが `--cx-color-primary` を `!important` で決める(`styles/scss/root.scss:66-70`、`projects/storefrontapp/src/app/spartacus/spartacus-features.module.ts:384`)。`:root` の値は `app-root` より下に届かない | その内側の `cx-storefront` で変数を定義する。CSS 変数は近い祖先の値を継承する |
+| Adapter の `load()` を替えても、商品詳細ページでは何も起きない | 商品詳細ページは複数の scope をまとめて取る `loadMany()` を使い、本体の `loadMany()` は `load()` を経由しない(`core/occ/adapters/product/occ-product.adapter.ts:29-57`) | 1 つのメソッドだけ替えるときは、本体がどのメソッドを呼ぶかを先に確かめる。H5 の「本体の中身に依存する」弱さがそのまま出た例 |
+
+---
+
+### 29.7 まとめ
 
 | 方法 | 何を書くか | 段 | 主に使う種類 |
 |---|---|---|---|

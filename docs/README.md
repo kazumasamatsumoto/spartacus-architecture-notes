@@ -60,7 +60,7 @@
 - [26. 並行開発のリポジトリ戦略](26-repository-strategy-parallel-maintenance.md) — 保守チームは現行構成(直下に bin/・config/)を変えず、移行チームは core-customize/・js-storefront/ で開発する。パスの違いを移行側だけで吸収する 2 方式(A: 移行リポジトリへ `git subtree` で取り込む、B: merge せずデプロイのたびに組み立てる)、git の実験 J・K、どちらでも残るもの(同じ行の衝突、JSP の移植)
 - [27. フロントだけのコンポーネントカスタマイズ一覧](27-frontend-component-customization-catalog.md) — CMS の部品はキー(typeCode / Flex は flexType / JSP インクルードは uid)で Angular 部品を引く。標準・Flex・JSP インクルード・対応なしの 4 種類、方法 M1〜M14、機能別の一覧、デモ 24 ページの実測(対応なし 6 件)。付録に Spartacus の対応 258 行の全件表([extras/27-cms-component-mappings.md](extras/27-cms-component-mappings.md))
 - [28. アクセラレータからの移行手順](28-accelerator-to-composable-storefront-migration.md) — 新規開発(型から積む)と逆に、今あるページを OCC で測ってから差分を作る。段階 0〜7(棚卸し・OCC とベースサイト・アプリ・CMS・部品・ロジック・URL・並行と切り替え)、JSP を捨てる前に読む手順(仕様カード・一覧を作る grep・アドオンの差し替えとスロットの出し分け)、同じバックエンドのアクセラレータ用サイトと Spartacus 用サイトの実測比較(対応なし 15 対 6)、旧 URL `…/p/<コード>` は既定で受ける、1 画面ぶんのチケットの書き方
-- [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) — 何を変えるか(見た目・配置・部品・差し込み・ダイアログ・文言・URL・サイト・SEO・取る項目・データの形・処理・状態・機能の切り替えの 14 種類)× どう変えるか(CMS データ・設定・スタイル・差し込み・DI の置き換え・DI の追加・Angular 標準・イベント・バックエンドの 9 つ)。種類ごとに書くものと定義の行、仕組み、浅い方法から試す選び方
+- [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) — 何を変えるか(見た目・配置・部品・差し込み・ダイアログ・文言・URL・サイト・SEO・取る項目・データの形・処理・状態・機能の切り替えの 14 種類)× どう変えるか(CMS データ・設定・スタイル・差し込み・DI の置き換え・DI の追加・Angular 標準・イベント・バックエンドの 9 つ)。種類ごとに書くものと定義の行、仕組み、浅い方法から試す選び方。H2〜H8 のサンプル実装を本物の Spartacus(クローンのデモアプリ + デモ OCC)で動かした結果と、動かして分かった落とし穴 3 つ([playground/customization-samples](../playground/customization-samples/))
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
