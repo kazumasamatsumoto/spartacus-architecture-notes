@@ -295,6 +295,8 @@ CMS のデータで変わるか? ── はい → H1(フロントは触らな�
 
 ### 29.6 サンプル実装: 本物の Spartacus で動かす
 
+サンプル 1 つずつの詳しい解説(コードの意味、本体の中でどう効くか、確かめ方、つまずきやすい点)は [29-1](29-1-customization-samples-walkthrough.md) にある。
+
 H2〜H8 を 1 つずつ実装したサンプルを [playground/customization-samples](../playground/customization-samples/) に置いた。SAP/spartacus のクローンに入っているデモアプリへ `apply.sh` で組み込み、デモの OCC(electronics-spa)につないで、全部が効くことを確かめた。2211 以降の `@spartacus/*` は公開 npm に無い(SAP のレジストリで配布)ため、クローンのソースのまま動かしている。
 
 ![サンプルを入れた商品詳細ページ](../playground/customization-samples/screenshot-pdp.jpg)
@@ -344,7 +346,7 @@ export class SamplesModule {}
 | H5 置き換え(メタ) | `ProductPageMetaResolver` を継承して `resolveTitle()` だけ替える | タブのタイトルが `[H5 meta] DSC-N1 \| Digital Compacts \| Sony` になる |
 | H5 置き換え(Adapter) | `OccProductAdapter` を継承して `load()` と `loadMany()` で記録 | 商品詳細ページで `[H5 adapter] loadMany 346944:attributes` が出る |
 | H7 インターセプター | `next.handle(req).pipe(finalize(...))` で所要時間を記録 | `[H7 interceptor] GET /occ/v2/electronics-spa/products/358639 522ms` などが OCC の呼び出しごとに出る |
-| H7 ルート | `RouterModule.forChild` で `sample/hello` | `/electronics-spa/en/USD/sample/hello` が開く。サイトの接頭辞は Spartacus が処理する |
+| H7 ルート | `RouterModule.forChild` で `sample/hello`。`canActivate: [CmsPageGuard]` と `data: { pageLabel: '/help' }` で外枠を CMS のページから借りる | `/electronics-spa/en/USD/sample/hello` が開き、Help のページのヘッダーとフッターの間に自作の中身が出る |
 | H8 イベント | `eventService.get(CartAddEntrySuccessEvent)` → `GlobalMessageService.add(...)` | カートに追加すると「[H8 event] 346944 x1 added」が出る(確認メッセージは 3 秒で消える) |
 
 H5 のメタ情報の例は、置き換えが multi provider にも効く例になっている。本体は `PageMetaResolver` の multi に `useExisting: ProductPageMetaResolver` で登録している(`core/product/product.module.ts:17-21`)。そのため、クラスのトークンを置き換えると、multi の中身も自作になる。
@@ -377,4 +379,4 @@ H5 のメタ情報の例は、置き換えが multi provider にも効く例に�
 
 ---
 
-[目次](README.md) | ← [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md) | [番外. サブエージェントとスキルの分け方](extra-agent-split-patterns.md) →
+[目次](README.md) | ← [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md) | [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) →

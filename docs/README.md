@@ -61,6 +61,7 @@
 - [27. フロントだけのコンポーネントカスタマイズ一覧](27-frontend-component-customization-catalog.md) — CMS の部品はキー(typeCode / Flex は flexType / JSP インクルードは uid)で Angular 部品を引く。標準・Flex・JSP インクルード・対応なしの 4 種類、方法 M1〜M14、機能別の一覧、デモ 24 ページの実測(対応なし 6 件)。付録に Spartacus の対応 258 行の全件表([extras/27-cms-component-mappings.md](extras/27-cms-component-mappings.md))
 - [28. アクセラレータからの移行手順](28-accelerator-to-composable-storefront-migration.md) — 新規開発(型から積む)と逆に、今あるページを OCC で測ってから差分を作る。段階 0〜7(棚卸し・OCC とベースサイト・アプリ・CMS・部品・ロジック・URL・並行と切り替え)、JSP を捨てる前に読む手順(仕様カード・一覧を作る grep・アドオンの差し替えとスロットの出し分け)、同じバックエンドのアクセラレータ用サイトと Spartacus 用サイトの実測比較(対応なし 15 対 6)、旧 URL `…/p/<コード>` は既定で受ける、1 画面ぶんのチケットの書き方
 - [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) — 何を変えるか(見た目・配置・部品・差し込み・ダイアログ・文言・URL・サイト・SEO・取る項目・データの形・処理・状態・機能の切り替えの 14 種類)× どう変えるか(CMS データ・設定・スタイル・差し込み・DI の置き換え・DI の追加・Angular 標準・イベント・バックエンドの 9 つ)。種類ごとに書くものと定義の行、仕組み、浅い方法から試す選び方。H2〜H8 のサンプル実装を本物の Spartacus(クローンのデモアプリ + デモ OCC)で動かした結果と、動かして分かった落とし穴 3 つ([playground/customization-samples](../playground/customization-samples/))
+  - [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) — 10 個のサンプル(URL・文言・色・差し込み・部品の差し替え・Normalizer・メタ情報・Adapter・インターセプターとルート・イベント)を、やりたいこと/なぜこの方法か/コードの意味/本体の中でどう効くか/確かめ方/つまずきやすい点/使いどころ の順に解説
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
@@ -93,6 +94,7 @@
 | フロントだけで部品をカスタマイズする方法の一覧。Spartacus 標準にある部品と、JSP の部品(無い部品)での違い | 27 |
 | 新規はバックオフィスから作る流れだが、今 hybris で動いているものを Composable Storefront へ移すときの作業手順 | 28 |
 | Composable Storefront でカスタマイズできる種類と、それぞれの方法(仕組み)の整理 | 29 |
+| カスタマイズの方法を、動くサンプルで 1 つずつ丁寧に説明してほしい | 29-1 |
 | サブエージェント開発で、スキルやエージェントの責務・分類単位の分け方のパターンを表やマトリクスで | 番外 |
 
 ## 調査対象
@@ -143,5 +145,6 @@
 - [27. フロントエンドだけでコンポーネントをカスタマイズする方法の一覧: 標準にある部品・JSP 由来の部品・無い部品](27-frontend-component-customization-catalog.md)
 - [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md)
 - [29. カスタマイズの種類と方法の総覧: 何を変えるか × どう変えるか](29-customization-types-and-methods.md)
+- [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html)。実例: SAP/spartacus の `.claude/`)
 - [付録](appendix.md)

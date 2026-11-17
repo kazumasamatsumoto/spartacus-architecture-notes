@@ -3,7 +3,7 @@ import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { inject, NgModule, provideAppInitializer } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { CmsConfig, ProductAdapter, ProductPageMetaResolver, PRODUCT_NORMALIZER, provideConfig } from '@spartacus/core';
-import { provideOutlet, OutletPosition } from '@spartacus/storefront';
+import { CmsPageGuard, provideOutlet, OutletPosition } from '@spartacus/storefront';
 import { sampleConfigProviders } from './h2-config.providers';
 import { SampleShippingNoteComponent } from './h4-shipping-note.component';
 import { SampleProductAdapter } from './h5-product.adapter';
@@ -16,8 +16,15 @@ import { SampleProductIntroComponent } from './k3-product-intro.component';
 
 @NgModule({
   imports: [
-    // H7: CMS に無いページ
-    RouterModule.forChild([{ path: 'sample/hello', component: SampleHelloPageComponent }]),
+    // H7: CMS に無いページ。ヘッダーとフッターは CMS のページ(ここでは /help)から借りる
+    RouterModule.forChild([
+      {
+        path: 'sample/hello',
+        component: SampleHelloPageComponent,
+        canActivate: [CmsPageGuard],
+        data: { pageLabel: '/help' },
+      },
+    ]),
   ],
   providers: [
     // H2: 設定(URL・文言)
