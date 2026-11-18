@@ -338,4 +338,4 @@ a11y の例と同じく、手順は定義ファイルに書き、プロンプト
 
 ---
 
-[目次](README.md) | ← [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) | [付録](appendix.md) →
+[目次](README.md) | ← [29-2. 描画される部品と、材料にされる部品](29-2-rendered-vs-data-components.md) | [付録](appendix.md) →

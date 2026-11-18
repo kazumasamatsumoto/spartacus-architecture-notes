@@ -16,4 +16,5 @@ grep -q SamplesModule "$APP/app/app.module.ts" || {
   rm "$APP/app/app.module.ts.bak"
 }
 grep -q h3-theme "$APP/styles.scss" || printf "\n@import 'app/samples/h3-theme';\n" >> "$APP/styles.scss"
+grep -q n1-brand-logo "$APP/styles.scss" || printf "@import 'app/samples/n1-brand-logo';\n" >> "$APP/styles.scss"
 echo "applied. 起動: cd $1 && CX_BASE_URL=<OCC の URL> npm start"

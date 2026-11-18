@@ -1,6 +1,6 @@
 # customization-samples: 29 章のカスタマイズ方法を本物の Spartacus で動かす
 
-[29 章](../../docs/29-customization-types-and-methods.md)の方法 H2〜H8 を 1 つずつ実装したサンプルです。1 つずつの解説は [29-1](../../docs/29-1-customization-samples-walkthrough.md) にあります。
+[29 章](../../docs/29-customization-types-and-methods.md)の方法 H2〜H8 を 1 つずつ実装したサンプルです。1 つずつの解説は [29-1](../../docs/29-1-customization-samples-walkthrough.md) にあります。ナビゲーションの奥のリンクを変える n1〜n3 は [29-2](../../docs/29-2-rendered-vs-data-components.md) で解説しています。
 SAP/spartacus のクローンに入っているデモアプリ `projects/storefrontapp` に組み込み、デモの OCC(electronics-spa)につないで動作を確かめました(2026-11-17、`@spartacus/core` 221121.20.0、Angular 21.2)。
 
 ![商品詳細ページ](screenshot-pdp.jpg)
@@ -33,6 +33,10 @@ CX_BASE_URL=https://composable-storefront-demo.eastus.cloudapp.azure.com:8443 np
 | `h7-timing.interceptor.ts` | H7 Angular | すべての HTTP の所要時間をコンソールに出す | OCC の呼び出しごとにログが出る |
 | `h7-hello-page.component.ts` | H7 Angular | CMS に無いページ `/sample/hello`(外枠は `pageLabel: '/help'` で CMS のページから借りる) | Help のヘッダーとフッターの間に表示される。中のリンクは H2 の設定から `/item/358639` で作られる |
 | `h8-cart-added-message.service.ts` | H8 イベント | `CartAddEntrySuccessEvent` を受けて画面にメッセージを出す | カートに追加すると、確認メッセージとログが出る |
+| `n1-brand-logo.scss` | H3 スタイル(29-2 A) | ナビゲーションの奥にある Canon のリンクの `<a>` を href で狙い、`::before` でアイコンを付ける | 「Brands」を開くと Canon の左に丸が出る |
+| `n2-brand-logo-navigation.service.ts` | H5 置き換え(29-2 B) | `NavigationService.getNavigationNode` を上書きし、取得結果から node に `styleClasses` と CSS 変数を書き足す | 10 ブランド全部の `<a>` に `sample-brand-logo` のクラスと画像が付く |
+| `n3-brand-category-navigation.component.ts` | H2 の `cmsComponents`(29-2 C) | 親の `CategoryNavigationComponent` を自作に替え、`<img>` で描く | `<img>` が 10 個出る。フライアウトが無くなり、見出しの色が崩れる |
+| `n-nested-link.providers.ts` | — | 29-2 の A・B・C の切り替え(`NESTED_LINK_SAMPLE` = `'css'` / `'service'` / `'parent'`) | — |
 | `samples.module.ts` | — | 上の全部をまとめて登録する | — |
 
 ## 動かして分かった落とし穴(29.7 に詳しく)

@@ -1010,6 +1010,41 @@ for i,(t,col) in enumerate(flow):
 d28.box("H2 設定: provideConfig の断片を 1 つの Config に深くマージ(config-providers.ts:18, 55)\nH5: 抽象クラスがそのまま注入トークン(product.adapter.ts:11)\nH6: 全部順に使う(Normalizer)か、hasMatch / getPriority で 1 つ選ぶ(applicable.ts:32-44)", 1240, 760, 520, 100, *GREY, 10, "align=left;spacingLeft=6;")
 d28.text("バージョンアップの手間: H1 < H2 < H3・H4 < H6 < H5", 1240, 880, 520, 30, 11, "fontStyle=1;")
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+d28.xml()+'</mxfile>'
+d29=D("29 描画される部品と、材料にされる部品")
+d29.text("同じ CMSLinkComponent でも、スロットの直下なら Angular の部品になり、ナビゲーションの中なら親が読む「材料」になる。29-2 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d29.group("① スロットの直下(例: HelpLink は SiteLinks スロット)", 40, 70, 820, 420, "#f5f5f5", "#666666")
+a1=d29.box("cms/pages の応答\ncontentSlots の components に HelpLink", 60, 110, 360, 60, *GREY)
+a2=d29.box("cx-page-slot が components を 1 つずつ回す\n(page-slot.component.html:6)", 60, 200, 360, 60, *BLUE)
+a3=d29.box("flexType 名の outlet(:9)", 470, 200, 360, 60, *RED)
+a4=d29.box("cxComponentWrapper が getMapping(flexType) で対応表を引く\n(component-wrapper.directive.ts:82-84)", 60, 290, 360, 70, *BLUE)
+a5=d29.box("cmsComponents の対応表\nCMSLinkComponent → LinkComponent(link.module.ts:19)", 470, 290, 360, 70, *RED)
+a6=d29.box("Angular の部品が作られて描画される", 60, 390, 360, 60, *GREEN)
+d29.edge(a1,a2); d29.edge(a2,a4); d29.edge(a4,a6)
+d29.edge(a3,a2,"差し替え点",dashed=True,color="#b85450"); d29.edge(a5,a4,"差し替え点",dashed=True,color="#b85450")
+gB=d29.group("② ノードの entry(例: CanonBrandCategoryLink)", 40, 520, 820, 560, "#f5f5f5", "#666666")
+b1=d29.box("NavigationBar スロットの CategoryNavigationComponent\n= ①の流れで作られる親の部品", 60, 560, 360, 60, *GREEN)
+b2=d29.box("NavigationService が木の entry を集めて一括取得\n(navigation.service.ts:95-117 → cms/components)", 60, 650, 360, 70, *BLUE)
+b3=d29.box("populateLink が 5 項目だけ書き写す\nlinkName・url・target・styleClasses・styleAttributes\n(:166-193、private)", 60, 750, 360, 80, *YEL)
+b4=d29.box("NavigationNode(ただのオブジェクト)\n{ title, url, target, styleClasses, styleAttributes }", 60, 860, 360, 60, *GREY)
+b5=d29.box("cx-navigation-ui の固定テンプレート\n<cx-generic-link>{{ node.title }}(:34-60、outlet 0 個)", 60, 950, 360, 60, *BLUE)
+b6=d29.box("cx-generic-link が class / style を中の <a> に付ける\n(generic-link.component.ts:55-56)", 470, 950, 360, 60, *BLUE)
+b7=d29.box("対応表も outlet も通らない\n→ 子だけを差し替える入口は無い", 470, 750, 360, 80, *RED)
+d29.edge(b1,b2); d29.edge(b2,b3); d29.edge(b3,b4); d29.edge(b4,b5); d29.edge(b5,b6)
+gC=d29.group("変え方: 流れのどこに割り込むか", 900, 70, 880, 1010, "#fff7e6", "#d79b00")
+rows=[("段階 0 CMS データ","linkName / url を変える(FE は触らない)",GREY[0],"表示名・行き先"),
+("A CSS","<a> を href や styleClasses で狙い ::before で描く","#dae8fc","アイコン(飾り)。確認済み"),
+("B サービス差し替え","getNavigationNode を上書きし、取得結果から node に印を書き足す",GREEN[0],"バックエンドの独自属性を CSS 変数で使う。確認済み"),
+("C 親の差し替え","CategoryNavigationComponent の対応表を自作に",ORANGE[0],"本物の <img>。フライアウトとキーボード操作は自分で作り直す。確認済み")]
+y=110
+for t,body,fill,use in rows:
+    d29.box(t, 920, y, 200, 90, fill, "#666666", 12, "fontStyle=1;")
+    d29.box(body, 1130, y, 380, 90, "#ffffff", "#999999", 11, "align=left;spacingLeft=6;")
+    d29.box(use, 1520, y, 240, 90, "#ffffff", "#999999", 11, "align=left;spacingLeft=6;")
+    y+=110
+d29.box("割り込む場所(左の図と対応)\n段階 0 → 一括取得で返る中身(CMS のデータ)\nA → 最後に描かれる <a>\nB → 一括取得から NavigationNode までの間(public の getNavigationNode)\nC → 親の CategoryNavigationComponent(親は①の流れなので対応表が効く)", 920, 560, 840, 130, *GREY, 12, "align=left;spacingLeft=8;")
+d29.box("見分け方: cms/pages の応答で uid を探す\nスロットの components の直下 → ①(対応表・outlet が使える)\nnavigationNode の entries の中 → ②(親かサービスで変える)\ntools/cms-component-placement.py で一覧にできる", 920, 720, 840, 130, *YEL, 12, "align=left;spacingLeft=8;")
+d29.text("「コンポーネント」は CMS のデータの型の名前。描画されるかどうかは型ではなく、置かれた場所で決まる", 920, 880, 840, 60, 13, "fontStyle=1;")
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+d28.xml()+d29.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

@@ -747,4 +747,4 @@ provideAppInitializer(() => inject(SampleCartAddedMessageService).start()),
 
 ---
 
-[目次](README.md) | ← [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) | [番外. サブエージェントとスキルの分け方](extra-agent-split-patterns.md) →
+[目次](README.md) | ← [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) | [29-2. 描画される部品と、材料にされる部品](29-2-rendered-vs-data-components.md) →

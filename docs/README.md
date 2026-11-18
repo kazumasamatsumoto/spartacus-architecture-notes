@@ -62,6 +62,7 @@
 - [28. アクセラレータからの移行手順](28-accelerator-to-composable-storefront-migration.md) — 新規開発(型から積む)と逆に、今あるページを OCC で測ってから差分を作る。段階 0〜7(棚卸し・OCC とベースサイト・アプリ・CMS・部品・ロジック・URL・並行と切り替え)、JSP を捨てる前に読む手順(仕様カード・一覧を作る grep・アドオンの差し替えとスロットの出し分け)、同じバックエンドのアクセラレータ用サイトと Spartacus 用サイトの実測比較(対応なし 15 対 6)、旧 URL `…/p/<コード>` は既定で受ける、1 画面ぶんのチケットの書き方
 - [29. カスタマイズの種類と方法の総覧](29-customization-types-and-methods.md) — 何を変えるか(見た目・配置・部品・差し込み・ダイアログ・文言・URL・サイト・SEO・取る項目・データの形・処理・状態・機能の切り替えの 14 種類)× どう変えるか(CMS データ・設定・スタイル・差し込み・DI の置き換え・DI の追加・Angular 標準・イベント・バックエンドの 9 つ)。種類ごとに書くものと定義の行、仕組み、浅い方法から試す選び方。H2〜H8 のサンプル実装を本物の Spartacus(クローンのデモアプリ + デモ OCC)で動かした結果と、動かして分かった落とし穴 3 つ([playground/customization-samples](../playground/customization-samples/))
   - [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) — 10 個のサンプル(URL・文言・色・差し込み・部品の差し替え・Normalizer・メタ情報・Adapter・インターセプターとルート・イベント)を、やりたいこと/なぜこの方法か/コードの意味/本体の中でどう効くか/確かめ方/つまずきやすい点/使いどころ の順に解説
+  - [29-2. 描画される部品と、材料にされる部品](29-2-rendered-vs-data-components.md) — OCC で「コンポーネント」として返るのに差し替えが効かない部品があるのはなぜか。スロットの直下と、タブ・カルーセルのように親が `cxComponentWrapper` に渡す入れ子は描画され、ナビゲーションの中のリンクは親が読む材料になる。ナビゲーションの奥の Canon のリンクにアイコンを付ける 3 つの方法(CSS・NavigationService の差し替え・親の差し替え)を動かして比べた。見分け方のツール [tools/cms-component-placement.py](../tools/cms-component-placement.py)
 
 - [付録](appendix.md) — デモ OCC の実レスポンス、エンドポイント設定の一覧
 
@@ -95,6 +96,7 @@
 | 新規はバックオフィスから作る流れだが、今 hybris で動いているものを Composable Storefront へ移すときの作業手順 | 28 |
 | Composable Storefront でカスタマイズできる種類と、それぞれの方法(仕組み)の整理 | 29 |
 | カスタマイズの方法を、動くサンプルで 1 つずつ丁寧に説明してほしい | 29-1 |
+| ナビゲーションの奥の部品(Canon のリンクなど)をカスタマイズするには。子のコンポーネントは描画されないのか | 29-2 |
 | サブエージェント開発で、スキルやエージェントの責務・分類単位の分け方のパターンを表やマトリクスで | 番外 |
 
 ## 調査対象
@@ -112,7 +114,7 @@
 
 ## 章の一覧(番号順 = 読む順)
 
-各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 28 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
+各章は 1 ページずつ分割し、冒頭に対応する図と「この章が答える問い」を置いている。図は [diagrams/](diagrams/)(draw.io 29 ページ + PNG / SVG)。図の番号は章番号と独立している(対応は [0 章の表](00-summary.md))。
 
 - [0. 要約](00-summary.md)
 - [1. Angular 入門(バックエンド担当者向け)と Spartacus への対応](01-angular-basics.md)
@@ -146,5 +148,6 @@
 - [28. 動いている hybris(アクセラレータ)サイトを Composable Storefront へ移行する作業手順](28-accelerator-to-composable-storefront-migration.md)
 - [29. カスタマイズの種類と方法の総覧: 何を変えるか × どう変えるか](29-customization-types-and-methods.md)
 - [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md)
+- [29-2. 描画される部品と、材料にされる部品: ナビゲーションの奥のリンクを変える](29-2-rendered-vs-data-components.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html)。実例: SAP/spartacus の `.claude/`)
 - [付録](appendix.md)

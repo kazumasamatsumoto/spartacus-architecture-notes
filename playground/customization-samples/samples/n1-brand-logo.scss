@@ -1,0 +1,46 @@
+// 29-2 A: CSS だけで、ナビゲーションの奥にある Canon のリンクにアイコンを付ける
+// (親の部品も、子のデータも変えない。styles.scss の最後で読み込む)
+//
+// 子のリンクは Angular の部品にはならず、cx-navigation-ui の中に cx-generic-link として描かれる。
+// cx-generic-link は class と style を自分の @Input で受け、中の <a> に付け直す
+// (core-libs/storefront/shared/components/generic-link/generic-link.component.ts:55-56)。
+// だから、狙うのは cx-generic-link ではなく、その中の <a> である
+
+// A-1: FE だけで完結する版。<a> の href の末尾(/c/brand_10)で Canon を見分ける
+cx-category-navigation a[href$='/c/brand_10']::before {
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='10' fill='%23e76f51'/%3E%3Ctext x='10' y='14' font-size='11' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3EC%3C/text%3E%3C/svg%3E");
+}
+
+// A-2: CMS で CanonBrandCategoryLink の styleClasses に "brand-logo brand-canon" を入れる版。
+// styleClasses は NavigationService が node に書き写す 5 項目の 1 つなので、<a> の class になる
+// (navigation.service.ts:185-186)。デモの CMS は編集できないので、この版は画面で確かめていない
+cx-category-navigation a.brand-logo::before {
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  background: no-repeat center / contain;
+}
+cx-category-navigation a.brand-canon::before {
+  background-image: url('/assets/brands/canon.svg');
+}
+
+// B(n2)で使う: サービスが <a> に付けたクラスと CSS 変数からアイコンを描く
+cx-category-navigation a.sample-brand-logo::before {
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-inline-end: 6px;
+  vertical-align: middle;
+  background: no-repeat center / contain var(--sample-brand-logo);
+}

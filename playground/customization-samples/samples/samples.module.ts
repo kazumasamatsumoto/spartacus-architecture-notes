@@ -13,6 +13,7 @@ import { SampleHelloPageComponent } from './h7-hello-page.component';
 import { SampleTimingInterceptor } from './h7-timing.interceptor';
 import { SampleCartAddedMessageService } from './h8-cart-added-message.service';
 import { SampleProductIntroComponent } from './k3-product-intro.component';
+import { NESTED_LINK_SAMPLE, nestedLinkProviders } from './n-nested-link.providers';
 
 @NgModule({
   imports: [
@@ -48,6 +49,8 @@ import { SampleProductIntroComponent } from './k3-product-intro.component';
     { provide: HTTP_INTERCEPTORS, useClass: SampleTimingInterceptor, multi: true },
     // H8: イベントの購読を起動時に始める
     provideAppInitializer(() => inject(SampleCartAddedMessageService).start()),
+    // 29-2: ナビゲーションの奥にあるリンク(Canon)を変える。切り替えは n-nested-link.providers.ts
+    ...nestedLinkProviders(NESTED_LINK_SAMPLE),
   ],
 })
 export class SamplesModule {}
