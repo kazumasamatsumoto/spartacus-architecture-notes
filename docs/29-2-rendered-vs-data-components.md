@@ -383,4 +383,4 @@ provideConfig(<CmsConfig>{
 
 ---
 
-[目次](README.md) | ← [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) | [番外. サブエージェントとスキルの分け方](extra-agent-split-patterns.md) →
+[目次](README.md) | ← [29-1. カスタマイズのサンプルを 1 つずつ読む](29-1-customization-samples-walkthrough.md) | [29-3. 差し替えが届かない場所](29-3-where-replacement-does-not-reach.md) →

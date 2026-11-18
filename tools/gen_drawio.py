@@ -1045,6 +1045,30 @@ d29.box("割り込む場所(左の図と対応)\n段階 0 → 一括取得で返
 d29.box("見分け方: cms/pages の応答で uid を探す\nスロットの components の直下 → ①(対応表・outlet が使える)\nnavigationNode の entries の中 → ②(親かサービスで変える)\ntools/cms-component-placement.py で一覧にできる", 920, 720, 840, 130, *YEL, 12, "align=left;spacingLeft=8;")
 d29.text("「コンポーネント」は CMS のデータの型の名前。描画されるかどうかは型ではなく、置かれた場所で決まる", 920, 880, 840, 60, 13, "fontStyle=1;")
 
-out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+d28.xml()+d29.xml()+'</mxfile>'
+d30=D("30 差し替えが届かない場所")
+d30.text("cms/pages で返った部品が画面に出るまでの関門と、cmsComponents の差し替えが届かない 7 つの場所。29-3 章", 40, 20, 1740, 30, 16, "fontStyle=1;")
+gA=d30.group("描画までの流れ", 40, 70, 760, 1000, "#f5f5f5", "#666666")
+steps=[("cms/pages の応答\nページ → スロット → 部品(スロットは入れ子にならない)",GREY),
+("レイアウト設定でスロットを選ぶ\n設定にあるスロットだけ残す(page-layout.service.ts:117-119)",BLUE),
+("PageLayoutHandler が状態でスロットを外す\n(page-layout.service.ts:62-65)",BLUE),
+("cx-page-slot が部品を cxComponentWrapper に渡す\n(page-slot.component.html:14)",BLUE),
+("flexType で対応表を引く\nflexType = typeCode / Flex は flexType / JspInclude は uid\n(occ-cms-page-normalizer.ts:151-157)",BLUE),
+("Angular の部品を作る(component-wrapper.directive.ts:82-100)",GREEN),
+("部品のテンプレートが描く\n子の部品・データ・中のスロット",GREEN)]
+prev=None; boxes=[]
+for i,(t,col) in enumerate(steps):
+    b=d30.box(t, 60, 110+i*135, 720, 90, *col, 12)
+    if prev: d30.edge(prev,b)
+    prev=b; boxes.append(b)
+gB=d30.group("届かない場所(数字は 29-3 章の節)", 840, 70, 940, 1000, "#fff7e6", "#d79b00")
+pits=[(1,"29-3.2 設定に無いスロットは捨てられる\nデモ: HomepageNavLink・カートの CenterLeftContentSlot / BottomContentSlot・商品の Section3"),
+(2,"29-3.3 状態で外される\nカートに商品があると EmptyCartMiddleContent を外す(cart-page-layout-handler.ts:33-56)"),
+(4,"29-3.4 キーが typeCode ではない: CMSFlexComponent と書いても効かない\n29-3.5 登録が無い: 何も描かれず警告だけ(cms-components.service.ts:174)"),
+(6,"29-3.6 ナビゲーションのリンクは材料(navigation.service.ts:166-193)\n29-3.7 別の部品が uid でデータを読む(save-for-later.component.ts:56-58)\n29-3.8 部品の中のスロット: 部品を差し替えると消える(login.component.html:6-11)")]
+for idx,t in pits:
+    p=d30.box(t, 860, 110+idx*135-10 if idx!=6 else 110+idx*135-40, 900, 110 if idx==6 else 90, *RED, 11, "align=left;spacingLeft=8;")
+    d30.edge(p, boxes[idx], dashed=True, color="#b85450")
+
+out='<mxfile host="app.diagrams.net" modified="2026-10-23T00:00:00.000Z" agent="gen_drawio.py" version="24.0.0" type="device">'+d1.xml()+d2.xml()+d3.xml()+d4.xml()+d5.xml()+d6.xml()+d7.xml()+d8.xml()+d9.xml()+d10.xml()+d11.xml()+d12.xml()+d13.xml()+d14.xml()+d15.xml()+d16.xml()+d17.xml()+d18.xml()+d19.xml()+d20.xml()+d21.xml()+d22.xml()+d23.xml()+d24.xml()+d25.xml()+d26.xml()+d27.xml()+d28.xml()+d29.xml()+d30.xml()+'</mxfile>'
 import os,sys; out_path=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(__file__),'..','docs','diagrams','spartacus-architecture.drawio'); open(out_path,'w').write(out)
 print("ok", len(out))

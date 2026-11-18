@@ -46,6 +46,7 @@
 | 27 アクセラレータからの移行手順 | 左: 新規開発(型から積む)と移行(測ってから差分を作る)の違い、残す・作り直す・捨てるもの。中: 段階 0〜7。右: 同じバックエンドの electronics と electronics-spa の実測(28 章) | [page27.png](diagrams/page27.png) / [svg](diagrams/page27.svg) |
 | 28 カスタマイズの種類 × 方法 | 左: 何を変えるか 14 種類 × どう変えるか 9 つの方法の対応(●)。右: 浅い方法から試す選び方と、設定・DI の置き換え・DI の追加の仕組み(29 章) | [page28.png](diagrams/page28.png) / [svg](diagrams/page28.svg) |
 | 29 描画される部品と、材料にされる部品 | 左: スロットの直下の部品が cxComponentWrapper で描画される流れと、ナビゲーションの中のリンクが 5 項目だけ書き写されて文字のリンクになる流れ。右: アイコンを付ける A CSS / B サービスの差し替え / C 親の差し替えが、流れのどこに割り込むか(29-2 章) | [page29.png](diagrams/page29.png) / [svg](diagrams/page29.svg) |
+| 30 差し替えが届かない場所 | 左: cms/pages の部品が画面に出るまでの関門(レイアウト設定 → PageLayoutHandler → cxComponentWrapper → 対応表のキー → 部品の作成 → テンプレート)。右: 差し替えが届かない 7 つの場所が、どの関門にあたるか(29-3 章) | [page30.png](diagrams/page30.png) / [svg](diagrams/page30.svg) |
 
 ![全体フロー](diagrams/page1.png)
 

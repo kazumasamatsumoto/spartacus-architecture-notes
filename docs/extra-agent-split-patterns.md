@@ -338,4 +338,4 @@ a11y の例と同じく、手順は定義ファイルに書き、プロンプト
 
 ---
 
-[目次](README.md) | ← [29-2. 描画される部品と、材料にされる部品](29-2-rendered-vs-data-components.md) | [付録](appendix.md) →
+[目次](README.md) | ← [29-3. 差し替えが届かない場所](29-3-where-replacement-does-not-reach.md) | [付録](appendix.md) →
