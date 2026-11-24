@@ -153,4 +153,5 @@
 - [29-2. 描画される部品と、材料にされる部品: ナビゲーションの奥のリンクを変える](29-2-rendered-vs-data-components.md)
 - [29-3. 差し替えが届かない場所: 7 つの例外とサブスロット](29-3-where-replacement-does-not-reach.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html)。実例: SAP/spartacus の `.claude/`)
+- [番外 2. GitHub Universe 2026 サマリー](extras/github-universe-2026-summary.md) — 6 つの発表、GitHub の思想(アンビエント・インテリジェンス)、GitHub Intelligence、GitHub Next(gh-aw / Ace)、批判的な視点
 - [付録](appendix.md)
