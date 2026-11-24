@@ -1,6 +1,6 @@
 # 番外 2. GitHub Universe 2026 サマリー
 
-> 作成日: 2026-11-24。共有された調査メモ 4 本を 1 枚にまとめたものです。リンクと引用はメモからそのまま取っており、各ページを開いて中身と一致するかは確かめていません。例外は 5 節の Chopin と Ace の状態です。これは公式のリポジトリとプロジェクトページを開いて確かめました。5.1 節は Chopin の README(コミット [1dbf9b4](https://github.com/githubnext/chopin/blob/1dbf9b4/README.md), 2026-11-24 時点)を読んで書き、`README.md:行番号` で引用しています。
+> 作成日: 2026-11-24。共有された調査メモ 4 本を 1 枚にまとめたものです。リンクと引用はメモからそのまま取っており、各ページを開いて中身と一致するかは確かめていません。例外は 5 節の Chopin と Ace の状態です。これは公式のリポジトリとプロジェクトページを開いて確かめました。5.1 節は Chopin の README(コミット [1dbf9b4](https://github.com/githubnext/chopin/blob/1dbf9b4/README.md), 2026-11-24 時点)を読んで書き、`README.md:行番号` で引用しています。5.2 節は gh-aw の README(コミット [3663274](https://github.com/github/gh-aw/blob/3663274/README.md), 2026-11-24 時点)と、README から案内されている 2 ページ(`how-they-work.mdx`・`architecture.mdx`)を読んで書きました。
 
 GitHub Universe 2026(2026 年 10 月 28〜29 日)の主張は「実装はエージェントへ、人間は方向性・判断・センスへ」です。GitHub は「AGI」という言葉をほぼ使わず、「アンビエント・インテリジェンス」という言葉で未来を語っています。
 
@@ -54,7 +54,7 @@ GitHub Next は GitHub 社内の研究開発チームで、Copilot を生んだ�
 
 | プロジェクト | 段階 | 中身 | 資料 |
 | --- | --- | --- | --- |
-| GitHub Agentic Workflows(gh-aw) | 10 月 28 日に一般提供。MIT ライセンス | Markdown で書いた自然言語の指示を、制約付きの GitHub Actions にコンパイルする。Copilot・Claude・Codex を切り替えられる | [公式ドキュメント](https://github.github.com/gh-aw/)、[GA の Changelog](https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available)、[セキュリティの仕組み](https://github.github.com/gh-aw/introduction/architecture/) |
+| GitHub Agentic Workflows(gh-aw) | 10 月 28 日に一般提供。MIT ライセンス | Markdown で書いた自然言語の指示を、制約付きの GitHub Actions にコンパイルする。Copilot・Claude Code・Codex・Gemini・Pi を切り替えられる(5.2 節) | [公式ドキュメント](https://github.github.com/gh-aw/)、[GA の Changelog](https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available)、[セキュリティの仕組み](https://github.github.com/gh-aw/introduction/architecture/) |
 | Chopin | 2026 年 9 月公開の研究プロトタイプ。MIT ライセンス。GitHub の正式な製品ではない | 人とエージェントが、実装計画・仕様・RFC・決定記録をリアルタイムに共同で書く場。エージェント「Planner」は選んだリポジトリを読んで文書の編集を提案し、コードで決められないことはチームに尋ねる。決めるのは人 | [リポジトリ githubnext/chopin](https://github.com/githubnext/chopin)、[プロジェクトページ](https://githubnext.com/projects/chopin/)、[発表の投稿(X)](https://twitter.com/GitHubNext/status/2095215736322953601) |
 | Ace(Agent Collaboration Environment) | 研究プロトタイプ。公式ページでは「当面休止」 | 複数人と複数エージェントが同時に使う作業場。「Slack、GitHub、Claude/Copilot の間に生まれた子ども」と説明されている | [One Developer, Two Dozen Agents, Zero Alignment](https://githubnext.com/talks/one-developer-two-dozen-agents-zero-alignment/)、[Realtime Multiplayer Automation and You](https://githubnext.com/talks/realtime-multiplayer-automation-and-you/) |
 
@@ -144,6 +144,102 @@ GitHub App には、Contents・Pull requests・Workflows の読み書き権限�
 #### このノートの文脈で読むなら
 
 Chopin が分けているのは、計画を書く Planner と、実装するコーディングエージェントです。Planner は既定で読み取り専用で、実装は `/mcp` や `chopin connect` でつないだ別のエージェントが担います。権限の強さは `HARNESS` で段階的に選びます。これは[番外. サブエージェントとスキルの分け方](../extra-agent-split-patterns.md)の「責務と権限で分ける」考え方と同じ形です。ただし、この対応づけは README から読んだ私の解釈で、Chopin 側が書いていることではありません。
+
+### 5.2 gh-aw を README から詳しく
+
+gh-aw は、AI を使ったリポジトリの自動化を Markdown で書き、GitHub Actions の上で安全に動かすための GitHub CLI 拡張です。書いた Markdown は、普通の GitHub Actions のワークフローにコンパイルされます(`README.md:16`)。README 本体は短いので、ここでは README が「仕組み」と「セキュリティ」の説明として案内している 2 ページも読んでいます。
+
+- README: [`README.md`](https://github.com/github/gh-aw/blob/3663274/README.md)
+- 仕組み: [`how-they-work.mdx`](https://github.com/github/gh-aw/blob/3663274/docs/src/content/docs/introduction/how-they-work.mdx)
+- セキュリティ: [`architecture.mdx`](https://github.com/github/gh-aw/blob/3663274/docs/src/content/docs/introduction/architecture.mdx)
+
+#### 普通の Actions との分担
+
+決まった入力に決まった結果を返す仕事は、今までどおり普通の Actions に任せます。ビルド、テスト、lint、デプロイ、再現できるスクリプトがそれです。gh-aw を足すのは、推論や解釈が要る仕事だけです(`README.md:18`)。
+
+| 普通の Actions に残す | gh-aw に任せる |
+| --- | --- |
+| ビルド、テスト、lint、デプロイ、再現できるスクリプト | Issue の振り分け、PR のレビュー、CI 失敗の調査、ドキュメントの手入れ、依存関係の分析、リポジトリのレポート |
+
+README は、gh-aw は既存の CI/CD を「補うもので、置き換えるものではない」と書いています(`README.md:18`)。ワークフローの中に決まった手順のステップを混ぜることもできます(`how-they-work.mdx:48`)。
+
+#### ワークフローは 2 つの部分でできている
+
+1 つのワークフローは、YAML の frontmatter と Markdown の本文でできています(`README.md:49`)。
+
+- **frontmatter**: いつ動くか(トリガー)、何に触れるか(権限)、何を使えるか(ツール)、どの AI エンジンかを決めます。
+- **本文**: エージェントにやってほしいことを自然言語で書きます。
+
+`gh aw compile` がこれを検証し、GitHub Actions が実行する `.lock.yml` を生成します。公式の骨組みは次のとおりです(`how-they-work.mdx:14-22`)。
+
+```markdown
+---
+on: ...
+permissions: ...
+tools: ...
+---
+# Natural Language Instructions
+Analyze this issue and provide helpful triage comments...
+```
+
+触れるのは、frontmatter で設定したツールだけです。外部ツールとの接続には MCP も使います(`how-they-work.mdx:42`)。
+
+試しながら書くときのコマンドもあります。`gh aw compile --watch` で書き直すたびに検証し、`gh aw run` で動かし、`gh aw logs` でコストを見ます(`how-they-work.mdx:67`)。導入は `gh extension install github/gh-aw` です(`README.md:41-43`)。
+
+#### 選べる AI エンジン
+
+既定は GitHub Copilot です。エンジンは frontmatter の `engine:` で選び、それぞれ別の認証情報を使います(`how-they-work.mdx:26-36`)。
+
+| エンジン | `engine:` | 必要な認証 |
+| --- | --- | --- |
+| GitHub Copilot(既定) | `copilot` | `copilot-requests: write` 権限か `COPILOT_GITHUB_TOKEN` |
+| Claude Code | `claude` | `ANTHROPIC_API_KEY` か Anthropic の WIF |
+| OpenAI Codex | `codex` | `CODEX_API_KEY` か `OPENAI_API_KEY` |
+| Google Gemini | `gemini` | `GEMINI_API_KEY` か Google の WIF |
+| Pi | `pi` | `model:` の接頭辞に応じて、Copilot・Anthropic・OpenAI のどれかの認証 |
+
+#### 書き込みは別のジョブに分ける(safe-outputs)
+
+gh-aw の安全の中心は、エージェントに書き込み権限を渡さないことです。エージェントのジョブは、既定で GitHub を読むだけで、サンドボックスの中で動きます(`README.md:20`、`README.md:53`)。Issue の作成、コメント、PR の作成のような書き込みは、次の流れを通ります。
+
+1. エージェントは、書き込みを直接せず、「こうしたい」という依頼を成果物(`agent_output.json`)として残します(`architecture.mdx:67`、`architecture.mdx:145-151`)。
+2. エージェントが終わった後、別のジョブで検査を順番にかけます。PR の数の上限、方針のチェック、トークンなどの秘密を外に出さない無害化です(`architecture.mdx:67`)。
+3. 検出用の AI エージェントが、成果物と差分(`aw.patch`)を読みます。秘密の漏えい、悪意のあるコード、方針違反を探します(`architecture.mdx:363-372`)。
+4. 通った依頼だけを、操作ごとに必要な最小限の権限を持つジョブが実行します。たとえば `create_pull_request` は `contents: write` と `pull-requests: write` です(`architecture.mdx:160-164`)。
+
+こうしておけば、エージェントが乗っ取られても、リポジトリを直接書き換えることはできません(`architecture.mdx:145`)。
+
+注意点が 2 つあります。
+
+- **検出の既定は「警告」**: 検出は既定で警告にとどまります。脅威が見つかっても、レビューできる出力には注記が付き、ブランチへの push はレビュー用の PR になります。レビューできない操作は中止されます。止めたいときは `continue-on-error: false` にします(`architecture.mdx:365`)。
+- **`safe-outputs:` を書かないとき**: `create-issue` だけが控えめな既定値(`max: 1`)で有効になります(`safe-outputs.md:16`)。
+
+#### 3 層の守り
+
+セキュリティの説明は、3 つの層に分かれています(`architecture.mdx:19-69`)。
+
+| 層 | 信頼するもの | 主な仕組み |
+| --- | --- | --- |
+| 基盤(Substrate) | ランナー、カーネル、コンテナ実行環境 | Docker のコンテナ分離。対象のホステッドランナーなら Cloud Hypervisor の microVM。外向き通信を許可したドメインに絞る firewall(AWF)、API プロキシ、MCP Gateway |
+| 設定(Configuration) | 宣言した設定と、それを解釈するコンパイラ | スキーマ検証、使える式の許可リスト、Action のコミット SHA 固定、セキュリティスキャナ(actionlint・zizmor・poutine)、実行前の権限チェック |
+| 計画(Plan) | コンパイラが分けた段階と、段階の間の受け渡し | safe-outputs、入力の無害化、秘密の伏せ字化、脅威検出、作者の信頼度による絞り込み(`min-integrity`) |
+
+出典: `architecture.mdx:827-846`
+
+- **AWF**: エージェントをコンテナに入れ、HTTP/HTTPS の通信を Squid プロキシ経由にして、許可したドメインにしか出られないようにします。コンテナの中では動かないエージェント向けに、ホストの一部を読み取り専用で見せる chroot モードもあります(`architecture.mdx:191-197`)。
+- **作者の信頼度による絞り込み**: MCP Gateway がツールの呼び出しを横取りして、信頼度の低い作者の内容をエージェントに見せないようにします。公開リポジトリでは自動で `min-integrity: approved` になり、オーナー・メンバー・コラボレーターの内容だけが届きます(`architecture.mdx:598-600`)。プロンプトインジェクション対策の要です。
+- **秘密の伏せ字化**: 成果物をアップロードする前に、`/tmp/gh-aw` の中の秘密の値を伏せます。途中で失敗しても必ず動きます(`architecture.mdx:606`)。
+- **人が自分で守るところ**: 自分で書いたステップやカスタムジョブは、エージェントのサンドボックスの外で動く「信頼されたコード」です。安全かどうかは書いた人の責任になります。`strict: false` や、サンドボックス・firewall・検出の無効化は、信頼の前提を変えることだと書かれています(`architecture.mdx:50-58`)。
+
+#### README の注意書き
+
+- `0.83.3` 以上 `0.85.4` 未満の版で[脆弱性](https://github.com/github/gh-aw/security/advisories/GHSA-8h78-hpm7-29gg)が見つかり、その範囲のリリースは取り下げられています(`README.md:34-35`)。
+- これらの安全策は設定で変えられます。そのため、使う人は権限、ツール、ネットワーク、生成されたファイルを、デプロイ前に確かめる必要があります(`README.md:53`)。README は、注意深く人が見ていても失敗はあり得るので「自己責任で」使うように、と書いています(`README.md:55`)。
+- 手を動かして学ぶ教材として、[Factory Tour Workshop](https://github.com/githubnext/gh-aw-workshop) が案内されています(`README.md:506-507`)。
+
+#### このノートの文脈で読むなら
+
+gh-aw は、1 つの仕事を 3 つの役に分けています。考えるエージェント(読むだけ)、検査する検出エージェント、書き込む決まった手順のジョブです。それぞれに必要な権限だけを渡します。Chopin の Planner が読み取り専用なのと同じ考え方で、[番外. サブエージェントとスキルの分け方](../extra-agent-split-patterns.md)の「権限で分ける」型にあたります。ただし、この対応づけは私の解釈で、gh-aw 側が書いていることではありません。
 
 Gazit 氏の考え方は、[WeAreDevelopers の講演](https://www.wearedevelopers.com/videos/1903-github-next-and-the-future-of-coding-idan-gazit)でも聞けます。
 
