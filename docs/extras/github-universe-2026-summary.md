@@ -1,6 +1,6 @@
 # 番外 2. GitHub Universe 2026 サマリー
 
-> 作成日: 2026-11-24。共有された調査メモ 4 本を 1 枚にまとめたものです。リンクと引用はメモからそのまま取っており、各ページを開いて中身と一致するかは確かめていません。例外は 5 節の Chopin と Ace の状態で、公式のリポジトリとプロジェクトページを開いて確かめました。
+> 作成日: 2026-11-24。共有された調査メモ 4 本を 1 枚にまとめたものです。リンクと引用はメモからそのまま取っており、各ページを開いて中身と一致するかは確かめていません。例外は 5 節の Chopin と Ace の状態です。これは公式のリポジトリとプロジェクトページを開いて確かめました。5.1 節は Chopin の README(コミット [1dbf9b4](https://github.com/githubnext/chopin/blob/1dbf9b4/README.md), 2026-11-24 時点)を読んで書き、`README.md:行番号` で引用しています。
 
 GitHub Universe 2026(2026 年 10 月 28〜29 日)の主張は「実装はエージェントへ、人間は方向性・判断・センスへ」です。GitHub は「AGI」という言葉をほぼ使わず、「アンビエント・インテリジェンス」という言葉で未来を語っています。
 
@@ -64,10 +64,86 @@ GitHub Next は GitHub 社内の研究開発チームで、Copilot を生んだ�
     - 横のチャット: `@chopin` で Planner を呼べます。
     - 決定の記録: 本文とは別に、決めた人の名前つきで残ります。後の編集で黙って上書きされません。
     - MCP サーバー: 計画を手元のコーディングエージェントへ持ち出せます。
-- **Chopin の制約**: 標準の Planner は GitHub に書き込めず、編集するのは Chopin の文書だけです。読むのは開始時点のデフォルトブランチで、対応は GitHub.com だけです。一般向けの公開インスタンスは無く、自分で立てて使います([README](https://github.com/githubnext/chopin/blob/main/README.md))。
+- **Chopin の制約**: 標準の Planner は GitHub に書き込めず、一般向けの公開インスタンスもありません。詳しくは 5.1 節にあります。
 - **Ace との関係**: Chopin は Ace の「精神的な子ども」とされています。Ace は野心的ですが複雑すぎたため休止し、うまくいった考えを、計画づくりに絞った Chopin へ引き継いでいます([プロジェクトページ](https://githubnext.com/projects/chopin/))。
 - **Ace の問題意識**: ローカルのエージェントの計画は共有されないまま終わります。ビジネス要件、社内政治、ユーザー調査、組織の経緯は人の頭の中にあり、エージェントには届きません。エージェントを増やすほど、人間側の合意形成が詰まります。
 - **学ぶ教材として**: gh-aw は中身をすべて読め、エンジンも差し替えられます。ハーネスを外側から統制する仕組みを学ぶのに向いています。[番外. サブエージェントとスキルの分け方](../extra-agent-split-patterns.md)と並べて読むと、分け方と統制の両面が見えます。
+
+### 5.1 Chopin を README から詳しく
+
+Chopin は、人とリポジトリを読むエージェントが「長く残る文書」を一緒に書く道具です。対象は実装計画、技術仕様、RFC、提案、決定記録です。決めるのは人で、エージェントの Planner は、リポジトリを読んで編集を提案し、コードで決められないことをチームに尋ねます(`README.md:3-5`)。実験的な研究ソフトウェアで、作りかけの流れや互換性のない変更があり得る、と明記されています(`README.md:7-8`)。
+
+#### 1 つの文書は 3 つの部分でできている
+
+各文書は GitHub のリポジトリ 1 つにつながり、次の 3 つを持ちます(`README.md:17-21`)。
+
+| 部分 | 中身 |
+| --- | --- |
+| Document | 人と Planner が同時に編集するリッチテキスト。中身は制限付きの MDX です。他の人の位置とカーソルが見え、エージェントが最近編集した箇所には一時的な印が付きます |
+| Chat | 文書の横にあるチームの会話です。保存したメッセージは Planner のコンテキストに入ります。1 人のときは全メッセージが `@chopin` に届きます。複数人のときは、Planner は自動参加で順番を待ち、`@chopin` と書けばすぐ呼べます |
+| Decisions | 質問への答えと、受け入れたコメントの記録です。誰が決めたかが付き、本文とは別に保存されます。後の編集で黙って上書きされることはありません |
+
+このほかに **Research** があります。文書で `/research` と打つと調査依頼が始まり、文書の中に進み具合のカードが出ます。終わった調査は、親の下に子文書として公開されます。子文書には Chat がなく、親の Chat と Planner から扱います。保留・失敗・取り消しの依頼は一覧に出ません(`README.md:25`)。
+
+#### Planner の動き方は 3 通りある
+
+Planner をどこで、どの権限で動かすかを `HARNESS` で選びます(`README.md:29`)。
+
+| 設定 | Planner ができること |
+| --- | --- |
+| 既定(`copilot-sdk`) | 範囲を絞った読み取り専用のツールで、リポジトリとプルリクエストを調べます。編集できるのは Chopin の文書だけです。GitHub への書き込み、チェックアウトの編集、コードの実装はできません |
+| `HARNESS=atomic` | Planner のセッションごとに Atomic のフルセッションを動かします。サーバープロセスのユーザーの権限で、シェルとファイルシステムに触れます |
+| `HARNESS=remote` | `/api/v1/agent` につないだ外部のクライアントで Planner を動かします |
+
+これとは別に、コーディングエージェントが `/mcp` からつながり、文書を作ったり直したりできます。承認された実装の段取り(implementation graph)に沿って作業を進めることもできます(`README.md:29`)。いまの Planner のプロンプトとツール名は計画づくり向けですが、文書の仕組み自体はリポジトリにつながる技術文書なら何でも扱えます(`README.md:31`)。
+
+#### Chat での呼び方
+
+| 書き方 | 起きること |
+| --- | --- |
+| `should we cover the export format?` | Chat に保存され、Planner のコンテキストに入ります。1 人ならすぐ返事が来て、複数人なら順番を待ちます |
+| `@chopin` | 最近の Chat に対して、すぐ Planner が動きます |
+| `@chopin draft the export section` | その依頼で、すぐ Planner が動きます |
+| `@chopin compare #Release plan` | 指定した別の文書の最新版を読み、いまの文書で答えます |
+
+出典: `README.md:108-113`
+
+- **`#` で参照できるもの**: Chat で `#` と打つと、同じリポジトリの他の文書、子文書、見出し、Decisions、リポジトリのファイルを選べます。参照は文書名が変わっても切れません。また、どの文書を参照しても、Planner が編集する文書は変わりません(`README.md:115`)。
+- **費用の持ち主**: `copilot-sdk` では、最初に Planner を動かした人などが、その文書の GitHub App のトークンと Copilot の利用量を受け持ちます。セッションが終わるかサーバーが再起動するまで続き、画面から付け替える方法はありません(`README.md:117`)。
+
+#### 自分のマシンでエージェントを動かす
+
+`chopin` CLI を使うと、自分のマシンを Chopin サーバーにつなげます。ビルドや手元での調査、Planner の作業を、自分のコーディングエージェントでそのマシン上で動かせます(`README.md:119-121`)。
+
+- **必要な環境**: KVM が使える x86_64 の Linux か、Windows Hypervisor Platform が使える x86_64 の Windows です。エージェントは 1 つずつ専用の microVM([NVX](https://github.com/microsoft/nvx))で動きます。そのため、マシンにエージェントを入れたり、エージェントにサインインしたりする必要はありません(`README.md:123`)。
+- **つなぎ方**: `chopin connect --agent copilot` でつなぎます。リポジトリは必要になったときに clone されます。`--install-service` を付けると、SSH を閉じた後も動き続けます(`README.md:125-131`)。
+- **選べるエージェント**: 組み込みは GitHub Copilot CLI(`@github/copilot@1.0.114`)と Atomic で、どちらも Chopin で試験済みです。ACP を話すエージェントなら、`chopin connect -- my-agent --acp` の形でつなげます(`README.md:133-139`)。
+
+#### いまの制約
+
+出典: `README.md:143-151`
+
+| 項目 | 制約 |
+| --- | --- |
+| 対応先 | GitHub.com だけです。GitHub Enterprise Server は設定できません |
+| 読むコード | `copilot-sdk` では、セッション開始時点のデフォルトブランチを読みます。コード検索もそのリポジトリの中だけです。手元のチェックアウトやコミット前の変更は読みません(`HARNESS=atomic` か、つないだマシンで動く Planner なら読めます) |
+| 認証と権限 | 参加者は全員 GitHub でサインインし、GitHub App 経由でリポジトリに触れる権限が必要です。公開リポジトリでも、Chopin の文書は公開されません。pull 権限なら閲覧、push か管理権限なら作成・編集と Planner の呼び出しができます |
+| モデルに送るもの | 文書の中身、Chat、Planner が選んだリポジトリの抜粋が、設定したモデル提供元に送られます。`copilot-sdk` なら GitHub Copilot です。Web 調査では、送った依頼文だけが送られます |
+| 保存先 | 文書、やり取り、決定、調査、ジョブ、セッションは PostgreSQL に入ります。GitHub の認証情報は、データベースの外に置いた `SESSION_ENCRYPTION_KEY` で暗号化されます |
+| 決定用のモデル | `AGENT=on` のときは、`OPENAI_API_KEY`・`JEV_API_KEY`・`DECISIONS_MODEL` のどれかで決定用のモデルを設定する必要があります。複数人のときの順番待ちと、図の確認に使います |
+| 規模 | 1 つのデータベースに書き込めるプロセスは 1 つだけです。横に台数を増やす構成には対応していません |
+
+#### 手元で動かすには
+
+用意するものは、Bun 1.4.5、PostgreSQL 用の Docker Compose、自分で登録する GitHub App、テスト用リポジトリへの push 権限、Copilot の利用権です。`AGENT=on` のときは OpenAI などの API キーも要ります(`README.md:35-41`)。
+
+GitHub App には、Contents・Pull requests・Workflows の読み書き権限と、Checks・Commit statuses・Issues の読み取り権限を付けます(`README.md:45-68`)。そのうえで `bun install` を実行し、`.env` を設定して、`bun run db:up`・`bun run migrate`・`bun run dev` の順に動かします。起動したら `http://127.0.0.1:8787` を開きます(`README.md:70-100`)。`AGENT=off` にすると Planner なしで動き、外部のエージェント用の `/mcp` は残ります(`README.md:80`)。
+
+注意点が 1 つあります。`/research` の Web 検索が、自分で登録した App のトークンで使えるかどうかは、README 自身が「未確認」としています(`README.md:102`)。
+
+#### このノートの文脈で読むなら
+
+Chopin が分けているのは、計画を書く Planner と、実装するコーディングエージェントです。Planner は既定で読み取り専用で、実装は `/mcp` や `chopin connect` でつないだ別のエージェントが担います。権限の強さは `HARNESS` で段階的に選びます。これは[番外. サブエージェントとスキルの分け方](../extra-agent-split-patterns.md)の「責務と権限で分ける」考え方と同じ形です。ただし、この対応づけは README から読んだ私の解釈で、Chopin 側が書いていることではありません。
 
 Gazit 氏の考え方は、[WeAreDevelopers の講演](https://www.wearedevelopers.com/videos/1903-github-next-and-the-future-of-coding-idan-gazit)でも聞けます。
 
