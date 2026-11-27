@@ -35,7 +35,7 @@ const wide = this.bo.isMatched('(min-width: 1024px)');
 
 #### 1.2 公開 API
 
-型定義は `cdk/types/layout.d.ts` にあります。公開されているのは次の 5 つです(`:90`)。
+型定義は `cdk/types/layout.d.ts` にあります。公開されているのは次の 5 つです(`:87-88`)。
 
 | API | 内容 | 場所 |
 |---|---|---|
