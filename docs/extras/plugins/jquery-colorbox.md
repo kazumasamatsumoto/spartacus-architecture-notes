@@ -154,7 +154,100 @@ export class MyDialogComponent {
 | 同じダイアログを二重に開かない | 同じ呼び出し名が描画中なら、`multi: true` のときだけ描く | `launch-render.strategy.ts:92-102` |
 | `body` のクラスを外す | `DIALOG` のときだけ `modal-open` を外す | `launch-render.strategy.ts:145-153` |
 
-#### 2.3 `cxFocus` でフォーカスを管理する
+#### 2.3 なぜ設定を書くだけでダイアログが開くのか
+
+2.1 節の書き方では、テンプレートに `<app-my-dialog>` を書いていません。それでもダイアログが開くのは、`openDialog()` を呼んだあとの処理をすべて Spartacus が引き受けているからです。正確には、開くのは「設定」と「`openDialog()` の呼び出し」の 2 つがそろったときです。設定は、「その呼び出し名なら、どのコンポーネントを、どこに、どう出すか」を引く**対応表**の役目をしています。
+
+> Angular の動きは `@angular/core@21.2.26` の `fesm2022/_debug_node-chunk.mjs`(以下 `ng/`)で確かめた
+
+```
+openDialog('MY_DIALOG', openElement, vcr, data)
+  │
+  ├─ ① 設定から 'MY_DIALOG' の項目を引く             launch-dialog.service.ts:167-174
+  ├─ ② 項目のキーから「描き方(戦略)」を 1 つ選ぶ      :181-185 → resolveApplicable
+  ├─ ③ 戦略がコンポーネントを作り、DOM に足す        inline-root-render.strategy.ts:36-65
+  ├─ ④ dialogType に応じて CSS クラスを付ける        launch-render.strategy.ts:104-136
+  └─ ⑤ closeDialog() を待ち、来たら片付ける          launch-dialog.service.ts:60-69
+```
+
+##### ① 設定は、アプリ全体で 1 つの対応表になる
+
+`provideConfig({ launch: { MY_DIALOG: {…} } })` で書いた内容は、Spartacus のグローバルな設定(`Config`)に合わされる。`LayoutConfig` は、その `Config` と同じものとして登録されている(`sf/layout/launch-dialog/launch-dialog.module.ts:46` の `{ provide: LayoutConfig, useExisting: Config }`。`LaunchDialogModule.forRoot()` は `sf/layout/layout.module.ts:18` で読み込まれる)。
+
+`openDialog()` から呼ばれる `findConfiguration()` は、`layoutConfig.launch[caller]` を引くだけである(`sf/layout/launch-dialog/services/launch-dialog.service.ts:167-174`)。項目が無ければ、開発モードで `No configuration provided for caller …` と警告を出し、何もしない(`:94-96`)。
+
+##### ② 設定のキーで「描き方」が決まる
+
+描き方(戦略)は 4 つある。どれも `LaunchRenderStrategy` のトークンに `multi: true` で登録されている(`launch-dialog.module.ts:19-40`)。各戦略は「自分の担当か」を判定する `hasMatch()` を持ち、設定にどのキーがあるかを見る。
+
+| 設定のキー | 選ばれる戦略 | `hasMatch` の場所 | 描く場所 |
+|---|---|---|---|
+| `inlineRoot: true` | `InlineRootRenderStrategy` | `inline-root-render.strategy.ts:67-69` | アプリのルート要素の直下 |
+| `inline: true` | `InlineRenderStrategy` | `inline-render.strategy.ts:74` | `openDialog()` に渡した `ViewContainerRef` の位置 |
+| `outlet: '…'` | `OutletRenderStrategy` | `outlet-render.strategy.ts:83` | 指定したアウトレット |
+| `cxRoute: '…'` | `RoutingRenderStrategy` | `routing-render.strategy.ts:30` | ページ遷移する(ダイアログではない) |
+
+`getStrategy()` は `resolveApplicable()` を呼び、`hasMatch()` に当てはまる戦略を選ぶ(`launch-dialog.service.ts:181-185`)。複数が当てはまれば、優先度(`getPriority()`)で 1 つに絞る(`core-libs/core/src/util/applicable.ts:63-87`)。CMS コンポーネントの対応づけなど、Spartacus のほかの箇所でも使われている「当てはまるものを選ぶ」仕組みである。
+
+##### ③ コンポーネントを作り、ルートの直下に足す
+
+`inlineRoot` の場合は次のとおり(`sf/layout/launch-dialog/services/inline-root-render.strategy.ts:36-65`)。
+
+```ts
+const componentRef = componentFactory.create(contentInjector);          // コンポーネントを作る
+this.injector.get(ApplicationRef)?.attachView(componentRef.hostView);   // 変更検知の対象にする
+this.renderer.appendChild(
+  this.hostComponent?.location.nativeElement,   // ApplicationRef.components[0] = アプリのルート(:32-34)
+  componentRef.location.nativeElement           // 作ったコンポーネントの要素
+);
+```
+
+| 疑問 | 答え |
+|---|---|
+| テンプレートに `<app-my-dialog>` を書かなくてよいのはなぜか | コードでコンポーネントを作り、ルートの要素に `appendChild` しているから |
+| `attachView` は何のためか | テンプレートの外で作ったコンポーネントは、変更検知の対象に入らない。`ApplicationRef` に付けると対象に入り、`{{ }}` やイベントが動く |
+| ダイアログの中で `inject(LaunchDialogService)` できるのはなぜか | `create()` に渡す `contentInjector` は親の無い空のインジェクタ(`:44-46`)。それでも Angular は、環境インジェクタが渡されなければ、作成元の `ComponentFactoryResolver` が持つモジュールのインジェクタを使う(`ng/…:8752` の `environmentInjector \|\| this.ngModule`)。そのため、ルートに登録されたサービスが手に入る |
+| 同じダイアログが二重に開かないのはなぜか | 描画済みの呼び出し名を `renderedCallers` に記録し、同じ名前があれば `multi: true` のときだけ描く(`launch-render.strategy.ts:92-102`) |
+
+##### ④ クラスを付けると、Bootstrap の CSS で「ダイアログらしく」見える
+
+`dialogType: DIALOG_TYPE.DIALOG` なら、作った要素に `d-block fade modal show` を付け、`body` に `modal-open` を付ける(`launch-render.strategy.ts:35`, `:112-114`)。見た目は Bootstrap の CSS によるものである。
+
+| クラス | 効果 | 場所 |
+|---|---|---|
+| `modal` | `position: fixed`、画面全体、`z-index` を上げる。ただし `display: none` | `core-libs/styles/vendor/bootstrap/scss/_modal.scss:26-34` |
+| `d-block` | `display: block` で、上の `none` を打ち消して表示する | Bootstrap のユーティリティ |
+| `fade` + `show` | 透明度の遷移。`show` が無いと `opacity: 0` | `core-libs/styles/vendor/bootstrap/scss/_transitions.scss:10-14` |
+| `body.modal-open` | 背面のスクロールを止める | `_modal.scss:15-17` |
+
+Spartacus は「重ねて表示する」CSS を自分では持たず、**Bootstrap の modal のクラスを付けているだけ**である。ほかの `dialogType` では別のクラスが付く(`POPOVER` なら `cx-dialog-popover` など。`launch-render.strategy.ts:36-57`, `:116-131`)。
+
+##### ⑤ 閉じるまで待ち、片付ける
+
+`openDialog()` は、③で作った `ComponentRef` と `dialogClose` を `combineLatest` でつないだ Observable を返す(`launch-dialog.service.ts:60-69`)。
+
+1. ダイアログ側が `closeDialog(reason)` を呼ぶと、`dialogClose` に値が流れる(`:138-140`)
+2. 開いた要素にフォーカスを戻す(`:64`)
+3. 描画済みの一覧から消し、`DIALOG` なら `body` の `modal-open` を外す(`:65`、`launch-render.strategy.ts:145-153`)
+4. コンポーネントを `destroy()` する(`:66`)
+
+この片付けは、開く側が `openDialog()` の戻り値を `subscribe()` したときだけ動く。購読しないと、ダイアログは開いても、閉じたときに消えない。開く側のコンポーネントがダイアログより先に破棄される場合は、サービスの中で購読する `openDialogAndSubscribe()` を使う(`:106-114`)。
+
+##### Colorbox との役目の分け方の違い
+
+Colorbox は `$.colorbox({ href })` を呼ぶと、その場で膜と箱の DOM を作り、中身を入れる(1.3 節)。Spartacus では、その役目が次のように分かれている。
+
+| 役目 | 担っているもの |
+|---|---|
+| どのコンポーネントを出すか | 設定(`launch` の `component`) |
+| どこに描くか | 戦略(`inlineRoot` / `inline` / `outlet` / `cxRoute`) |
+| どう見せるか | Bootstrap の CSS クラス(`dialogType`) |
+| フォーカスの閉じ込め | ダイアログ側の `cxFocus`(2.4 節) |
+| いつ閉じるか | ダイアログ側の `closeDialog()` |
+
+開く側は呼び出し名を渡すだけなので、`provideConfig` で同じ呼び出し名の設定を上書きすれば、呼び出す側のコードを変えずに、ダイアログの中身や出し方を差し替えられる。
+
+#### 2.4 `cxFocus` でフォーカスを管理する
 
 `cxFocus` は、いくつかのフォーカス機能を 1 つの設定オブジェクトで束ねたディレクティブである(`sf/layout/a11y/keyboard-focus/focus.directive.ts:12-16`)。ダイアログでよく使う項目は次のとおり。型は `sf/layout/a11y/keyboard-focus/keyboard-focus.model.ts` にある。
 
@@ -167,7 +260,7 @@ export class MyDialogComponent {
 | `focusOnEscape` | Esc でホストにフォーカスを戻す。同時に `(esc)` イベントを出す | `keyboard-focus.model.ts:65`、`escape/escape-focus.directive.ts:36-47` |
 | `lock` | 中の要素を Tab の順番から外し、Enter で中に入る | `keyboard-focus.model.ts:146` |
 
-#### 2.4 Colorbox との差
+#### 2.5 Colorbox との差
 
 | 観点 | Colorbox | Spartacus(`LaunchDialogService` + `cxFocus`) |
 |---|---|---|
