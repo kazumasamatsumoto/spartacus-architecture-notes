@@ -139,12 +139,27 @@ Spartacus の HTML テンプレートでは 17 か所で使われています。
 | 条件・繰り返し | `{{if}}`、`{{each}}` | `@if`、`@for`、`@switch` |
 | 名前付きテンプレート | `$.template(name, …)`(グローバルな登録簿) | 同じコンポーネント内なら `<ng-template #name>` + `ngTemplateOutlet`、外から差し替えるならアウトレット |
 | データの変更で描き直す | `$item.update()` を自分で呼ぶ | 変更検知が自動で描き直す(signal、`async` パイプ) |
-| 文字列から実行時にテンプレートを作る | できる | できない(AOT。3.3 節) |
+| 文字列から実行時にテンプレートを作る | できる | できない(AOT。3.6 節) |
 | CSP | `'unsafe-eval'` が要る | 要らない |
+
+#### 2.5 Spartacus の部品と組み合わせる例
+
+3 節の書き方(`ngTemplateOutlet` など)は、自作のコンポーネントの中で使うものです。**Spartacus の標準コンポーネントの中身**を差し替えたいときは、`ngTemplateOutlet` ではなく、次のどちらかを使います。
+
+| したいこと | 方法 |
+|---|---|
+| 差し込み口(`[cxOutlet]`)がある場所を差し替える・前後に足す | アウトレット。`*cxOutletRef` か `provideOutlet()`(2.3 節) |
+| 差し込み口が無いコンポーネントを丸ごと差し替える | CMS のマッピング(`cmsComponents`)で自作のコンポーネントに差し替える |
+
+SSR については、アウトレットもサーバーで描けます。`cxOutletDefer` を付けたアウトレットは、画面に入るまで描くのを遅らせます(`sf/cms-structure/outlet/outlet.directive.ts:56`, `:85`)。この遅延はブラウザでの表示位置に基づくので、サーバーでどう扱われるかは個別に確かめます。
+
+Spartacus には、CMS や API から届いた文字列をテンプレートとして実行時に描く仕組みはありません(3.6 節)。
 
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/core` と `@angular/common` だけで書きます。Spartacus のアウトレットや CMS のマッピングを使う書き方は 2.3 節と 2.5 節にあります。
 
 #### 3.1 jquery.tmpl の典型例を置き換える
 
@@ -154,7 +169,7 @@ Spartacus の HTML テンプレートでは 17 か所で使われています。
   <li>
     <span class="name">${name}</span>
     {{if promotion}}<span class="promo">{{html promotion}}</span>{{/if}}
-    <span class="price">${price.formattedValue}</span>
+    <span class="price">${price}</span>
   </li>
 </script>
 <script>$('#cartItemTmpl').tmpl(entries).appendTo('#cartItems');</script>
@@ -164,7 +179,7 @@ Spartacus の HTML テンプレートでは 17 か所で使われています。
 // Angular
 import { Component, input } from '@angular/core';
 
-interface Entry { code: string; name: string; promotion?: string; price: { formattedValue: string } }
+interface Entry { code: string; name: string; promotion?: string; price: string }
 
 @Component({
   selector: 'app-cart-items',
@@ -176,7 +191,7 @@ interface Entry { code: string; name: string; promotion?: string; price: { forma
           @if (e.promotion) {
             <span class="promo" [innerHTML]="e.promotion"></span>
           }
-          <span class="price">{{ e.price.formattedValue }}</span>
+          <span class="price">{{ e.price }}</span>
         </li>
       } @empty {
         <li>カートは空です</li>
@@ -223,28 +238,132 @@ export class ListComponent<T> {
 </app-list>
 ```
 
-Spartacus の標準コンポーネントの中身を差し替えたいときは、`ngTemplateOutlet` ではなく、アウトレット(2.3 節)か CMS のマッピングの差し替えを使います。
+#### 3.3 入れ子と包み: `{{tmpl}}` と `{{wrap}}`
 
-#### 3.3 実行時に文字列のテンプレートが来る場合
+`{{tmpl(data) "#name"}}` で別のテンプレートを入れ子に描いていたところは、子コンポーネントにします。`{{wrap "#name"}}…{{/wrap}}` で中身を包んでいたところは、`<ng-content>` で中身を受け取るコンポーネントにします。
 
-CMS や API から「テンプレートの文字列」が届き、それを実行時に描きたい、という使い方は Angular の得意分野ではありません。Angular のテンプレートはビルド時にコンパイルされ、実行時に文字列からコンポーネントを作るには JIT コンパイラが要ります。Spartacus もそうした仕組みを持っていません。
+```ts
+import { Component, input } from '@angular/core';
+
+// {{wrap "#panelTmpl"}}…{{/wrap}} に当たる
+@Component({
+  selector: 'app-panel',
+  template: `
+    <section class="panel" [attr.aria-labelledby]="headingId()">
+      <h2 [id]="headingId()">{{ heading() }}</h2>
+      <ng-content />
+    </section>
+  `,
+})
+export class PanelComponent {
+  readonly heading = input.required<string>();
+  readonly headingId = input.required<string>();
+}
+```
+
+```html
+<!-- {{tmpl(entries) "#cartItemTmpl"}} を、子コンポーネントの呼び出しにする -->
+<app-panel heading="カート" headingId="cart-heading">
+  <app-cart-items [entries]="entries()" />
+</app-panel>
+```
+
+#### 3.4 データの取り出しと描き直し: `$.tmplItem` と `$item.update()`
+
+jquery.tmpl では、クリックされた要素から `$.tmplItem(elem).data` で元のデータを引き、データを変えたら `$item.update()` で描き直していました。Angular では、`@for` の中のイベントにデータをそのまま渡せます。データは signal に持ち、新しい値を入れれば描き直されます。
+
+```ts
+import { Component, signal } from '@angular/core';
+
+interface Movie { id: number; name: string; year: number; watched: boolean }
+
+@Component({
+  selector: 'app-movies',
+  template: `
+    <ul>
+      @for (m of movies(); track m.id) {
+        <li>
+          <b>{{ m.name }}</b> ({{ m.year }})
+          <button type="button" [attr.aria-pressed]="m.watched" (click)="toggle(m)">
+            見た
+          </button>
+        </li>
+      }
+    </ul>
+  `,
+})
+export class MoviesComponent {
+  readonly movies = signal<Movie[]>([
+    { id: 1, name: 'Meet Joe Black', year: 1998, watched: false },
+    { id: 2, name: 'The Matrix', year: 1999, watched: true },
+  ]);
+
+  toggle(m: Movie): void {
+    // $.tmplItem(this).data に当たるのが引数の m。$item.update() は要らない
+    this.movies.update((list) =>
+      list.map((x) => (x.id === m.id ? { ...x, watched: !x.watched } : x)),
+    );
+  }
+}
+```
+
+- `track m.id` で、どの行がどのデータかを Angular が覚える。jquery.tmpl が `_tmplitem` 属性と `jQuery.data` で行っていたこと(1.2 節)に当たる
+- 押すと状態が切り替わるボタンには `aria-pressed` を付け、状態を支援技術に伝える。`<button>` なので、キーボード(Enter と Space)でも操作できる
+
+#### 3.5 あとから命令的に差し込む: `ViewContainerRef`
+
+`$.tmpl(...).appendTo('#target')` のように、イベントのたびに断片を足していく使い方は、`ViewContainerRef.createEmbeddedView` で書けます。ただし、多くの場合は 3.4 節のように「配列に足して `@for` で描く」ほうが簡単です。
+
+```ts
+import { Component, TemplateRef, ViewContainerRef, viewChild } from '@angular/core';
+
+@Component({
+  selector: 'app-notices',
+  template: `
+    <ng-template #noticeTmpl let-msg><p class="notice">{{ msg }}</p></ng-template>
+    <div role="status" aria-live="polite">
+      <ng-container #host />
+    </div>
+  `,
+})
+export class NoticesComponent {
+  private readonly tmpl = viewChild.required<TemplateRef<{ $implicit: string }>>('noticeTmpl');
+  private readonly host = viewChild.required('host', { read: ViewContainerRef });
+
+  add(msg: string): void {
+    // $.tmpl('#noticeTmpl', msg).appendTo(...) に当たる
+    this.host().createEmbeddedView(this.tmpl(), { $implicit: msg });
+  }
+
+  clear(): void {
+    this.host().clear();
+  }
+}
+```
+
+足した断片も Angular のテンプレートなので、`{{ msg }}` はエスケープされます。差し込む先を `role="status"` の要素の中にしておくと、足した文が読み上げられます(差し込む要素そのものに `role="status"` を付けて足すと、読み上げられないことがある)。
+
+#### 3.6 実行時に文字列のテンプレートが来る場合
+
+CMS や API から「テンプレートの文字列」が届き、それを実行時に描きたい、という使い方は Angular の得意分野ではありません。Angular のテンプレートはビルド時にコンパイルされ、実行時に文字列からコンポーネントを作るには JIT コンパイラ(`@angular/compiler`)が要ります。
 
 この場合は、次のどちらかにします。
 
 - テンプレートはコードに置き、届くのは**データだけ**にする(推奨)
 - どうしても文字列のテンプレートが要るなら、ロジックを持たないテンプレートエンジン(4 節)で HTML 文字列を作り、`[innerHTML]` で出す。Angular がサニタイズするので、イベントやコンポーネントは使えない
 
-#### 3.4 SSR での注意
+#### 3.7 SSR での注意
 
 - Angular のテンプレートは、サーバーでもそのまま描ける。jquery.tmpl でブラウザが後から描いていた部分も、サーバーの HTML に含まれるようになる
 - jquery.tmpl はブラウザの DOM と jQuery を前提にしている(`document.createElement` など。`pkg/jquery.tmpl.js:318`)。サーバーでは動かさない
-- `ngTemplateOutlet` もアウトレットも、サーバーで描ける。`cxOutletDefer` を付けたアウトレットは、画面に入るまで描くのを遅らせる(`sf/cms-structure/outlet/outlet.directive.ts:56`, `:85`)。この遅延はブラウザでの表示位置に基づくので、サーバーでどう扱われるかは個別に確かめる
+- `ngTemplateOutlet`、子コンポーネント、`<ng-content>` も、サーバーで描ける
+- 3.5 節の `createEmbeddedView` は、ボタンを押したときなど、利用者の操作から呼ぶ。サーバーで呼ぶ場面は普通は無い。描画のあとブラウザでだけ足したいものがあるなら、`afterNextRender` の中で呼ぶ
 
 ---
 
 ### 4. ほかの選択肢
 
-Angular のアプリでは、テンプレートエンジンを足す必要はほとんどありません。3.3 節の「実行時に文字列のテンプレートが来る」場合に限った候補です。
+Angular のアプリでは、テンプレートエンジンを足す必要はほとんどありません。3.6 節の「実行時に文字列のテンプレートが来る」場合に限った候補です。
 
 | ライブラリ | 版(2026-11-27) | peerDependencies | 内容 |
 |---|---|---|---|
@@ -265,7 +384,10 @@ Angular CDK の Portal(`@angular/cdk/portal`)も、テンプレートやコン�
 | データを一覧や部品として描く | Angular のテンプレート(`{{ }}`、`@if`、`@for`) |
 | 同じコンポーネント内で、同じ断片を何度も使う | `<ng-template #name>` + `ngTemplateOutlet` |
 | 呼び出し側に描き方を決めさせる部品を作る | テンプレートを `contentChild` や `input` で受け、`ngTemplateOutlet` で描く |
-| Spartacus 標準の画面の一部を差し替える・前後に足す | アウトレット(`cxOutletRef`、`provideOutlet`)。差し込み口が無ければ CMS のマッピングを差し替える |
+| Spartacus 標準の画面の一部を差し替える・前後に足す | アウトレット(`cxOutletRef`、`provideOutlet`)。差し込み口が無ければ CMS のマッピングを差し替える(2.5 節) |
+| Spartacus を使わない Angular アプリで、`$.template` の名前付きテンプレートや `{{wrap}}` を置き換える | 同じコンポーネント内なら `<ng-template>` + `ngTemplateOutlet`、ほかの部品と組み合わせるなら子コンポーネントと `<ng-content>`(3.2〜3.3 節)。アウトレットに当たる部品は要らない |
+| `$.tmplItem` / `$item.update()` でデータを引いて描き直していた | `@for` のイベントにデータを渡し、signal を更新する(3.4 節) |
+| `.appendTo()` で断片を足していく | まず配列に足して `@for` で描く。命令的に足すなら `ViewContainerRef.createEmbeddedView`(3.5 節) |
 | `{{html …}}` で HTML を出していた | `[innerHTML]`。Angular が許さないもの(`style` 属性など)が要るなら [DOMPurify の章](dompurify.md) |
 | 実行時に文字列のテンプレートが届く | まずデータだけ受け取る形に変える。無理なら Mustache などで文字列を作り `[innerHTML]` |
 

@@ -5,7 +5,7 @@
 > **根拠の取り方**:
 > - **プラグイン**: npm の `dompurify@3.5.0`(2026-11-27 時点の `latest`。2026-11-22 公開)の tarball を展開し、`dist/purify.es.mjs`、`src/tags.ts`、`src/attrs.ts`、`README.md` を読んだ。アクセラレータのファイル名(`purify.min.js`)には版が無いので、最新版について書く。アクセラレータが実際に同梱している版とは違う可能性がある。以下 `pkg/` はパッケージのルート
 > - **Angular**: npm の `@angular/core@21.2.26` の `fesm2022/_debug_node-chunk.mjs`(以下 `ng/`)。サニタイザの実装がここにある
-> - **Spartacus**: SAP/spartacus `develop` のコミット `2db8cb96f5361cb59c2d95ef80438df4630344f9`(2026-11-19)。以下 `sf/` は `core-libs/storefront/`、`il/` は `integration-libs/` を指す。`.spec.ts` は除いて grep した
+> - **Spartacus**: SAP/spartacus `develop` のコミット `2db8cb96f5361cb59c2d95ef80438df4630344f9`(2026-11-19)。以下 `sf/` は `core-libs/storefront/`、`core/` は `core-libs/core/src/`、`il/` は `integration-libs/` を指す。`.spec.ts` は除いて grep した
 > - 代替ライブラリのバージョンは 2026-11-27 に `npm view` で確認した
 
 ---
@@ -18,7 +18,7 @@ Angular では、`[innerHTML]` に文字列を渡すと、**Angular が自動で
 
 ただし Spartacus の段落コンポーネント(`CMSParagraphComponent`)は、`bypassSecurityTrustHtml` で **Angular のサニタイズをわざと切っています**。CMS の HTML を書き換えずにそのまま出すためです。CMS の編集者が書いた HTML を「信頼できる」とみなす設計です。この前提が成り立たない場合に、DOMPurify を使う意味が出てきます。
 
-DOMPurify を Angular に持ち込むなら、「DOMPurify で消毒してから `bypassSecurityTrustHtml` で渡す」が基本形です。SSR では DOMPurify は DOM が無いと動きません。動かないときは**入力をそのまま返す**ので、サーバー側では特に注意が要ります(3.3 節)。
+DOMPurify を Angular に持ち込むなら、「DOMPurify で消毒してから `bypassSecurityTrustHtml` で渡す」が基本形です。SSR では DOMPurify は DOM が無いと動きません。動かないときは**入力をそのまま返す**ので、サーバー側では特に注意が要ります(3.4 節)。
 
 ---
 
@@ -111,7 +111,7 @@ CMS の HTML に `style="color:red"` を書くと、Angular 標準では色が�
 ></div>
 ```
 
-つまり、CMS の編集者が段落に `<img src=x onerror=…>` を書くと、そのまま実行されます。CMS の編集権限を持つ人を信頼できるなら、これは仕様です。信頼の範囲が広い場合(外部の制作会社、取り込んだデータなど)は、段落コンポーネントを差し替えて DOMPurify を挟みます(3.2 節)。
+つまり、CMS の編集者が段落に `<img src=x onerror=…>` を書くと、そのまま実行されます。CMS の編集権限を持つ人を信頼できるなら、これは仕様です。信頼の範囲が広い場合(外部の制作会社、取り込んだデータなど)は、段落コンポーネントを差し替えて DOMPurify を挟みます(2.5 節)。
 
 一方、次のような `[innerHTML]` はサニタイズを切っていないので、Angular 標準のサニタイズが効きます(`[innerHTML]` は本体の HTML テンプレートに 23 か所)。
 
@@ -241,7 +241,7 @@ protected removeScriptTags(html: string) { … }
 | 切る前の検査 | 無い | URL の検査、エスケープ | `<script>` の除去(CTA だけ)、`sandbox`(設定したときだけ) |
 | ライブラリを入れないと動かないか | 標準で動く | 標準で動く | `@spartacus/opf` を入れたときだけ |
 
-段落だけは、標準の Spartacus で動き、外から来る値をまったく検査せずに信頼しています。DOMPurify を挟む候補になるのは、主にここです(3.2 節)。
+段落だけは、標準の Spartacus で動き、外から来る値をまったく検査せずに信頼しています。DOMPurify を挟む候補になるのは、主にここです(2.5 節)。
 
 #### 2.4 Trusted Types
 
@@ -252,9 +252,59 @@ Spartacus は Trusted Types の設定を持っていません(`trustedTypes`、`
 - `trusted-types` の許可リストに `angular` と `angular#unsafe-bypass` が要る。DOMPurify を入れるなら `dompurify` も要る(または DOMPurify に `TRUSTED_TYPES_POLICY: null` を渡す。`pkg/README.md:180-205`)
 - `cxSupplementHashAnchors` パイプは `<template>` の `innerHTML` に文字列を直接代入している(`sf/shared/pipes/suplement-hash-anchors/supplement-hash-anchors.pipe.ts:37-38`)。Trusted Types を強制すると、ここで例外になると考えられる(動かして確かめてはいない)
 
+#### 2.5 Spartacus の部品と組み合わせる例
+
+段落コンポーネントで DOMPurify を挟むには、CMS のマッピングで `CMSParagraphComponent` と `CMSTabParagraphComponent` を自作のコンポーネントに差し替えます。標準のマッピングは `sf/cms-components/content/paragraph/paragraph.module.ts:22-31` にあります。DOMPurify を呼ぶところは 3.2 節と同じです。
+
+```ts
+import { Component, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { CmsConfig, CmsParagraphComponent, provideConfig } from '@spartacus/core';
+import { CmsComponentData, SupplementHashAnchorsPipe } from '@spartacus/storefront';
+import DOMPurify from 'dompurify';
+
+@Component({
+  selector: 'app-safe-paragraph',
+  imports: [SupplementHashAnchorsPipe],
+  template: `<div [innerHTML]="purify(data()?.content | cxSupplementHashAnchors)"></div>`,
+})
+export class SafeParagraphComponent {
+  protected readonly data = toSignal(
+    inject<CmsComponentData<CmsParagraphComponent>>(CmsComponentData).data$
+  );
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
+  purify(html: string): SafeHtml | string {
+    // リンクの書き換え(cxSupplementHashAnchors)を先に、DOMPurify を最後にかける
+    return this.isBrowser
+      ? this.sanitizer.bypassSecurityTrustHtml(DOMPurify.sanitize(html))
+      : html; // サーバーでは Angular の標準サニタイズに任せる
+  }
+}
+
+// アプリの providers に足す
+export const safeParagraphProviders = [
+  provideConfig(<CmsConfig>{
+    cmsComponents: {
+      CMSParagraphComponent: { component: SafeParagraphComponent },
+      CMSTabParagraphComponent: { component: SafeParagraphComponent },
+    },
+  }),
+];
+```
+
+- `CmsComponentData` は `sf/cms-structure/page/model/cms-component-data.ts:10-13`、`cxSupplementHashAnchors` パイプは `sf/shared/pipes/suplement-hash-anchors/supplement-hash-anchors.pipe.ts:21`, `:36`、`provideConfig` は `core/config/config-providers.ts:18-27` にある
+- 標準の段落コンポーネントは、段落の中のリンクのクリックを拾い、同じホストへのリンクを `Router.navigateByUrl` で開く(`sf/cms-components/content/paragraph/paragraph.component.ts:29-42`)。差し替えると、この処理も無くなる。要るなら同じ `@HostListener('click')` を書き写す
+- 「サーバーでは Angular の標準サニタイズに任せ、ブラウザで bypass する」形は、Spartacus の OPF の CTA と同じである(`il/opf/cta/components/opf-cta-element/opf-cta-element.component.ts:36-41`)
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/*` とブラウザ標準(と DOMPurify 本体)だけで書きます。Spartacus の部品と組み合わせる書き方は 2.5 節にあります。
 
 #### 3.1 まずは何も足さない
 
@@ -298,14 +348,47 @@ export class RichTextComponent {
 }
 ```
 
-Spartacus の段落に入れるなら、`CMSParagraphComponent` のマッピングを自作のコンポーネントに差し替えます。`cxSupplementHashAnchors` のようにリンクを書き換える処理があるなら、**書き換えを先に、DOMPurify を最後に**かけます(1.2 節の README の注意)。
+受け取った HTML のリンクを書き換えるなど、ほかの処理もかけるなら、**書き換えを先に、DOMPurify を最後に**かけます(1.2 節の README の注意)。
 
-#### 3.3 SSR での注意
+#### 3.3 何か所でも使うならパイプにする
+
+同じ処理を多くのテンプレートで使うなら、パイプにまとめます。
+
+```ts
+import { inject, Pipe, PipeTransform, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import DOMPurify, { type Config } from 'dompurify';
+
+@Pipe({ name: 'purify' })
+export class PurifyPipe implements PipeTransform {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
+  transform(html: string | null | undefined, config: Config = {}): SafeHtml | string {
+    const value = html ?? '';
+    if (!this.isBrowser) {
+      return value; // サーバーでは Angular の標準サニタイズに任せる
+    }
+    return this.sanitizer.bypassSecurityTrustHtml(DOMPurify.sanitize(value, config));
+  }
+}
+```
+
+```html
+<div [innerHTML]="article.body | purify: { FORBID_ATTR: ['style'] }"></div>
+```
+
+- パイプは既定で純粋(pure)なので、`html` と `config` が変わったときだけ消毒し直す。テンプレートに書いたオブジェクトリテラル(`{ FORBID_ATTR: … }`)は、中の値が変わらない限り同じオブジェクトが渡されるので、変更検知のたびに消毒し直すことはない
+- `Config` 型は DOMPurify の型定義から import できる(`pkg/dist/purify.es.d.mts:446`)
+- `@taiga-ui/dompurify` の `dompurify` パイプ(4 節)も同じ形をとっている
+
+#### 3.4 SSR での注意
 
 - **DOMPurify は DOM が無いと何もしない**。Node.js で `import DOMPurify from 'dompurify'` すると、`window` が無いので `isSupported = false` のインスタンスができる。このとき `sanitize()` は例外を出さず、**入力をそのまま返す**(`pkg/dist/purify.es.mjs:1100-1102`, `:2470`)。サーバーで「消毒したつもり」になるのが一番危ない
 - サーバーで消毒したいなら、jsdom の `window` を渡してインスタンスを作る(`pkg/README.md:94-133`)。README は最新の jsdom を強く勧め、happy-dom は安全ではないとしている(`:98-102`)
-- Angular のサーバー用の `document`(`inject(DOCUMENT).defaultView`)を DOMPurify に渡したときに、`isSupported` が `true` になるか、安全に動くかは確認していない。DOMPurify の README はこの組み合わせに触れていない
-- 3.2 節の例のように、サーバーでは Angular の標準サニタイズに任せ、ブラウザで DOMPurify に切り替える方法もある。Spartacus の OPF の CTA も同じ形をとっている(`il/opf/cta/components/opf-cta-element/opf-cta-element.component.ts:36-41`)。この場合、サーバーで描いた HTML とブラウザで描き直した HTML が違う(`style` 属性の有無など)ので、表示が一瞬変わることがある
+- Angular のサーバー用の `document`(`inject(DOCUMENT).defaultView`。`DOCUMENT` は `@angular/core` から import できる)を DOMPurify に渡したときに、`isSupported` が `true` になるか、安全に動くかは確認していない。DOMPurify の README はこの組み合わせに触れていない
+- 3.2 節と 3.3 節の例のように、サーバーでは Angular の標準サニタイズに任せ、ブラウザで DOMPurify に切り替える方法もある。判定には `isPlatformBrowser(inject(PLATFORM_ID))` を使う。この場合、サーバーで描いた HTML とブラウザで描き直した HTML が違う(`style` 属性の有無など)ので、表示が一瞬変わることがある
 
 ---
 
@@ -332,10 +415,11 @@ Spartacus の段落に入れるなら、`CMSParagraphComponent` のマッピン�
 |---|---|
 | 外から来た HTML を出すだけで、`style` などが消えてもよい | `[innerHTML]` に文字列を渡す。Angular 標準で足りる |
 | 文字として出せばよい | `{{ }}` で出す |
-| CMS の段落など、Spartacus が bypass している箇所で、HTML の書き手を信頼しきれない | `CMSParagraphComponent` を差し替え、DOMPurify で消毒してから bypass する |
-| Angular 標準より広く許可したい(`style` 属性、SVG など) | DOMPurify + `bypassSecurityTrustHtml`。パイプにするなら `@taiga-ui/dompurify` の `dompurify` パイプ |
+| CMS の段落など、Spartacus が bypass している箇所で、HTML の書き手を信頼しきれない | `CMSParagraphComponent` を差し替え、DOMPurify で消毒してから bypass する(2.5 節) |
+| Angular 標準より広く許可したい(`style` 属性、SVG など) | DOMPurify + `bypassSecurityTrustHtml`(3.2 節)。パイプにするなら自作の `purify` パイプ(3.3 節)か、`@taiga-ui/dompurify` の `dompurify` パイプ |
+| Spartacus を使わない Angular アプリで、外から来た HTML を出す | まず `[innerHTML]` で Angular 標準に任せる(3.1 節)。足りなければ DOMPurify を `isPlatformBrowser` で包んだコンポーネントかパイプ(3.2〜3.3 節)。Spartacus 固有の差し替えは要らない |
 | SSR でもサーバーで消毒したい | jsdom の `window` で DOMPurify を作る(`isomorphic-dompurify` でもよい)。または DOM を使わない `sanitize-html` |
-| Trusted Types を強制したい | CSP の `trusted-types` に `angular`、`angular#unsafe-bypass` を入れる。DOMPurify を使うなら `dompurify` も入れるか、`TRUSTED_TYPES_POLICY: null` を渡す。Spartacus 側で文字列を `innerHTML` に代入している箇所を洗い出す |
+| Trusted Types を強制したい | CSP の `trusted-types` に `angular`、`angular#unsafe-bypass` を入れる。DOMPurify を使うなら `dompurify` も入れるか、`TRUSTED_TYPES_POLICY: null` を渡す。Spartacus 側(Spartacus を使わないなら自分のコード)で文字列を `innerHTML` に代入している箇所を洗い出す |
 
 ---
 

@@ -97,26 +97,22 @@ isDesktop$ = this.bp.isUp(BREAKPOINT.lg);    // lg 以上か
 | 受け取り方 | `match` / `unmatch` のコールバック | `Observable<boolean>`。テンプレートなら `async` パイプ |
 | 最初の 1 回だけの処理 | `setup`、`deferSetup` | 無い。`take(1)` や `filter` で書く |
 | 後片付け | `unregister` を自分で呼ぶ | 購読を外せば終わる(`async` パイプなら自動) |
-| SSR | 読み込んだ時点で例外(3.3 節) | 一番小さいブレークポイント |
+| SSR | 読み込んだ時点で例外(3.6 節) | 一番小さいブレークポイント |
 
 `core-libs` と `feature-libs` には、`matchMedia` を直接呼んでいる箇所がありません(2026-11-27 に grep で確認)。
 
----
+#### 2.3 Spartacus の部品と組み合わせる例
 
-### 3. Angular で書くとどうなるか
+**見た目だけなら Bootstrap の mixin**
 
-#### 3.1 見た目だけなら CSS
-
-要素を出し分けるだけなら、JS は要りません。SSR でもちらつきません。
+Spartacus のスタイルは Bootstrap のブレークポイントに合わせてあるので、Bootstrap の `media-breakpoint-up` / `media-breakpoint-down` が使えます。Spartacus 自身も使っています(mixin は `core-libs/styles/vendor/bootstrap/scss/mixins/_breakpoints.scss:75`, `:88`。使用例は `core-libs/styles/scss/components/content/navigation/_navigation-ui.scss:29`)。
 
 ```scss
 .cx-only-desktop { display: none; }
 @include media-breakpoint-up(lg) { .cx-only-desktop { display: block; } }
 ```
 
-Spartacus のスタイルは Bootstrap のブレークポイントに合わせてあるので、Bootstrap の `media-breakpoint-up` / `media-breakpoint-down` が使えます。Spartacus 自身も使っています(mixin は `core-libs/styles/vendor/bootstrap/scss/mixins/_breakpoints.scss:75`, `:88`。使用例は `core-libs/styles/scss/components/content/navigation/_navigation-ui.scss:29`)。
-
-#### 3.2 幅で振る舞いを変えるなら `BreakpointService` を signal で
+**幅で振る舞いを変えるなら `BreakpointService` を signal で**
 
 ```ts
 import { Component, inject } from '@angular/core';
@@ -142,37 +138,158 @@ export class MenuComponent {
 
 enquire.js の `match` / `unmatch` で行っていた処理は、「`isMobile()` が `true` のときの状態」と「`false` のときの状態」としてテンプレートに書きます。コールバックで DOM を書き換える必要はありません。
 
-#### 3.3 幅以外の条件なら `matchMedia` を包む
+`BreakpointService` のしきい値は `LayoutConfig.breakpoints` の 1 か所で決まります。3 節の `matchMedia` を使う書き方を Spartacus の中で使うなら、クエリの数値は `LayoutConfig` の値から組み立て、`BreakpointService` とずれないようにします([番外 3](../breakpoint-observer.md) の 3 節)。
 
-`(orientation: landscape)`、`(prefers-reduced-motion: reduce)`、`(hover: hover)` などは、`BreakpointService` では扱えません。数か所なら、`matchMedia` を signal に包む小さな関数で足ります。
+---
 
-```ts
-import { DestroyRef, inject, PLATFORM_ID, signal, Signal } from '@angular/core';
-import { DOCUMENT, isPlatformBrowser } from '@angular/common';
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
 
-/** メディアクエリの一致を signal で返す。SSR では fallback を返す */
-export function mediaQuery(query: string, fallback = false): Signal<boolean> {
-  const isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  const win = inject(DOCUMENT).defaultView;
-  if (!isBrowser || !win?.matchMedia) {
-    return signal(fallback).asReadonly();
-  }
-  const mql = win.matchMedia(query);
-  const matches = signal(mql.matches);
-  const onChange = (e: MediaQueryListEvent) => matches.set(e.matches);
-  mql.addEventListener('change', onChange);
-  inject(DestroyRef).onDestroy(() => mql.removeEventListener('change', onChange));
-  return matches.asReadonly();
+この節は、`@angular/core` と `@angular/common`、ブラウザ標準の `matchMedia` と CSS だけで書きます。Spartacus の `BreakpointService` や Bootstrap の mixin を使う書き方は 2.3 節にあります。
+
+#### 3.1 見た目だけなら CSS
+
+要素を出し分けるだけなら、JS は要りません。SSR でもちらつきません。
+
+```css
+.only-desktop { display: none; }
+@media (min-width: 992px) {
+  .only-desktop { display: block; }
 }
-
-// 使う側(コンポーネントのフィールド初期化で呼ぶ)
-readonly reducedMotion = mediaQuery('(prefers-reduced-motion: reduce)');
 ```
 
-#### 3.4 SSR での注意
+CSS のカスタムプロパティ(`var(--bp-lg)`)は `@media` の条件の中では使えません。しきい値を 1 か所で管理したいなら、Sass の変数や mixin にまとめます。
+
+#### 3.2 JS で一致を知りたいなら `matchMedia` を signal に包む
+
+`matchMedia` を signal に包む小さな関数で、幅も幅以外の条件(`(orientation: landscape)`、`(prefers-reduced-motion: reduce)`、`(hover: hover)` など)も扱えます。
+
+```ts
+import { afterNextRender, DestroyRef, DOCUMENT, inject, signal, Signal } from '@angular/core';
+
+/**
+ * メディアクエリの一致を signal で返す。
+ * サーバーと最初の描画では fallback を返し、描画のあとブラウザで本当の値に切り替える。
+ */
+export function mediaQuery(query: string, fallback = false): Signal<boolean> {
+  const matches = signal(fallback);
+  const win = inject(DOCUMENT).defaultView;
+  const destroyRef = inject(DestroyRef);
+
+  afterNextRender(() => {
+    // afterNextRender はブラウザでだけ呼ばれる
+    if (!win?.matchMedia) return;
+    const mql = win.matchMedia(query);
+    matches.set(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => matches.set(e.matches);
+    mql.addEventListener('change', onChange);
+    destroyRef.onDestroy(() => mql.removeEventListener('change', onChange));
+  });
+
+  return matches.asReadonly();
+}
+```
+
+```ts
+import { Component, signal } from '@angular/core';
+
+@Component({
+  selector: 'app-menu',
+  template: `
+    @if (isMobile()) {
+      <button type="button" aria-controls="main-nav" [attr.aria-expanded]="open()"
+              (click)="open.set(!open())">メニュー</button>
+    }
+    <nav id="main-nav" [hidden]="isMobile() && !open()">…</nav>
+  `,
+})
+export class MenuComponent {
+  readonly isMobile = mediaQuery('(max-width: 767.98px)', true);
+  readonly reducedMotion = mediaQuery('(prefers-reduced-motion: reduce)');
+  readonly open = signal(false);
+}
+```
+
+- `mediaQuery()` は `inject()` を使うので、コンポーネントのフィールド初期化(注入コンテキスト)で呼ぶ
+- `DOCUMENT` は `@angular/core` から import できる(`@angular/common` も同じものを再 export している)
+- `afterNextRender` を使うのは、ハイドレーションのときにサーバーの HTML と最初の描画を揃えるためである。ハイドレーションを使わず、最初から本当の値で描きたいなら、`isPlatformBrowser(inject(PLATFORM_ID))` で分けて、ブラウザではその場で `mql.matches` を読んでもよい
+- メニューのボタンには `aria-expanded` と `aria-controls` を付け、開閉の状態を支援技術に伝える。`<button>` なので Enter と Space で操作できる。`[hidden]` で隠したナビゲーションは、フォーカスも読み上げも受けない
+
+#### 3.3 enquire.js の `register` をそのまま置き換える
+
+`setup` や `deferSetup` も含めて、enquire.js と同じ呼ばれ方にしたいなら、コールバックを受ける関数にします。呼ばれる順序は enquire.js(1.1 節、`pkg/src/QueryHandler.js:11-59`)に合わせました。
+
+```ts
+import { afterNextRender, DestroyRef, DOCUMENT, inject } from '@angular/core';
+
+export interface MediaQueryHandler {
+  setup?: () => void;
+  deferSetup?: boolean;
+  match?: () => void;
+  unmatch?: () => void;
+  destroy?: () => void;
+}
+
+/** enquire.register に当たる。コンポーネントが破棄されると unregister に当たる処理が走る */
+export function registerMediaQuery(query: string, h: MediaQueryHandler): void {
+  const win = inject(DOCUMENT).defaultView;
+  const destroyRef = inject(DestroyRef);
+
+  afterNextRender(() => {
+    if (!win?.matchMedia) return;
+    const mql = win.matchMedia(query);
+    let initialised = false;
+    const setupOnce = () => {
+      if (!initialised) { initialised = true; h.setup?.(); }
+    };
+    const on = () => { setupOnce(); h.match?.(); };
+    const off = () => h.unmatch?.();
+
+    if (!h.deferSetup) setupOnce();   // 既定では登録した時点で setup
+    if (mql.matches) on();            // 登録した時点で一致していれば match
+    const onChange = (e: MediaQueryListEvent) => (e.matches ? on() : off());
+    mql.addEventListener('change', onChange);
+
+    destroyRef.onDestroy(() => {
+      mql.removeEventListener('change', onChange);
+      h.destroy ? h.destroy() : off(); // destroy が無ければ unmatch
+    });
+  });
+}
+```
+
+| enquire.js | 3.3 節の関数 | 違い |
+|---|---|---|
+| `enquire.register(query, handler)` | `registerMediaQuery(query, handler)` | 呼ぶのはコンポーネントの初期化の中。ブラウザで、最初の描画のあとに登録される |
+| `enquire.unregister(query)` | コンポーネントの破棄 | `DestroyRef` に結び付くので、外し忘れが無い |
+| 同じクエリを何度登録しても `MediaQueryList` は 1 つ | 登録ごとに `matchMedia` を呼ぶ | 数十か所で使うなら、クエリごとに 1 つにまとめるサービスにする |
+| `shouldDegrade` | 無い | 今のブラウザはすべて `matchMedia` を持つ |
+
+ただし、多くの場合は 3.2 節の signal で足ります。`match` / `unmatch` で DOM を書き換えていた処理は、signal の値に応じてテンプレートを書き分ける形に直すほうが、Angular らしく、SSR とも相性がよくなります。どうしても値の変化で処理を走らせたいなら、3.2 節の signal を `effect()` で見ます。
+
+#### 3.4 しきい値を 1 か所で決める
+
+```ts
+export const BREAKPOINTS = { sm: 576, md: 768, lg: 992, xl: 1200 } as const;
+export type Breakpoint = keyof typeof BREAKPOINTS;
+
+export const up = (bp: Breakpoint) => `(min-width: ${BREAKPOINTS[bp]}px)`;
+export const down = (bp: Breakpoint) => `(max-width: ${BREAKPOINTS[bp] - 0.02}px)`;
+
+// 使う側
+readonly isDesktop = mediaQuery(up('lg'));
+```
+
+上の数値は Bootstrap と同じ値の例です。CSS 側(Sass の変数)と同じ値を使います。`max-width` に 0.02px を引くのは、`min-width: 992px` と `max-width: 992px` が 992px ちょうどで両方とも一致するのを避けるためで、Bootstrap と同じ方法です(Spartacus が同梱する Bootstrap の `core-libs/styles/vendor/bootstrap/scss/mixins/_breakpoints.scss:49-59`)。
+
+#### 3.5 Angular CDK を使う場合
+
+Angular チームの公式パッケージ `@angular/cdk` の `BreakpointObserver`(`@angular/cdk/layout`)も、任意のメディアクエリを `Observable` で受けられます。3.2 節の関数で足りない(多くの画面で使い、クエリの共有や複数クエリの同時判定が欲しい)場合の候補です。Angular 21 には `@angular/cdk@21`(dist-tag `v21-lts`)を使います。詳しくは 4 節にあります。
+
+#### 3.6 SSR での注意
 
 - **enquire.js はサーバーでは読み込むだけで失敗する**。読み込んだ時点で `new MediaQueryDispatch()` が走り(`pkg/src/index.js:2`)、`window.matchMedia` を参照する(`MediaQueryDispatch.js:14`)。Node.js には `window` が無いので、ここで例外になる。Angular のコードから import するなら、ブラウザでだけ動的に読み込む必要がある
-- サーバーには画面が無いので、どの方法でも「仮の答え」を決めて返すことになる。`BreakpointService` は一番小さいブレークポイント、3.3 節の関数は `fallback`。ブラウザで本当の値に切り替わると表示が変わるので、CSS で済むものは CSS に任せる
+- サーバーには画面が無いので、どの方法でも「仮の答え」を決めて返すことになる。3.2 節の関数は `fallback`、Spartacus の `BreakpointService` は一番小さいブレークポイントを返す。ブラウザで本当の値に切り替わると表示が変わるので、CSS で済むものは CSS に任せる
+- `window` は直接参照せず、`inject(DOCUMENT).defaultView` から取る。ブラウザでだけ動かす処理は `afterNextRender` の中に書くか、`isPlatformBrowser(inject(PLATFORM_ID))` で分ける。リスナーの後片付けは `DestroyRef` に任せる
 
 ---
 
@@ -195,9 +312,11 @@ Angular CDK を使う場合の注意:
 | 条件 | 方法 |
 |---|---|
 | 要素を出し分けるだけ | CSS のメディアクエリ(Bootstrap の mixin) |
-| 幅で部品の振る舞いを変える(メニューの開き方など) | `BreakpointService` の `isUp()` / `isDown()`。signal にするなら `toSignal` |
+| 幅で部品の振る舞いを変える(メニューの開き方など) | `BreakpointService` の `isUp()` / `isDown()`。signal にするなら `toSignal`(2.3 節) |
+| Spartacus を使わない Angular アプリで、幅や幅以外の条件で振る舞いを変える | `matchMedia` を signal に包んだ関数(3.2 節)。しきい値は 1 か所の定数にまとめる(3.4 節) |
+| Spartacus を使わず、enquire.js の `setup` / `match` / `unmatch` の呼ばれ方をそのまま残したい | `afterNextRender` と `DestroyRef` で包んだ `registerMediaQuery`(3.3 節) |
 | 幅でスロットの並びを変える | `LayoutConfig` の `layoutSlots` にブレークポイント別の `slots` を書く([番外 3](../breakpoint-observer.md) の 2.4 節) |
-| 幅以外の条件が数か所 | `matchMedia` を包んだ小さな関数(3.3 節) |
+| 幅以外の条件が数か所 | `matchMedia` を包んだ小さな関数(3.2 節) |
 | 幅以外の条件を多くの画面で使う | `@angular/cdk@21` の `BreakpointObserver` |
 | enquire.js の `setup` / `deferSetup` に当たる「最初の 1 回だけ」 | コンポーネントの初期化で書く。一致したときだけなら `isUp(…).pipe(filter(Boolean), take(1))` |
 

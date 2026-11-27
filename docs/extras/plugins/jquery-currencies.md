@@ -6,7 +6,7 @@
 > - **プラグイン(原典の特定)**: `jquery.currencies.min.js` という名前のファイルを配っている原典として、Shopify 向けの [carolineschnapp/currencies](https://github.com/carolineschnapp/currencies)(Caroline Schnapp 作、MIT)が見つかった。npm の `jquery.currencies.js@1.0.0`(2023-11-07 に第三者が公開。2026-11-27 時点で唯一の版)は、このリポジトリの `jquery.currencies.js` と `jquery.currencies.min.js` をそのまま収めたもので、`master`(コミット `240aa0dde325431b7e733d474bc99ceaeb36ff9b`)のファイルとバイト単位で一致した。以下 `pkg/` はこのパッケージのルート
 >   - **アクセラレータが同梱している `jquery.currencies.min.js` が、この原典と同じものかは確認できなかった**。アクセラレータのファイルの中身を読めておらず、SAP Commerce との関係を示す資料も見つからなかった。1.3 節に、同じものだとすると不自然な点を挙げる。本章の 1 節は「原典がこれだとしたら」という前提で読んでほしい
 >   - 原典が前提にしている Shopify の `currencies.js`(換算レートと `Currency.convert` を持つ)は読めていない
-> - **Angular**: npm の `@angular/common@21.2.26` の型定義
+> - **Angular**: npm の `@angular/core@21.2.26` と `@angular/common@21.2.26` の型定義(`types/`)と実装(`fesm2022/`)。`CurrencyPipe`、`formatCurrency` と `Intl.NumberFormat` の出力は、Node.js 22.23.5 で実際に呼んで確かめた
 > - **Spartacus**: SAP/spartacus `develop` のコミット `2db8cb96f5361cb59c2d95ef80438df4630344f9`(2026-11-19)。以下 `sf/` は `core-libs/storefront/`、`core/` は `core-libs/core/src/`、`fl/` は `feature-libs/`、`il/` は `integration-libs/` を指す。`.spec.ts` は除いて grep した
 > - 代替ライブラリのバージョンは 2026-11-27 に `npm view` で確認した
 
@@ -157,15 +157,13 @@ jquery.currencies が「画面の文字を読んで書き換える」のに対�
 | `fl/order/components/amend-order/amend-order.service.ts:123-137` | 返品・取消の数量を変えたときの金額を、ブラウザで計算して `formatCurrency` で整形する。ロケールは `'en'` に固定されている(`:132` の TODO コメント) |
 | `fl/quote/components/summary/seller-edit/quote-summary-seller-edit.component.service.ts:55-69` | 見積もりの値引き入力欄の書式に `Intl.NumberFormat` を使う |
 | `fl/product-configurator/rulebased/cpq/common/converters/cpq-configurator-normalizer-utils.service.ts:157` | CPQ の価格を `formatCurrency` で整形する |
-| `il/opf/gift-card/root/components/opf-gift-card-order-summary/opf-gift-card-order-summary.component.html:64` | `| currency` パイプ |
+| `il/opf/gift-card/root/components/opf-gift-card-order-summary/opf-gift-card-order-summary.component.html:64` | `\| currency` パイプ |
 
 Spartacus には `cxNumeric`(`DecimalPipe` を継承し、言語を Spartacus の現在の言語に合わせる。`core/i18n/numeric.pipe.ts:12-44`)と `cxDate` はありますが、**`cxCurrency` のような通貨用のパイプはありません**。
 
----
+#### 2.6 Spartacus の部品と組み合わせる例
 
-### 3. Angular で書くとどうなるか
-
-#### 3.1 まずはサーバーの `formattedValue` を出す
+**まずはサーバーの `formattedValue` を出す**
 
 Spartacus の画面と書式を揃えるなら、これが一番確実です。
 
@@ -173,9 +171,9 @@ Spartacus の画面と書式を揃えるなら、これが一番確実です。
 <span class="price">{{ product.price?.formattedValue }}</span>
 ```
 
-#### 3.2 ブラウザで計算した金額を整形する: `CurrencyPipe`
+**ブラウザで計算した金額を、Spartacus の現在の通貨と言語で整形する**
 
-数量を変えたときの小計など、ブラウザで計算した数値を出すときは `CurrencyPipe` を使います。`transform(value, currencyCode?, display?, digitsInfo?, locale?)` です(`@angular/common@21.2.26` の `types/_common_module-chunk.d.ts:1604`, `:1641-1643`)。
+数量を変えたときの小計など、ブラウザで計算した数値を出すときは、3.2 節の `CurrencyPipe` に、`CurrencyService` と `LanguageService` の現在の値を渡します。
 
 ```ts
 import { Component, computed, inject, input } from '@angular/core';
@@ -205,30 +203,250 @@ export class SubtotalComponent {
 
 注意点:
 
-- `CurrencyPipe` は、`locale` に渡した言語の**ロケールデータ**が登録されていないと例外になる。Spartacus の `cxNumeric` も同じ理由で、登録が無いと `'en'` に切り替えている(`core/i18n/numeric.pipe.ts:26-34`)。使う言語は `registerLocaleData` で登録しておく
+- Spartacus の言語(`LanguageService.getActive()`)の値で、Angular のロケールデータを `registerLocaleData` で登録しておく(3.1 節)。Spartacus の `cxNumeric` は、登録が無いと `'en'` に切り替えている(`core/i18n/numeric.pipe.ts:26-34`)
 - 通貨記号の位置や桁区切りは Angular(CLDR)の規則で決まる。SAP Commerce の `formattedValue` と同じになるとは限らない。同じ画面に両方を並べると、書式がずれて見えることがある
-- 金額の計算は、浮動小数点の誤差に注意する。Spartacus の `amend-order.service.ts:126-127` は、100 倍して `Math.round` で丸めている
+- 金額の計算の丸めは、Spartacus の `fl/order/components/amend-order/amend-order.service.ts:126-127` では、100 倍して `Math.round` で丸めている
+- SSR では、言語は `LanguageService` から取り、サーバーとブラウザで同じ値を使う。Spartacus の通貨の保存は `localStorage` なので、SSR の時点では読めず、サーバーは設定の既定通貨(または URL の通貨)で描く
+- 参考価格(3.6 節)の換算レートは、OCC か別の API から取る
 
-#### 3.3 コンポーネントの外で整形する: `Intl.NumberFormat`
+---
 
-パイプが使えない場所(サービスの中など)では、ブラウザ標準の `Intl.NumberFormat` を使います。
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/core`、`@angular/common`、`@angular/common/http`、RxJS とブラウザ標準の `Intl.NumberFormat` だけで書きます。Spartacus の `CurrencyService` や OCC の `formattedValue` を使う書き方は 2.6 節にあります。
+
+jquery.currencies の機能(1.1 節)は、次のように置き換えます。
+
+| jquery.currencies | Angular 標準 | 節 |
+|---|---|---|
+| `Currency.moneyFormats`、`formatMoney` | `CurrencyPipe`(`\| currency`)、`formatCurrency`、`Intl.NumberFormat`。書式は CLDR のデータから決まる | 3.1〜3.4 |
+| `Currency.currentCurrency`、`Currency.cookie` | 通貨を signal に持つサービスと、Cookie への保存 | 3.3 |
+| `convertAll`(画面の文字を書き換える) | 通貨が変わったら数値を取り直し、テンプレートで描き直す | 3.5 |
+| `Currency.convert`(換算) | サーバーから受け取ったレートで計算し、参考価格として出す | 3.6 |
+
+#### 3.1 アプリ全体の既定を決める: `LOCALE_ID`、`DEFAULT_CURRENCY_CODE`、`registerLocaleData`
+
+```ts
+// app.config.ts
+import { ApplicationConfig, DEFAULT_CURRENCY_CODE, LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeJa from '@angular/common/locales/ja';
+import localeDe from '@angular/common/locales/de';
+
+// en-US 以外のロケールは、使うものをすべて登録する
+registerLocaleData(localeJa);
+registerLocaleData(localeDe);
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    { provide: LOCALE_ID, useValue: 'ja' },
+    { provide: DEFAULT_CURRENCY_CODE, useValue: 'JPY' },
+  ],
+};
+```
+
+| 部品 | 役割 | 既定 | 場所 |
+|---|---|---|---|
+| `LOCALE_ID`(`@angular/core`) | 数値・日付・通貨の書式を決めるロケール。パイプに `locale` を渡さないときに使われる | `en-US` | `@angular/core@21.2.26` の `types/core.d.ts:4568` |
+| `DEFAULT_CURRENCY_CODE`(`@angular/core`) | `CurrencyPipe` に通貨コードを渡さないときに使う通貨。**ロケールとは関係しない**(型定義のコメント) | `USD` | `types/core.d.ts:4569-4612`、実装は `fesm2022/_debug_node-chunk.mjs:18429-18430` |
+| `registerLocaleData`(`@angular/common`) | ロケールの書式データ(CLDR から作ったもの)を登録する。`@angular/common/locales/<id>` に各ロケールのデータがある | `en-US` だけ組み込み | `@angular/common@21.2.26` の `types/common.d.ts:244` |
+
+- 登録していないロケールを `CurrencyPipe` や `formatCurrency` に渡すと、`NG0701: Missing locale data for the locale "fr".` という例外になる(Node.js 22 で `formatCurrency` を呼んで確認)
+- `LOCALE_ID` と `DEFAULT_CURRENCY_CODE` は、アプリを起動するときに決まる値である。利用者が画面で通貨や言語を切り替える場合は、3.3 節のように、パイプの引数で渡す
+- `DEFAULT_CURRENCY_CODE` を設定しないと、通貨コードを省いた `| currency` は、ロケールが `ja` でもドルで出る(`CurrencyPipe` の既定は `'USD'`。`fesm2022/_common_module-chunk.mjs:3173`。`ja` で `$1,234.50` になることを確認)。通貨コードは、なるべくパイプに明示する
+
+#### 3.2 テンプレートで整形する: `CurrencyPipe`
+
+`transform(value, currencyCode?, display?, digitsInfo?, locale?)` です(`@angular/common@21.2.26` の `types/_common_module-chunk.d.ts:1604`, `:1641-1643`)。
+
+```html
+{{ 1234.5 | currency: 'JPY' : 'symbol' : undefined : 'ja' }}     <!-- ￥1,235 -->
+{{ 1234.5 | currency: 'EUR' : 'symbol' : undefined : 'de' }}     <!-- 1.234,50 € -->
+{{ 1234.5 | currency: 'USD' }}                                   <!-- $1,234.50(LOCALE_ID が en-US のとき) -->
+{{ 1.5    | currency: 'KWD' : 'symbol' : undefined : 'en-US' }}  <!-- KWD1.500 -->
+{{ 1234.5 | currency: 'USD' : 'code' }}                          <!-- USD1,234.50 -->
+```
+
+(コメントの結果は、`@angular/common@21.2.26` の `CurrencyPipe` と `formatCurrency` を Node.js 22 で直接呼んで確かめた。テンプレートに書いて動かしてはいない)
+
+| 引数 | 内容 |
+|---|---|
+| `currencyCode` | ISO 4217 の通貨コード。省くと `DEFAULT_CURRENCY_CODE` |
+| `display` | `'symbol'`(既定。`$`)、`'symbol-narrow'`(`CA$` ではなく `$`)、`'code'`(`USD`)、任意の文字列(その文字列を記号の代わりに使う。`''` で記号を消す) |
+| `digitsInfo` | `'1.0-0'` のように小数の桁数を指定する。省くと通貨ごとの桁数(JPY は 0、KWD は 3)になる(`@angular/common@21.2.26` の `fesm2022/_common_module-chunk.mjs:1106-1107`) |
+| `locale` | 書式のロケール。省くと `LOCALE_ID` |
+
+jquery.currencies が `moneyFormats` の表と `JOD`・`KWD`・`BHD` の特別扱いで書いていたこと(`pkg/jquery.currencies.js:594`)は、ここまでで標準でまかなえます。
+
+#### 3.3 利用者が通貨を切り替える: signal に持ち、Cookie に保存する
+
+jquery.currencies の `Currency.currentCurrency` と `Currency.cookie` に当たるものを、小さなサービスにします。Cookie にするのは、SSR のときにサーバーでも読めるからです(3.8 節)。
+
+```ts
+import {
+  DEFAULT_CURRENCY_CODE, DOCUMENT, effect, inject, Injectable, LOCALE_ID,
+  PLATFORM_ID, REQUEST, signal,
+} from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+
+export const CURRENCIES = ['JPY', 'USD', 'EUR'] as const;
+export type CurrencyCode = (typeof CURRENCIES)[number];
+const COOKIE = 'currency';
+
+@Injectable({ providedIn: 'root' })
+export class CurrencyContext {
+  private readonly doc = inject(DOCUMENT);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly request = inject(REQUEST); // SSR のときだけ値がある。それ以外は null
+
+  /** 書式のロケール。言語を切り替えるなら、これも set する(registerLocaleData 済みのものだけ) */
+  readonly locale = signal(inject(LOCALE_ID));
+  readonly currency = signal<CurrencyCode>(
+    this.readCookie() ?? (inject(DEFAULT_CURRENCY_CODE) as CurrencyCode),
+  );
+
+  constructor() {
+    // 選んだ通貨を Cookie に書く(jquery.currencies の Currency.cookie.write に当たる)
+    effect(() => {
+      const code = this.currency();
+      if (this.isBrowser) {
+        this.doc.cookie = `${COOKIE}=${code}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    });
+  }
+
+  private readCookie(): CurrencyCode | null {
+    const raw = this.isBrowser ? this.doc.cookie : (this.request?.headers.get('cookie') ?? '');
+    const value = raw.match(/(?:^|;\s*)currency=([A-Z]{3})/)?.[1];
+    return CURRENCIES.find((c) => c === value) ?? null;
+  }
+}
+```
+
+通貨を選ぶ UI は、jquery.currencies には無かったので自分で作ります。ラベル付きの `<select>` にすれば、キーボードでも支援技術でもそのまま使えます。
+
+```ts
+import { Component, inject } from '@angular/core';
+import { CURRENCIES, CurrencyCode, CurrencyContext } from './currency-context';
+
+@Component({
+  selector: 'app-currency-select',
+  template: `
+    <label for="currency-select">通貨</label>
+    <select id="currency-select" (change)="select($event)">
+      @for (c of currencies; track c) {
+        <option [value]="c" [selected]="c === ctx.currency()">{{ symbol(c) }} {{ c }}</option>
+      }
+    </select>
+  `,
+})
+export class CurrencySelectComponent {
+  protected readonly ctx = inject(CurrencyContext);
+  protected readonly currencies = CURRENCIES;
+
+  select(e: Event): void {
+    this.ctx.currency.set((e.target as HTMLSelectElement).value as CurrencyCode);
+  }
+
+  /** 通貨記号は Intl から取る(@angular/common の getCurrencySymbol は非推奨) */
+  symbol(code: string): string {
+    return new Intl.NumberFormat(this.ctx.locale(), { style: 'currency', currency: code })
+      .formatToParts(0)
+      .find((p) => p.type === 'currency')?.value ?? code;
+  }
+}
+```
+
+表示する側は、パイプに今の通貨とロケールを渡します。
+
+```html
+{{ amount() | currency: ctx.currency() : 'symbol' : undefined : ctx.locale() }}
+```
+
+- `REQUEST` は `@angular/core` の注入トークンで、SSR のときに今の要求(`Request`)が入る。それ以外では `null`(`types/core.d.ts:9388`、実装は `fesm2022/core.mjs:2912-2915`)
+- `getCurrencySymbol` と `getNumberOfCurrencyDigits` は、`@angular/common@21` で非推奨になっている。型定義のコメントは `Intl.NumberFormat` を使うよう勧めている(`types/common.d.ts:790-813`)
+- `@angular/forms` を使うなら、`<select [formControl]>` や `[(ngModel)]` でもよい
+
+#### 3.4 コンポーネントの外で整形する: `Intl.NumberFormat`
+
+パイプが使えない場所(サービスの中、`computed` の中など)では、ブラウザ標準の `Intl.NumberFormat` か、`@angular/common` の `formatCurrency` を使います。
 
 ```ts
 const fmt = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' });
-fmt.format(1234.5); // "￥1,235"(JPY は小数 0 桁。Node.js 上で確認)
+fmt.format(1234.5); // "￥1,235"(JPY は小数 0 桁。Node.js 22 で確認)
+
+// 通貨とロケールが変わったときだけ作り直す
+readonly formatter = computed(
+  () => new Intl.NumberFormat(this.ctx.locale(), { style: 'currency', currency: this.ctx.currency() }),
+);
+readonly label = computed(() => this.formatter().format(this.amount()));
 ```
 
-`Intl.NumberFormat` は通貨ごとの小数の桁数(JPY は 0、KWD は 3 など)を知っています。jquery.currencies が `moneyFormats` の表と `JOD`・`KWD`・`BHD` の特別扱いで書いていたこと(`pkg/jquery.currencies.js:594`)は、標準でまかなえます。
+`Intl.NumberFormat` は通貨ごとの小数の桁数を知っています。`resolvedOptions().maximumFractionDigits` で桁数も取れます(USD なら 2)。
 
-#### 3.4 別の通貨で「参考価格」を出したい場合
+**`CurrencyPipe` と `Intl.NumberFormat` は、同じ書式になるとは限りません**。`CurrencyPipe` は Angular に同梱された CLDR のデータを使い、`Intl.NumberFormat` は実行環境(ブラウザや Node.js)の ICU のデータを使います。たとえば `en-US` の `KWD` 1.5 は、`formatCurrency` では `KWD1.500`、Node.js 22 の `Intl.NumberFormat` では `KWD 1.500`(空白あり)でした。1 つの画面では、どちらかに揃えます。
 
-jquery.currencies のように、決済しない通貨で参考価格を見せたい要件もあり得ます。その場合も、換算レートは OCC か別の API から取り、`Intl.NumberFormat` で整形します。画面の文字を読んで書き換える方式は、Angular では使いません(Angular が描き直すと、書き換えた文字が元に戻るため)。参考価格であることを画面に明示し、カートや注文の金額と混ぜないようにします。
+#### 3.5 通貨が変わったら数値を取り直す
 
-#### 3.5 SSR での注意
+jquery.currencies の `convertAll` は、画面の文字を読んで書き換えていました。Angular では、通貨が変わったら価格のデータを取り直し、テンプレートで描き直します。
 
-- `formattedValue` はサーバーの文字列なので、SSR でもブラウザでも同じ表示になる
-- `CurrencyPipe` と `Intl.NumberFormat` は Node.js でも動く。ただし、サーバーとブラウザで使うロケールやタイムゾーンが違うと、ハイドレーションのあとに表示が変わることがある。言語は Spartacus の `LanguageService` から取り、両方で同じ値を使う
-- jquery.currencies の Cookie(`document.cookie`)や `$('span.money')` はサーバーには無い。Spartacus の通貨の保存は `localStorage` なので、SSR の時点では読めず、サーバーは設定の既定通貨(または URL の通貨)で描く
+```ts
+import { Component, computed, inject, input } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { switchMap } from 'rxjs';
+import { CurrencyContext } from './currency-context';
+
+interface PriceDto { value: number; currency: string }
+
+@Component({
+  selector: 'app-price',
+  imports: [CurrencyPipe],
+  template: `
+    @if (price(); as p) {
+      <span class="price">{{ p.value | currency: p.currency : 'symbol' : undefined : ctx.locale() }}</span>
+    }
+  `,
+})
+export class PriceComponent {
+  readonly code = input.required<string>();
+  protected readonly ctx = inject(CurrencyContext);
+  private readonly http = inject(HttpClient);
+
+  private readonly query = computed(() => ({ code: this.code(), curr: this.ctx.currency() }));
+
+  readonly price = toSignal(
+    toObservable(this.query).pipe(
+      switchMap(({ code, curr }) =>
+        this.http.get<PriceDto>(`/api/products/${code}/price`, { params: { curr } }),
+      ),
+    ),
+  );
+}
+```
+
+- `switchMap` なので、通貨を続けて切り替えたときは、前の要求の結果を捨てる
+- 通貨は、サーバーが返した `p.currency` を使って整形する。画面の選択と応答がずれても、金額と通貨記号が食い違わない
+- `HttpClient` を使うには、アプリの providers に `provideHttpClient()` を入れる
+
+#### 3.6 別の通貨で「参考価格」を出したい場合
+
+jquery.currencies のように、決済しない通貨で参考価格を見せたい要件もあり得ます。その場合も、換算レートはサーバーから取り、`Intl.NumberFormat` か `CurrencyPipe` で整形します。画面の文字を読んで書き換える方式は、Angular では使いません(Angular が描き直すと、書き換えた文字が元に戻るため)。参考価格であることを画面に明示し、カートや注文の金額と混ぜないようにします。
+
+#### 3.7 金額の計算
+
+- 浮動小数点の誤差に注意する。`0.1 + 0.2` は `0.30000000000000004` になる。合計などは、通貨の最小単位(セントなど)の整数で計算し、最後に割り戻す
+- 最小単位の桁数は通貨ごとに違う。`new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits` で取れる。「100 で割る」と決め打ちしない
+- 正しい金額(請求する額)は、サーバーで決める。ブラウザの計算は表示のためだけに使う
+
+#### 3.8 SSR での注意
+
+- `CurrencyPipe` と `Intl.NumberFormat` は Node.js でも動く。ただし、サーバーとブラウザで使うロケールが違うと、ハイドレーションのあとに表示が変わる。ロケールと通貨は、サーバーでもブラウザでも同じ値になるように決める
+- 3.3 節のように通貨を Cookie に置けば、サーバーでも `inject(REQUEST)` の Cookie から読める。`localStorage` に置くと、サーバーでは読めず、サーバーは既定の通貨で描き、ブラウザで別の通貨に変わる
+- `document.cookie` は、`inject(DOCUMENT)` から触る。書き込みは `isPlatformBrowser(inject(PLATFORM_ID))` でブラウザに限る。ブラウザでだけ、描画のあとに読み直したいものがあれば `afterNextRender` の中で行う
+- `Intl.NumberFormat` の結果は、実行環境の ICU の版で変わることがある(3.4 節)。サーバー(Node.js)とブラウザで書式を完全に揃えたいなら、Angular に同梱のデータを使う `CurrencyPipe` / `formatCurrency` に寄せる
+- jquery.currencies の `document.cookie` の直接参照や `$('span.money')` は、サーバーには無い
 
 ---
 
@@ -251,8 +469,12 @@ jquery.currencies のように、決済しない通貨で参考価格を見せ�
 | 商品やカートの金額を出す | OCC の `formattedValue` をそのまま出す |
 | 通貨を切り替える UI が要る | 標準の `cx-site-context-selector`(CMS の通貨セレクタのコンポーネント) |
 | 通貨が変わったときに自作の処理を走らせる | `CurrencyService.getActive()` を購読する。または `EventService` で `CurrencySetEvent` を受ける |
-| ブラウザで計算した金額を出す(小計など) | `CurrencyPipe` に現在の通貨と言語を渡す。ロケールデータを登録する |
-| サービスの中で整形する | `Intl.NumberFormat` |
+| ブラウザで計算した金額を出す(小計など) | `CurrencyPipe` に現在の通貨と言語を渡す。ロケールデータを登録する(Spartacus なら 2.6 節) |
+| サービスの中で整形する | `Intl.NumberFormat`(3.4 節) |
+| Spartacus を使わず、アプリの既定の言語と通貨を決める | `LOCALE_ID` と `DEFAULT_CURRENCY_CODE` を providers に書き、使うロケールを `registerLocaleData` で登録する(3.1 節) |
+| Spartacus を使わず、利用者に通貨を選ばせる | 通貨を signal に持つサービスを作り、Cookie に保存する。UI はラベル付きの `<select>`。パイプには通貨とロケールを引数で渡す(3.3 節) |
+| Spartacus を使わず、通貨が変わったら価格を取り直す | 通貨の signal を `toObservable` にし、`switchMap` で `HttpClient` の要求をし直す(3.5 節) |
+| SSR でサーバーとブラウザの表示を揃える | 通貨は Cookie に置いてサーバーでも読む。書式は `CurrencyPipe` / `formatCurrency` に揃える(3.8 節) |
 | ブラウザで金額の計算を多く行う | `currency.js` や `dinero.js` で誤差を避ける。ただし正しい金額はサーバーで決める |
 | 決済しない通貨で参考価格を出す | レートをサーバーから取り、`Intl.NumberFormat` で整形し、参考価格と明示する |
 
