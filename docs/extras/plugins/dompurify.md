@@ -1,6 +1,6 @@
 # DOMPurify: 信頼できない HTML から危険な部分を取り除く
 
-> **この章が答える問い**: アクセラレータが読み込む `purify.min.js`(DOMPurify)は何をしているのか。Spartacus(Angular)には同じ役割の仕組みがあるのか。Spartacus の段落コンポーネントがサニタイズを無効にしているのはなぜ問題になり得るのか。DOMPurify を Angular に持ち込むなら、Trusted Types と SSR で何に気をつけるのか
+> **この章が答える問い**: アクセラレータが読み込む `purify.min.js`(DOMPurify)は何をしているのか。Spartacus(Angular)には同じ役割の仕組みがあるのか。Spartacus がサニタイズを無効にしているのはどこで、なぜなのか。段落コンポーネントのそれはなぜ問題になり得るのか。DOMPurify を Angular に持ち込むなら、Trusted Types と SSR で何に気をつけるのか
 
 > **根拠の取り方**:
 > - **プラグイン**: npm の `dompurify@3.5.0`(2026-11-27 時点の `latest`。2026-11-22 公開)の tarball を展開し、`dist/purify.es.mjs`、`src/tags.ts`、`src/attrs.ts`、`README.md` を読んだ。アクセラレータのファイル名(`purify.min.js`)には版が無いので、最新版について書く。アクセラレータが実際に同梱している版とは違う可能性がある。以下 `pkg/` はパッケージのルート
@@ -88,7 +88,7 @@ DOMPurify との一番大きな違いは、**許可リストの広さ**です。
 | SVG、MathML | 消す | 残す(危険な属性は消す) |
 | 設定の変更 | できない(`Sanitizer` を差し替えるしかない) | `ALLOWED_TAGS`、`FORBID_ATTR`、フックなどで細かく変えられる |
 
-CMS の HTML に `style="color:red"` を書くと、Angular 標準では色が消えます。Spartacus の段落コンポーネントがサニタイズを切っている理由の 1 つは、おそらくこれです(Spartacus のソースに理由は書かれていません)。
+CMS の HTML に `style="color:red"` を書くと、Angular 標準では色が消えます。Spartacus がサニタイズを切っている箇所と、その理由は 2.2 節と 2.3 節にまとめました。
 
 #### 2.2 Spartacus でサニタイズを切っている箇所
 
@@ -122,7 +122,128 @@ CMS の HTML に `style="color:red"` を書くと、Angular 標準では色が�
 | `sf/cms-components/product/product-summary/product-summary.component.html:22` | 商品の `summary` |
 | `sf/cms-components/product/product-list/product-list-item/product-list-item.component.html:29` | 検索結果の `nameHtml`(ハイライト付きの商品名) |
 
-#### 2.3 Trusted Types
+#### 2.3 サニタイズを切っている理由
+
+2.2 節の 4 か所について、なぜサニタイズを切っているのかを 1 つずつ見ます。理由がソースのコメントに書かれているものと、書かれていないものがあります。書かれていないものは、「Angular の標準のサニタイズを通すと何が消えるか」から推測し、推測だと明記します。
+
+`il/opf/` 配下の 2 か所は、決済の統合ライブラリ(Open Payment Framework。`@spartacus/opf`)のものです。このライブラリを入れたときだけ動きます。
+
+##### まとめ
+
+| 場所 | 渡す値の出どころ | 切っている理由 | 理由の根拠 | 代わりに何で守っているか |
+|---|---|---|---|---|
+| 段落 | CMS の編集者が書いた HTML | `style`、`id`、`name` 属性や、`<form>`、`<iframe>`、SVG を残すため | **推測**(コメントなし) | 守っていない。CMS の編集者を信頼する前提 |
+| アイコン | Spartacus の設定(`IconConfig`) | `<svg><use xlink:href>` を出すため | **推測**(コードから明らか) | URL を先に `sanitize(SecurityContext.URL)`。文字は `textContent` でエスケープ |
+| OPF 決済画面 | 決済サービスが返す HTML と URL | 決済サービスのフォームや入れ物を残すため。`iframe` の `src` は、bypass しないと必ず例外になるため | HTML は**推測**。URL は Angular の仕様 | `iframe` に `sandbox` 属性を設定で付けられる |
+| OPF の CTA | 決済サービスが返す HTML | 決済ボタンの HTML を残すため | **コメントあり**(`<script>` を除くのは暫定) | ブラウザでは `<script>` を取り除く。SSR では bypass しない |
+
+##### 段落コンポーネント(`CMSParagraphComponent`、`CMSTabParagraphComponent`)
+
+```ts
+// sf/cms-components/content/paragraph/paragraph.component.ts:49-51
+public bypassSecurityTrustHtml(html: string = ''): SafeHtml {
+  return this.sanitizer.bypassSecurityTrustHtml(html);
+}
+```
+
+- **何を渡しているか**: CMS の段落の `content` に、`cxSupplementHashAnchors` パイプを通したもの(`paragraph.component.html:3`)
+- **理由**: ソースにも、メソッドのコメントにも書かれていない。Angular の標準のサニタイズを通すと、次のものが消える(`ng/…:3072-3080`)。CMS の編集者が普通に書く HTML が崩れるのを避けるため、と考えられる(**推測**)
+  - `style` 属性(文字の色、配置など)
+  - `id`・`name` 属性。ページ内リンクの飛び先が消える。`cxSupplementHashAnchors` パイプが `#id` だけのリンクを補っている(`sf/shared/pipes/suplement-hash-anchors/supplement-hash-anchors.pipe.ts:10-20`)ことから、Spartacus は段落の中でページ内リンクが使われる前提でいる
+  - `<form>`、`<input>`、`<iframe>`、`<svg>`(`VALID_ELEMENTS` に無い)。埋め込み動画や問い合わせフォームが消える
+- **代わりの守り**: 無い。`cxSupplementHashAnchors` パイプは `<template>` 要素の `innerHTML` に代入して `<a>` を探す(`:36-49`)。`<template>` の中身は実行されないので、パイプ自体は安全である。ただし、危険な部分を取り除くことはしない。パイプが返した文字列は、そのまま bypass される
+- **結果**: CMS の段落に書いた `<img src=x onerror=…>` や `<a href="javascript:…">` は、そのままページに入る。なお、`innerHTML` で入れた `<script>` は、ブラウザの仕様で実行されない
+
+##### アイコン(`cx-icon`)
+
+```ts
+// sf/cms-components/misc/icon/icon-loader.service.ts:33-46(抜粋)
+const url = this.sanitizer.sanitize(SecurityContext.URL, this.getSvgPath(type) || null);
+if (url) {
+  const useElement = this.winRef.document.createElement('use');
+  useElement.setAttribute('xlink:href', url);
+  const svgElement = this.winRef.document.createElement('svg');
+  svgElement.appendChild(useElement);
+  return this.sanitizer.bypassSecurityTrustHtml(svgElement.outerHTML);
+}
+```
+
+- **何を渡しているか**: Spartacus 自身が組み立てた `<svg><use xlink:href="…"></use></svg>`、または文字のアイコン。テンプレートは `<i [outerHTML]="icon">`(`sf/cms-components/misc/icon/icon.component.html:2`)
+- **理由**: Angular の標準のサニタイズでは `svg` と `use` が許可リストに無いので、SVG のアイコンが丸ごと消える(`ng/…:3072-3078`)。そのため bypass が要る(**推測**だが、コードから明らか)。文字のアイコンも bypass しているのは、戻り値の型を `SafeHtml` に揃えるためと考えられる(**推測**)
+- **代わりの守り**: 外から来る HTML を信頼しているわけではない
+  - SVG の URL は、bypass の前に `sanitize(SecurityContext.URL, …)` で検査する(`:35-38`)。`javascript:` などはここで落ちる
+  - 文字のアイコンは `textContent` に入れてから `innerHTML` で取り出す(`:50-52`)。`<` などはエスケープされる
+  - メソッドのコメントも「DOM に安全に足せる HTML 断片を返す」としている(`:30-32`)
+- **結果**: 値の出どころが Spartacus の設定なので、危険は小さい。設定の `IconConfig` に外部の値を流し込まない限り問題にならない
+
+##### OPF の決済画面(`cx-opf-checkout-payment-wrapper`)
+
+```ts
+// il/opf/checkout/components/opf-checkout-payment-wrapper/opf-checkout-payment-wrapper.component.ts:103-109
+bypassSecurityTrustHtml(html: string): SafeHtml {
+  return this.sanitizer.bypassSecurityTrustHtml(html);
+}
+bypassSecurityTrustResourceUrl(url: string): SafeResourceUrl {
+  return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+}
+```
+
+ここでは 2 種類の値を信頼しています。
+
+**`iframe` の URL**(テンプレート `:39-45`)
+
+- **何を渡しているか**: 決済サービスの画面の URL(`paymentLink.destination.url`)
+- **理由**: `iframe` の `src` は Angular の「リソース URL」の文脈で、ここだけは**サニタイズで安全にする方法が無い**。bypass していない値を渡すと、Angular は必ず例外を投げる(`ng/…:3352-3361` の `ɵɵsanitizeResourceUrl`。エラーは `unsafe value used in a resource URL context`)。外部の決済画面を `iframe` に出すには、bypass するしかない(Angular の仕様)
+- **代わりの守り**: `cxOpfSandbox` ディレクティブで `iframe` に `sandbox` 属性を付けられる(`opf-iframe-sandbox.directive.ts:18-22`)。値は決済の選択肢ごとに、設定 `opf.paymentOption.iframeSandboxMap` で決める(`opf-checkout-payment-wrapper.component.ts:111-117`)。設定しなければ付かない
+
+**決済サービスの HTML**(テンプレート `:87-89`)
+
+- **何を渡しているか**: 決済セッションの `dynamicScript.html`。決済サービス(OPF のバックエンド経由)が返す HTML である(`opf-checkout-payment-wrapper.service.ts:284-305`)
+- **理由**: ソースに書かれていない。決済サービスの HTML には、カード入力などのフォームや、決済サービスの JS が描き込む入れ物(`id` 付きの `<div>` など)が入る。Angular の標準のサニタイズでは `<form>`、`<input>`、`id` 属性が消えるので、決済画面が描けなくなるため、と考えられる(**推測**)
+- **関連する処理**: `innerHTML` で入れた `<script>` は実行されない。そのため OPF は、HTML の中の最初の `<script>` の中身を取り出し、`Function(…)()` で実行する(`il/opf/base/root/services/opf-resource-loader.service.ts:174-184`)
+  - これは bypass よりさらに強い信頼で、決済サービスの JS をそのまま動かす
+  - SSR では実行しない(コメント「SSR mode not supported for security concerns」、`:175`)
+  - 実行するのは、まだ決済の画面にいるときだけ(`opf-checkout-payment-wrapper.service.ts:74-93`)
+  - `htmlContentMode` が `SEPARATE` のときは実行しない(`:307-313`。`il/opf/base/root/model/opf-base.model.ts:42-45`)
+
+##### OPF の CTA(`cx-opf-cta-element`)
+
+```ts
+// il/opf/cta/components/opf-cta-element/opf-cta-element.component.ts:36-50
+renderHtml(html: string): SafeHtml {
+  // Display sanitized html in SSR for security concerns
+  return this.windowRef.isBrowser()
+    ? this.sanitizer.bypassSecurityTrustHtml(this.removeScriptTags(html))
+    : html;
+}
+
+// Removing script tags on FE until BE fix: CXSPA-8572
+protected removeScriptTags(html: string) { … }
+```
+
+- **何を渡しているか**: 決済サービスの「すぐ買う」ボタンなどの HTML(`dynamicScript.html`)
+- **理由**: 決済サービスのボタンの HTML を、そのまま描くため。ソースのコメントから、次の 2 つが読み取れる
+  - **SSR では bypass しない**: サーバーでは文字列のまま返し、Angular の標準のサニタイズに任せる(「Display sanitized html in SSR for security concerns」、`:37`)
+  - **`<script>` を取り除くのは暫定措置**: 「バックエンドが直るまで、フロントで `<script>` を取り除く」とある(「Removing script tags on FE until BE fix: CXSPA-8572」、`:43`)。CXSPA-8572 は SAP 社内の課題番号で、中身は公開されていない
+- **代わりの守り**: ブラウザでは、`DOMParser` で `<script>` を見つけ、その `outerHTML` を文字列から取り除いてから bypass する(`:44-50`)。`onerror` などのイベント属性や、`javascript:` の URL は取り除かない
+- **関連する処理**: 取り除いた `<script>` の中身は、`OpfCtaScriptsService` が別途 `executeScriptFromHtml` で実行する(`il/opf/cta/components/opf-cta-scripts/opf-cta-scripts.service.ts:50-55`)。つまり `<script>` を消すのは、「`innerHTML` で入れない」ためであって、「実行しない」ためではない
+
+##### 反対の例: あえてサニタイズを通している箇所
+
+`ng-select-a11y` ディレクティブは、ng-select が描いた選択肢の文字を、`sanitize(SecurityContext.HTML, …)` に通してから入力欄の `value` に入れている(`sf/shared/components/ng-select-a11y/ng-select-a11y.directive.ts:225-231`, `:250-251`)。DOM を直接触る場面でも、Angular のテンプレートを通らない値は自分でサニタイズする、という書き方の例になる。
+
+##### 段落とほかの 3 か所の違い
+
+| 観点 | 段落 | アイコン | OPF の 2 か所 |
+|---|---|---|---|
+| 誰が値を書くか | CMS の編集者(人) | 開発者(設定) | 外部の決済サービス |
+| 書ける人の範囲 | CMS の権限の持ち方で広くも狭くもなる | 開発者だけ | 決済サービスと、その通り道 |
+| 切る前の検査 | 無い | URL の検査、エスケープ | `<script>` の除去(CTA だけ)、`sandbox`(設定したときだけ) |
+| ライブラリを入れないと動かないか | 標準で動く | 標準で動く | `@spartacus/opf` を入れたときだけ |
+
+段落だけは、標準の Spartacus で動き、外から来る値をまったく検査せずに信頼しています。DOMPurify を挟む候補になるのは、主にここです(3.2 節)。
+
+#### 2.4 Trusted Types
 
 Angular は Trusted Types に対応しています。ブラウザに `trustedTypes` があれば、`angular` と `angular#unsafe-bypass` の 2 つのポリシーを作ります(`ng/…:2892-2937`)。`bypassSecurityTrustHtml` で渡した値は、後者のポリシーで `TrustedHTML` になります。
 
