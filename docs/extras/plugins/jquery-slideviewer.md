@@ -1,0 +1,198 @@
+# slideViewer 1.2: 画像を 1 枚ずつ横に送り、番号のボタンで切り替えるギャラリー
+
+> **この章が答える問い**: アクセラレータの `jquery.slideviewer.custom.1.2.js`(商品画像のギャラリー)は何をしていたのか。Spartacus の商品画像コンポーネントで置き換えられるのか。自分で書くなら、どう書けばよいのか
+
+> **根拠の取り方**:
+> - **プラグイン**: npm の `jquery.slideviewer` は、npm が置いた「security holding package」(`0.0.1-security`)で、中身は無い。作者(Gian Carlo Mingati)のページ `gcmingati.net` は、この作業環境からは名前解決できず読めなかった。そこで、GitHub の公開リポジトリに置かれた `jquery.slideviewer.1.2.js` の写しを 3 つ取り、比べて読んだ。2 つはヘッダーが `slideViewer 1.2` / `Version: 1.2.3 (9-JULY-2010)` で、違いは読み込み中の画像のパス 1 行だけだった。もう 1 つは 1.2.1。以下 `sv/` は 1.2.3 の写し(91 行)を指す。**作者が配布した原本と同じかは確認できていない**
+> - **`.custom` について**: ファイル名に `.custom` が付いているので、アクセラレータ側で手が入っている。この章は元のプラグインについて書く。`.custom` での変更点は確認できない
+> - **Spartacus**: SAP/spartacus `develop` のコミット `2db8cb96f5361cb59c2d95ef80438df4630344f9`(2026-11-19)。以下 `sf/` は `core-libs/storefront/`、`fl/` は `feature-libs/`、`styles/` は `core-libs/styles/`(SCSS)を指す
+> - 代替ライブラリのバージョンは 2026-11-27 に npm で確認
+
+---
+
+### 先に話し言葉で: 「メイン画像とサムネイル」は Spartacus の標準
+
+slideViewer は、`<ul>` に並べた画像を横一列につなげ、`left` をアニメーションさせて 1 枚ずつ見せるプラグインです。画像の下に `1` `2` `3` … の番号のリンクを作り、押すとその画像まで滑ります。画像の左半分を押すと前へ、右半分で次へ進みます。
+
+Spartacus では、商品画像は **`cx-product-images`**(CMS の `ProductImagesComponent`)が標準で表示します。メイン画像が 1 枚と、サムネイルの横スクロールです。サムネイルにフォーカスが入ると(クリックも含む)、メイン画像が切り替わります。滑るアニメーションと番号のボタンはありません。
+
+「サムネイルで選ぶギャラリー」でよければ、標準のままで足ります。「横に滑る 1 枚ずつのスライド」が要るなら、Angular で `signal` 1 つと CSS の `transform` / `transition` で書けます。
+
+---
+
+### 1. slideViewer は何をするか
+
+#### 1.1 使い方
+
+```html
+<div id="gallery" class="svw">
+  <ul>
+    <li><img src="1.jpg" alt="正面"></li>
+    <li><img src="2.jpg" alt="側面"></li>
+  </ul>
+</div>
+<script>
+  $(window).on('load', function () {   // 画像の幅を読むので、読み込み後に呼ぶ
+    $('#gallery').slideView({ easeFunc: 'easeInOutExpo', easeTime: 750 });
+  });
+</script>
+```
+
+#### 1.2 オプション(1.2.3)
+
+| オプション | 既定値 | 内容 | 場所 |
+|---|---|---|---|
+| `easeFunc` | `"easeInOutExpo"` | 送るときのイージング。jQuery の本体には無い名前なので、`jquery.easing` が要る | `sv/:23` |
+| `easeTime` | `750` | 送る時間(ms) | `sv/:24` |
+| `uiBefore` | `false` | 番号のリンクを画像の上に置くか(既定は下) | `sv/:25` |
+| `toolTip` | `false` | 番号にマウスを乗せると、画像の `alt` をツールチップで出す | `sv/:26` |
+| `ttOpacity` | `0.9` | ツールチップの不透明度 | `sv/:27` |
+
+ヘッダーには「jQuery v1.4.1 以降と `jquery.easing.1.2` が要る」と書かれています(`sv/:11-12`)。
+
+#### 1.3 中でどう動いているか
+
+| 処理 | 中身 | 場所 |
+|---|---|---|
+| 読み込み中の表示 | ページの準備ができたら、すべての `div.svw` の先頭にくるくる回る画像を足す。`slideView()` を呼ぶと消す | `sv/:16-18`、`:31` |
+| 寸法を決める | **最初の画像**の幅と高さを読み、箱の大きさにする。`ul` の幅は「画像の幅 × 枚数」。全部の画像が同じ大きさである前提 | `sv/:33-39` |
+| 番号のリンクを作る | 箱の後ろ(または前)に `div.stripTransmitter` を足し、`<a href="#">1</a>` … を並べる。`title` に画像の `alt` を入れる | `sv/:41-44` |
+| 送る | 番号を押すと `current` クラスを付け替え、`ul` の `left` を `-(幅 × 番号)` へ `animate()` する | `sv/:45-51` |
+| 画像を押して送る | 押した位置が箱の左半分なら前、右半分なら次の番号のリンクを `trigger("click")` する。端では反対の端へ戻る | `sv/:55-68` |
+| ツールチップ | `body` に `div.tooltip` を足し、`.live('mousemove')` でマウスの位置に出す | `sv/:73-88` |
+| ID の採番 | グローバル変数 `j` で `stripTransmitter0`、`1` … と番号を振る | `sv/:19`、`:90` |
+
+**今の jQuery では、そのままでは動かない**: `sv/:35` の `.size()` は jQuery 3.0 で、`sv/:79`、`:85` の `.live()` は jQuery 1.9 で削除されました。アクセラレータが読み込む `jquery@3.5.1`([番外 4](../replacing-jquery.md) の調べ)の `dist/jquery.js` にも、どちらもありません。また 3.5.1 の `jQuery.easing` は `linear` と `swing` だけです(npm の `jquery@3.5.1` の `dist/jquery.js:7246-7254`)。`.custom` の変更には、このあたりの手直しが含まれていると考えられますが、確認はできていません(推測)。
+
+**アクセシビリティ**: 番号のリンクは `href="#"` の `<a>` で、読み上げは「1」「2」だけです。画像を押して送る操作はマウスだけで、キーボードでは使えません。今どの画像かは `current` クラスで見た目にだけ出ています。
+
+---
+
+### 2. Spartacus の標準にあるか
+
+**結論: 一部ある。** 商品画像のギャラリー(メイン画像とサムネイル)は標準にある。横に滑るスライドと番号のボタンは無い。
+
+#### 2.1 `cx-product-images`
+
+CMS の `ProductImagesComponent` に `ProductImagesComponent`(`selector: 'cx-product-images'`)が割り当てられています(`sf/cms-components/product/product-images/product-images.module.ts:32-33`、`product-images.component.ts:22`)。商品詳細ページに置くだけで動き、入力はありません。商品は `CurrentProductService` から取ります。
+
+```html
+<!-- sf/cms-components/product/product-images/product-images.component.html:1-27 -->
+<cx-media [container]="main" … />                 <!-- メイン画像 -->
+<cx-carousel-scrolling class="thumbs" [items]="thumbs" [template]="thumb" />
+<ng-template #thumb let-item="item">
+  <cx-media [container]="item.container" tabindex="0"
+            (focus)="openImage(item.container)"
+            [class.is-active]="isActive(item.container) | async" format="product" />
+</ng-template>
+```
+
+| 処理 | 中身 | 場所 |
+|---|---|---|
+| 最初のメイン画像 | 商品の `images.PRIMARY` | `sf/cms-components/product/product-images/product-images.component.ts:42` |
+| サムネイル | `images.GALLERY` を並べる。**2 枚未満なら出さない** | `product-images.component.ts:98-108` |
+| 切り替え | サムネイルの `focus` で `openImage()` を呼び、メイン画像の `BehaviorSubject` を更新する | `product-images.component.ts:34`、`:57-59`、`product-images.component.html:23` |
+| 選択中の印 | `zoom.url` が同じものに `is-active` を付ける | `product-images.component.ts:61-74` |
+| サムネイルの並べ方 | `cx-carousel-scrolling`(横スクロールと `scroll-snap`。[Owl Carousel の章](./owl-carousel.md) 2.2 節) | `product-images.component.html:10-16` |
+| LCP 対策 | メイン画像に `fetchPriority` を渡す(`cxLcpContext`) | `product-images.component.html:2-6` |
+| 見た目 | 縦並び。画像は `aspect-ratio: 1 / 1` と `object-fit: scale-down`。サムネイルは幅 120px | `styles/scss/components/product/details/_product-images.scss:9-80` |
+
+画像ズームのライブラリ(`@spartacus/product/image-zoom`)を入れると、同じ CMS コンポーネントがズーム付きのものに差し替わります([jQuery Zoom の章](./jquery-zoom.md))。そのダイアログの中には、前後ボタンと `cx-carousel` のサムネイルがあります。
+
+#### 2.2 slideViewer との差
+
+| 機能 | slideViewer 1.2.3 | `cx-product-images` |
+|---|---|---|
+| 見せ方 | 横一列の画像を滑らせる | メイン画像を差し替える(アニメーションなし) |
+| 選び方 | 番号のリンク、画像の左右を押す | サムネイルを押すか、Tab でフォーカスする |
+| 前後ボタン | 無い(画像の左右を押す) | 無い(ズームのダイアログにはある) |
+| 画像の大きさ | 最初の画像の寸法に固定 | CSS で決める。`srcset` で解像度を選ぶ |
+| キーボード | 番号のリンクに Tab で行ける | サムネイルに Tab で行き、フォーカスで切り替わる |
+| 読み上げ | 「1」「2」… | 画像の `alt` |
+| データ | HTML に書いた `<img>` | OCC の商品の `images`(`PRIMARY` / `GALLERY`) |
+
+---
+
+### 3. Angular で書くとどうなるか
+
+「横に滑る 1 枚ずつのスライド」を書くなら、状態は「今何枚目か」の 1 つだけです。滑らせるのは CSS に任せます。
+
+```ts
+import { Component, computed, input, signal } from '@angular/core';
+
+@Component({
+  selector: 'app-slide-viewer',
+  template: `
+    <div class="viewport" role="group" aria-roledescription="carousel" aria-label="商品画像">
+      <ul class="strip" [style.transform]="offset()">
+        @for (img of images(); track img.src; let i = $index) {
+          <li [attr.aria-hidden]="i !== index()">
+            <img [src]="img.src" [alt]="img.alt" loading="lazy" />
+          </li>
+        }
+      </ul>
+    </div>
+    <div class="pager">
+      @for (img of images(); track img.src; let i = $index) {
+        <button type="button" (click)="index.set(i)"
+                [attr.aria-current]="i === index()"
+                [attr.aria-label]="(i + 1) + '枚目: ' + img.alt">{{ i + 1 }}</button>
+      }
+    </div>
+  `,
+  styles: `
+    .viewport { overflow: hidden; aspect-ratio: 1 / 1; }
+    .strip    { display: flex; margin: 0; padding: 0; list-style: none;
+                transition: transform 750ms cubic-bezier(0.87, 0, 0.13, 1); }  /* easeInOutExpo に近い */
+    .strip li { flex: 0 0 100%; }
+    .strip img { width: 100%; height: 100%; object-fit: contain; }
+    @media (prefers-reduced-motion: reduce) { .strip { transition: none; } }
+  `,
+})
+export class SlideViewerComponent {
+  images = input.required<{ src: string; alt: string }[]>();
+  index = signal(0);
+  offset = computed(() => `translateX(${-100 * this.index()}%)`);
+}
+```
+
+slideViewer との違いは次のとおりです。
+
+- 幅は `%` で決めるので、最初の画像の寸法を JS で読む必要がない。画像が読み終わるのを待つ必要もない
+- 番号のボタンは `<button>` にし、`aria-label` と `aria-current` を付ける
+- 画像の左右を押して送る操作が要るなら、見える「前へ」「次へ」のボタンにする。キーボードでも使える
+
+ネイティブのスワイプが要るなら、`transform` の代わりに `scroll-snap` で書きます([Owl Carousel の章](./owl-carousel.md) 3 節)。
+
+**SSR での注意**: この書き方は `window` も `document` も使わないので、サーバーでもそのまま描ける。サーバーとブラウザで同じ HTML になる(最初は 0 枚目)。slideViewer のように画像の寸法を読む作りは、サーバーでは寸法が 0 になる。
+
+---
+
+### 4. ほかの選択肢
+
+| ライブラリ | 版 | peerDependencies | Angular 21 で | メモ |
+|---|---|---|---|---|
+| `ng-gallery` | 12.0.0 | `@angular/core` / `@angular/common` / `@angular/cdk` `>=16.0.0`、`rxjs` | peerDependencies の上では可 | ギャラリー専用。**`@angular/cdk` が要る**。Spartacus は CDK に依存していないので、新しく足すことになる |
+| `photoswipe` | 5.4.4 | 無い | フレームワーク非依存 | 全画面で見るライトボックス。ピンチでの拡大も持つ |
+| `lightgallery` | 3.0.0 | 無い | フレームワーク非依存 | ライセンスが `GPL-3.0-only` か商用 |
+| カルーセルのライブラリ | — | — | — | `embla-carousel-angular@21`、`swiper` など。[Owl Carousel の章](./owl-carousel.md) 4 節 |
+
+---
+
+### 5. 選び方
+
+| 条件 | 方法 |
+|---|---|
+| メイン画像とサムネイルで足りる | `cx-product-images`(標準のまま) |
+| 見た目だけ変えたい(縦並びを横並びに、など) | `_product-images.scss` の `%cx-product-images` を上書きする |
+| 拡大も要る | `@spartacus/product/image-zoom`([jQuery Zoom の章](./jquery-zoom.md)) |
+| 横に滑るスライドと番号のボタンが要る | 3 節の自前コンポーネントを作り、CMS の `ProductImagesComponent` に割り当てる |
+| 全画面で見せたい | `photoswipe` |
+
+---
+
+### 6. コンピュータサイエンスの観点から
+
+- **寸法を読むか、比率で宣言するか**: slideViewer は、最初の画像の `width()` を読んで箱の幅を決める。画像が読み終わるまで幅は 0 なので、`window` の `load` を待って呼ぶ必要があった。CSS の `%`、`flex: 0 0 100%`、`aspect-ratio` で比率を宣言すれば、読み込みを待たずに配置が決まる。レイアウトのずれ(CLS)も起きにくい
+- **アニメーションの主体**: jQuery の `animate({ left })` は、JS がフレームごとに `left` を書き換える。毎回レイアウトの計算がやり直しになる。CSS の `transition` と `transform` なら、ブラウザが合成(コンポジット)の段階だけで動かせる
+- **グローバルな連番 ID**: slideViewer は、グローバル変数 `j` で DOM の ID を振る。同じページに部品が増えたり消えたりすると、番号が衝突する。Angular のコンポーネントは状態をインスタンスに持つので、DOM の ID で部品を探す必要がない
