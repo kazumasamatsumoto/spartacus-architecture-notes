@@ -163,11 +163,9 @@ inject(GlobalMessageService).add({ key: 'cart.updated' }, GlobalMessageType.MSG_
 | 短い通知 | `$.growlUI` | `GlobalMessageService` |
 | メッセージの文言 | HTML を直接渡す | 翻訳キー(`spinner.loading` など) |
 
----
+#### 2.6 Spartacus の部品と組み合わせる例
 
-### 3. Angular で書くとどうなるか
-
-**まず、状態を 1 つにまとめる。** 「処理中か」を `signal` で持ち、その値から見た目を決める。膜は、その見た目の 1 つにすぎない。
+3 節の「状態を `signal` で持ち、領域に `inert` と `aria-busy` を付ける」書き方は、Spartacus の画面でもそのまま使える。スピナーには `cx-spinner` を使い、データは Facade から取る。
 
 ```ts
 import { Component, inject, signal } from '@angular/core';
@@ -206,19 +204,179 @@ export class CartPanelComponent {
 }
 ```
 
-**ポイント**
+- `[attr.inert]="… ? '' : null"` の書き方は、Spartacus 自身にもある(`fl/product-configurator/common/components/configurator-cart-entry-bundle-info/configurator-cart-entry-bundle-info.component.html:53`)
+- ページ全体を止めるなら、Spartacus の画面では 2.3 節の `LaunchDialogService` を使う。`document.body` に膜を足さず、描画を Spartacus に任せられるので、SSR でも困らない
+- 数秒で消える通知は、3.3 節の自前の通知ではなく、2.4 節の `GlobalMessageService` を使う。表示の場所と読み上げ(`aria-live`)を `cx-global-message` がすでに持っている
 
-- **`inert` 属性**: 付けた要素とその子孫は、クリックもフォーカスもできなくなり、支援技術からも隠れる。BlockUI の `bindEvents` と `constrainTabKey` を、JS 無しでまとめて実現できる。BlockUI の要素ブロックでは Tab で膜の下に入れたが、`inert` ならその穴も無い。Angular では `[attr.inert]="busy() ? '' : null"` と書く。Spartacus にも同じ書き方がある(`fl/product-configurator/common/components/configurator-cart-entry-bundle-info/configurator-cart-entry-bundle-info.component.html:53`)
+---
+
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/*` とブラウザ標準(と RxJS)だけで書く。Spartacus の部品(`cx-spinner`、`LaunchDialogService`、`GlobalMessageService`)を使う書き方は 2 節にまとめた。
+
+**まず、状態を 1 つにまとめる。** 「処理中か」を `signal` で持ち、その値から見た目を決める。膜は、その見た目の 1 つにすぎない。
+
+#### 3.1 要素だけを止める(`$(el).block()`)
+
+```ts
+import { Component, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { finalize } from 'rxjs';
+
+@Component({
+  selector: 'app-cart-panel',
+  template: `
+    <section class="panel" [attr.aria-busy]="busy()" [attr.inert]="busy() ? '' : null">
+      …カートの中身…
+      <button type="button" (click)="update()" [disabled]="busy()">数量を更新</button>
+    </section>
+    @if (busy()) {
+      <div class="overlay">
+        <span class="spinner" role="status">更新しています</span>
+      </div>
+    }
+  `,
+  styles: `
+    :host { position: relative; display: block; }
+    .overlay {                                   /* BlockUI の overlayCSS */
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      background: rgb(255 255 255 / 0.6);
+      cursor: wait;
+      animation: show 0s 0.2s both;              /* 200ms 遅れて出す(ちらつき防止) */
+    }
+    .spinner {
+      width: 2rem; height: 2rem; border-radius: 50%;
+      border: 3px solid currentColor; border-right-color: transparent;
+      overflow: hidden; color: transparent;      /* 文字は読み上げ用。見た目は輪だけ */
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { rotate: 1turn; } }
+    @keyframes show { from { visibility: hidden; } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+  `,
+})
+export class CartPanelComponent {
+  busy = signal(false);
+  private http = inject(HttpClient);       // provideHttpClient() が要る
+
+  update() {
+    this.busy.set(true);
+    this.http.post('/api/cart', { /* … */ })
+      .pipe(finalize(() => this.busy.set(false)))   // 成功でも失敗でも戻す
+      .subscribe();
+  }
+}
+```
+
+- **`inert` 属性**: 付けた要素とその子孫は、クリックもフォーカスもできなくなり、支援技術からも隠れる。BlockUI の `bindEvents` と `constrainTabKey` を、JS 無しでまとめて実現できる。BlockUI の要素ブロックでは Tab で膜の下に入れたが、`inert` ならその穴も無い。Angular では `[attr.inert]="busy() ? '' : null"` と書く(`null` なら属性が外れる)
 - **`aria-busy="true"`**: 領域が更新中であることを支援技術に伝える。スピナーの `role="status"` と合わせて使う
 - **`finalize`**: 成功でも失敗でも、必ず `busy` を戻す。BlockUI でよくあった「エラーのときに `$.unblockUI()` を呼び忘れて、画面が固まる」を防ぐ
-- **ちらつきを防ぐ**: すぐ終わる処理でスピナーが一瞬だけ出るのを避けたいなら、CSS の `animation-delay` で 200ms ほど遅れて表示する。JS のタイマーは要らない
-- **ページ全体**: ページ全体を止めるなら、Spartacus の画面では 2.3 節の `LaunchDialogService` を使う。Spartacus の外なら、`<dialog>` を `showModal()` で開き、中にスピナーを置く。背面は自動で操作できなくなる。ただし、Esc キーで閉じられてしまうので、`cancel` イベントで `preventDefault()` する
+- **ちらつきを防ぐ**: すぐ終わる処理でスピナーが一瞬だけ出るのを避けるため、上の例では CSS のアニメーションで 200ms 遅れて表示している。JS のタイマーは要らない
 
-**SSR での注意**
+#### 3.2 ページ全体を止める(`$.blockUI()`)
 
-- 上の例は `signal` とテンプレートだけで書いているので、サーバーでもそのまま描ける。サーバーでは `busy()` が `false` のまま描かれる
-- `document.body` に膜を足す書き方(BlockUI の `$.blockUI()` と同じ形)は、サーバーでは `document` が無いので動かない。全画面の膜もテンプレートの中に書くか、`LaunchDialogService` に任せる
-- `showModal()` はブラウザでだけ呼ぶ。ユーザーの操作から呼ぶか、`afterNextRender` の中で呼ぶ
+`<dialog>` を `showModal()` で開き、中にスピナーを置く。背面はブラウザが自動で操作できなくする(背面が `inert` になったのと同じ扱い)。Esc キーで閉じられてしまうので、`cancel` イベントで `preventDefault()` する。
+
+```ts
+import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { finalize } from 'rxjs';
+
+@Component({
+  selector: 'app-place-order',
+  template: `
+    <button type="button" (click)="placeOrder()" [disabled]="busy()">注文を確定する</button>
+
+    <dialog #blocker class="blocker" (cancel)="$event.preventDefault()"
+            (close)="busy() && blocker.showModal()"
+            aria-labelledby="blockerMsg">
+      <p id="blockerMsg" role="status">注文を確定しています。画面を閉じずにお待ちください</p>
+    </dialog>
+  `,
+  styles: `.blocker::backdrop { background: rgb(0 0 0 / 0.5); cursor: wait; }`,
+})
+export class PlaceOrderComponent {
+  busy = signal(false);
+  private blocker = viewChild.required<ElementRef<HTMLDialogElement>>('blocker');
+  private http = inject(HttpClient);
+
+  placeOrder() {                     // クリックから呼ぶので、ブラウザでだけ動く
+    this.busy.set(true);
+    this.blocker().nativeElement.showModal();
+    this.http.post('/api/orders', { /* … */ })
+      .pipe(finalize(() => {
+        this.busy.set(false);                    // 先に戻す。(close) で開き直さないように
+        this.blocker().nativeElement.close();
+      }))
+      .subscribe();
+  }
+}
+```
+
+- `(close)` で開き直しているのは念のためである。ブラウザによっては、Esc を続けて押すと `cancel` を取り消せずに閉じる場合がある(本ノートでは各ブラウザの挙動を確かめていない)。処理中(`busy()` が真)に閉じられたら、すぐ開き直す。`finalize` では `busy` を先に偽にしてから閉じるようにする
+- `<dialog>` はテンプレートの中に書く。BlockUI のように `document.body` に膜を足さないので、サーバーでもそのまま描ける(閉じた `<dialog>` は表示されない)
+- `<dialog>` を使わず `div` で全画面を覆うなら、`position: fixed; inset: 0` の膜を置き、ページの本体(`<main>` など)に `inert` を付ける
+
+#### 3.3 数秒で消える通知(`$.growlUI`)
+
+```ts
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+
+@Component({
+  selector: 'app-toast',
+  template: `
+    <!-- 読み上げ用の領域は、最初から DOM に置いておく -->
+    <div class="toasts" aria-live="polite" role="status">
+      @for (m of messages(); track m.id) {
+        <p class="toast">{{ m.text }}</p>
+      }
+    </div>
+  `,
+})
+export class ToastComponent {
+  messages = signal<{ id: number; text: string }[]>([]);
+  private nextId = 0;
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.timers.forEach(clearTimeout));
+  }
+
+  show(text: string, ms = 3000) {    // BlockUI の growlUI も既定で 3 秒(`pkg/jquery.blockUI-2.66.js:40`)
+    const id = this.nextId++;
+    this.messages.update((list) => [...list, { id, text }]);
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      this.messages.update((list) => list.filter((m) => m.id !== id));
+    }, ms);
+    this.timers.add(t);
+  }
+}
+```
+
+- `aria-live` の領域は、通知を出す前から DOM にあることが要る。中身が変わったときに読み上げられる
+- アプリのどこからでも出したいなら、`messages` を `@Injectable({ providedIn: 'root' })` のサービスに移し、通知の表示はアプリの外枠のコンポーネントに 1 つだけ置く
+
+#### 3.4 BlockUI のオプションとの対応
+
+| BlockUI | Angular 標準での書き方 |
+|---|---|
+| `message` | テンプレートに書く。文言は `role="status"` の要素に入れる |
+| `overlayCSS` / `css` / `baseZ` | コンポーネントの `styles`。`<dialog>` なら `::backdrop`。`z-index` は top layer なので要らない |
+| `bindEvents` / `constrainTabKey` | 要素なら `inert`、ページ全体なら `<dialog>` の `showModal()` |
+| `focusInput` | `<dialog>` は開いたとき中の最初のフォーカスできる要素にフォーカスする。別の要素にしたいなら `autofocus` 属性 |
+| `fadeIn` / `fadeOut` | CSS の `transition` / `animation`、または `@angular/core` の `animate.enter` / `animate.leave`。`@angular/animations` は 20.2 で非推奨なので使わない |
+| `timeout` | 使わない。処理の終わり(`finalize`)で外す |
+| `onBlock` / `onUnblock` | `busy` を書き換える場所で、そのまま続けて書く。外に知らせるなら `output()` |
+| `ignoreIfBlocked` | `if (this.busy()) return;` |
+
+#### 3.5 SSR での注意
+
+- 3.1 節と 3.3 節は `signal` とテンプレートだけで書いているので、サーバーでもそのまま描ける。サーバーでは `busy()` が `false` のまま描かれる
+- `document.body` に膜を足す書き方(BlockUI の `$.blockUI()` と同じ形)は、サーバーでは動かない。全画面の膜もテンプレートの中に書く(3.2 節)。どうしても `body` に触るなら、グローバルの `document` ではなく `inject(DOCUMENT)` と `Renderer2` を使う
+- `showModal()` はブラウザでだけ呼ぶ。ユーザーの操作から呼ぶか、`afterNextRender` の中で呼ぶ。コンストラクタなどで分けるなら `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)で判定する
+- 通知のタイマー(3.3 節)は、ユーザーの操作のあとでだけ作る。サーバーで描く途中に `setTimeout` を作ると、その分だけ描画の完了が遅れることがある
 
 ---
 
@@ -241,10 +399,13 @@ export class CartPanelComponent {
 | 条件 | 方法 |
 |---|---|
 | ボタンの二度押しを防ぎたい | `cx-progress-button` の `loading`、または `[disabled]="busy()"` |
-| 一部の領域が更新中であることを示したい | `@if (busy())` で `cx-spinner` を重ね、領域に `inert` と `aria-busy` |
+| 一部の領域が更新中であることを示したい | `@if (busy())` で `cx-spinner` を重ね、領域に `inert` と `aria-busy`(2.6 節) |
 | 注文の確定など、ページ全体を止めたい | `LaunchDialogService` + `DIALOG_TYPE.POPOVER_CENTER_BACKDROP`(Spartacus の注文確定と同じ) |
 | 数秒で消える通知を出したい(`$.growlUI`) | `GlobalMessageService.add()` |
 | 通信中であることをさりげなく示したい | 画面上部の進捗バー(`@ngx-loading-bar/core` など) |
+| Spartacus を使わない Angular のアプリで、領域を止めたい | `signal` + `inert` + `aria-busy` + 自前のスピナー(3.1 節) |
+| Spartacus を使わない Angular のアプリで、ページ全体を止めたい | `<dialog>` の `showModal()`、`cancel` で `preventDefault()`(3.2 節) |
+| Spartacus を使わない Angular のアプリで、数秒で消える通知を出したい | `signal` の一覧 + `aria-live` の領域(3.3 節) |
 
 ---
 

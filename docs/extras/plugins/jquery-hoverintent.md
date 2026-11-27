@@ -98,9 +98,19 @@ $('.nav').hoverIntent({
 | タッチ | 扱わない | クリック(タップ)で開閉 |
 | 状態の持ち方 | 要素の `$.data` | マウスは CSS の状態(`:hover`)。クリックとキーは `openNodes` の配列と `is-open` クラス |
 
+#### 2.3 Spartacus の部品と組み合わせる例
+
+3 節の方法を、Spartacus のナビゲーションに当てはめるときの注意をまとめる。
+
+- **CSS で遅らせる(3.1 節)**: Spartacus のフライアウトは `display` の切り替えで開く(`core-libs/styles/scss/components/content/navigation/_navigation-ui.scss:385-409`)。3.1 節の `visibility` と `opacity` の書き方で上書きするときは、この `display` の切り替えと競合しないように、同じセレクタの組み立てに合わせる
+- **キーボードとタップ(3.3 節)**: `NavigationUIComponent` は、開くボタン(`aria-expanded`)、Esc で閉じる処理、フォーカスの移動をすでに持っている(2.1 節)。Spartacus のナビゲーションを使うなら、3.3 節を自分で書く必要は無い
+- **ディレクティブ(3.2 節)と Zone**: Spartacus はルートの `package.json` に `zone.js` を持ち(`package.json:197`)、サンプルのアプリは `provideZoneChangeDetection({ eventCoalescing: true })` で Zone を使う構成である(`projects/storefrontapp/src/app/app.config.ts:30`)。3.2 節の `NgZone.runOutsideAngular` が効く
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/*` とブラウザ標準(と RxJS)だけで書く。Spartacus の部品(`NavigationUIComponent` など)と組み合わせるときの注意は 2.3 節にまとめた。
 
 #### 3.1 まず CSS で遅らせる
 
@@ -134,7 +144,6 @@ $('.nav').hoverIntent({
 
 - `(hover: hover) and (pointer: fine)` で、マウスのある環境に限る。タッチの端末では「最初のタップでホバー扱い」になる問題を避けられる
 - `visibility: hidden` の要素は、フォーカスも読み上げもされない。閉じている間にキーボードで中へ入ってしまうことは無い
-- Spartacus の SCSS を上書きする場合は、`_navigation-ui.scss:385-409` の `display` の切り替えと競合しないように、同じセレクタの組み立てに合わせる
 
 #### 3.2 速さで判定したいならディレクティブ
 
@@ -222,14 +231,82 @@ export class HoverIntentDirective {
 
 - **状態は `signal` に持つ**: ホバー、クリック、キーボードのどれで開いても、同じ `open` を書き換える。見た目と `aria-expanded` は `open()` から決める
 - **`pointerType` で分ける**: Pointer Events はマウス・タッチ・ペンを同じイベントで扱う。タッチではホバーが無いので、クリック(タップ)だけで開閉させる
-- **`NgZone.runOutsideAngular`**: Spartacus はルートの `package.json` に `zone.js` を持つ、Zone を使う構成である。`pointermove` を Angular の中で聞くと、マウスが動くたびに変更検知が走る。外で聞き、`over` / `out` のときだけ `zone.run` で中に戻す
-- **キーボードの代わりにはならない**: ホバーは補助である。開くボタン(`aria-expanded`)、Esc で閉じる処理、フォーカスの移動は別に要る。Spartacus の `NavigationUIComponent` は、これらをすでに持っている(2.1 節)
+- **`NgZone.runOutsideAngular`**: Zone を使う構成(`zone.js` を読み込み、`provideZoneChangeDetection()` を使うアプリ)では、`pointermove` を Angular の中で聞くと、マウスが動くたびに変更検知が走る。外で聞き、`over` / `out` のときだけ `zone.run` で中に戻す。Zone を使わない構成(`provideZonelessChangeDetection()`)では、`NgZone` は何もしない実装に置き換わるので、このコードはそのまま動く
+- **キーボードの代わりにはならない**: ホバーは補助である。開くボタン(`aria-expanded`)、Esc で閉じる処理、フォーカスの移動は別に要る(3.3 節)
 
-**SSR での注意**
+#### 3.3 キーボードとタップでも開閉する
 
-- サーバーにはマウスも `pointer` イベントも無い。イベントの登録は `afterNextRender` の中で行う(上の例)。`afterNextRender` はブラウザでだけ実行される
+ホバーは近道である。土台には「開閉するボタン + リンクの一覧」(ディスクロージャー)を置き、ホバーはその上に重ねる。
+
+```ts
+import { Component, signal } from '@angular/core';
+import { HoverIntentDirective } from './hover-intent.directive';   // 3.2 節
+
+@Component({
+  selector: 'app-nav-item',
+  imports: [HoverIntentDirective],
+  template: `
+    <div class="nav-item" appHoverIntent [timeout]="300" (hoverIn)="onHoverIn()" (hoverOut)="onHoverOut()"
+        (keydown.escape)="close(btn)" (focusout)="onFocusOut($event)"
+        [class.is-open]="open()">
+      <button #btn type="button" aria-controls="nav-cat" [attr.aria-expanded]="open()"
+              (click)="toggle()">カテゴリ</button>
+      <ul id="nav-cat" class="wrapper" [hidden]="!open()">
+        <li><a href="/c/1">…</a></li>
+      </ul>
+    </div>
+  `,
+})
+export class NavItemComponent {
+  open = signal(false);
+  private byHover = false;   // ホバーで開いたか
+
+  onHoverIn() {
+    if (this.open()) return;
+    this.byHover = true;
+    this.open.set(true);
+  }
+  onHoverOut() {
+    if (!this.byHover) return;   // クリックやキーで開いたものは、ホバーでは閉じない
+    this.byHover = false;
+    this.open.set(false);
+  }
+  toggle() {                     // マウスのクリック、タップ、Enter / Space のどれでも呼ばれる
+    if (this.byHover) {          // ホバーで開いた直後のクリックは、閉じずに「開いたまま」にする
+      this.byHover = false;
+      return;
+    }
+    this.open.update((v) => !v);
+  }
+  close(btn: HTMLButtonElement) {   // Esc で閉じ、ボタンにフォーカスを戻す
+    if (!this.open()) return;
+    this.byHover = false;
+    this.open.set(false);
+    btn.focus();
+  }
+  onFocusOut(e: FocusEvent) {       // フォーカスが外へ出たら閉じる
+    const box = e.currentTarget as HTMLElement;
+    if (!box.contains(e.relatedTarget as Node | null)) {
+      this.byHover = false;
+      this.open.set(false);
+    }
+  }
+}
+```
+
+- 使う側は `<ul class="menu"><li><app-nav-item /></li>…</ul>` のように、`li` の中に置く
+- `aria-controls` が指す要素は、閉じている間も DOM に要る。`id` は項目ごとに別の値にする(例では固定にしている)。そのため、ここでは `@if` ではなく `[hidden]` で隠している
+- **ホバーで開いた直後のクリック**: マウスで止まると開き、そのままボタンを押すと、何もしなければ閉じてしまう。上の例では、ホバーで開いたあとの最初のクリックを「開いたまま固定する」操作として扱う
+- タップでは 3.2 節のディレクティブが反応しない(`pointerType` で除いている)ので、`click` だけで開閉する
+- ページの別の場所をクリックしたら閉じたいなら、`DOCUMENT` の `click` を `afterNextRender` の中で聞き、`DestroyRef.onDestroy()` で外す
+- 部品に任せたいなら、Angular チームの公式パッケージ `@angular/aria@21`(dist-tag `v21-lts`、`@angular/cdk@21` が要る、開発者プレビュー)がある。ただし、メニュー(`role="menu"`)の部品である点に注意する(4 節)
+
+#### 3.4 SSR での注意
+
+- サーバーにはマウスも `pointer` イベントも無い。イベントの登録は `afterNextRender` の中で行う(3.2 節の例)。`afterNextRender` はブラウザでだけ実行される
 - サーバーで描く HTML では、フライアウトは閉じた状態にしておく。`open` の初期値を `false` にすれば、そのまま閉じた HTML になる
 - 3.1 節の CSS だけの方法は、サーバーで描いた HTML にもそのまま効く
+- `afterNextRender` を使わずに分けるなら、`isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)で判定する。`window` や `document` は、グローバルではなく `inject(DOCUMENT)`(とその `defaultView`)から取る
 
 ---
 
@@ -251,10 +328,11 @@ export class HoverIntentDirective {
 | 条件 | 方法 |
 |---|---|
 | Spartacus のナビゲーションをそのまま使う | 何もしない。ホバーは CSS、キーボードとタップは `NavigationUIComponent` が扱う |
-| 横切っただけで開くのを防ぎたい | CSS の `transition-delay`(3.1 節)。Spartacus の SCSS を上書きする |
+| 横切っただけで開くのを防ぎたい | CSS の `transition-delay`(3.1 節)。Spartacus の SCSS を上書きする(2.3 節) |
 | マウスが離れたあと、少しの間は閉じないでほしい | CSS の `transition-delay`(閉じる側)。JS が要るなら 3.2 節の `timeout` |
 | マウスの速さで判定したい(hoverIntent と同じ) | 3.2 節のディレクティブ。フレームワーク非依存でよければ `hoverintent` |
-| タッチの端末 | ホバーに頼らない。タップで開閉する。CSS は `@media (hover: hover)` で分ける |
+| タッチの端末 | ホバーに頼らない。タップで開閉する(3.3 節)。CSS は `@media (hover: hover)` で分ける |
+| Spartacus を使わない Angular のアプリでフライアウトを作る | 開くボタン + `signal` + Esc / `focusout` で閉じる(3.3 節)。ホバーは CSS の遅れ(3.1 節)か 3.2 節のディレクティブを重ねる |
 
 ---
 

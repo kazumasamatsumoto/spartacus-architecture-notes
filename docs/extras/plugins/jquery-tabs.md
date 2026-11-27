@@ -151,9 +151,30 @@ export class ProductInfoComponent {
 | 切り替えのアニメーション | `show` / `hide` | 無い |
 | 翻訳 | 無い | 見出しは翻訳キーで書ける |
 
+#### 2.5 Spartacus の部品と組み合わせる例
+
+3 節の自前のタブを Spartacus の画面に置くときは、次の部品と組み合わせられる。
+
+- **タブとアコーディオンの切り替え**: 3.2 節の `matchMedia` の代わりに、`BreakpointService.isUp()`(`sf/layout/breakpoint/breakpoint.service.ts:106`)を使う。Spartacus の設定にあるブレークポイントと揃う。`cx-tab` の `breakpoint` もこれを使っている(2.3 節)。詳しくは [番外 3](../breakpoint-observer.md)
+
+  ```ts
+  import { inject } from '@angular/core';
+  import { toSignal } from '@angular/core/rxjs-interop';
+  import { BREAKPOINT, BreakpointService } from '@spartacus/storefront';
+
+  wide = toSignal(inject(BreakpointService).isUp(BREAKPOINT.md), { initialValue: true });
+  ```
+
+- **中身のデータ**: 3.3 節の `HttpClient` の代わりに、パネルの中のコンポーネントが Facade 経由でデータを取る([15 章](../../15-facade-connector-adapter.md))
+- **見出しの翻訳**: 見出しの文字は、`cx-tab` と同じく翻訳キーと `cxTranslate` パイプ(`core-libs/core/src/i18n/translate.pipe.ts:26`)で書ける
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は、`@angular/*` とブラウザ標準(と RxJS)だけで書く。Spartacus の部品(`cx-tab`、`BreakpointService` など)を使う書き方は 2 節にまとめた。
+
+#### 3.1 タブ
 
 状態は「開いているタブ」の 1 つだけである。`signal` で持ち、テンプレートで役割と状態を書く。
 
@@ -202,17 +223,109 @@ export class TabsComponent {
 
 **ポイント**
 
-- **開く方式を決める**: 上の例は「矢印で移したら開く」(自動)。Spartacus の `cx-tab` は「移すだけで、Enter / Space で開く」(手動)。パネルの中身が重い(描画や通信に時間がかかる)ときは手動が向く
+- **開く方式を決める**: 上の例は「矢印で移したら開く」(自動)。もう 1 つは「移すだけで、Enter / Space で開く」(手動。2 節の `cx-tab` もこの方式)。手動にするなら、フォーカスのある番号を別の `signal`(例: `focused`)に持ち、`tabindex` はその番号で決め、`onKey` では `focused` だけを動かす。`active` はボタンの `click`(Enter / Space でも出る)で変える。パネルの中身が重い(描画や通信に時間がかかる)ときは手動が向く
 - **閉じているパネル**: `@if` で DOM から消すと、中のコンポーネントは破棄され、入力中の値も消える。残したいなら `[hidden]` だけで隠す。上の例は枠を `[hidden]` で残し、中身を `@if` で消している
-- **アコーディオンだけで足りるなら `<details>` / `<summary>`**: ブラウザ標準で開閉でき、JS が要らない。`name` 属性を揃えると、同じ名前の `<details>` は 1 つしか開かなくなる(「1 つだけ開く」アコーディオン)
-- **タブとアコーディオンの切り替え**: Spartacus の画面なら `BreakpointService.isUp()` を使う([番外 3](../breakpoint-observer.md))。`cx-tab` の `breakpoint` はこれを使っている
+- **使えないタブ**(jQuery UI の `disabled`): ボタンに `[attr.aria-disabled]="true"` を付け、`click` と矢印キーの移動で飛ばす。`disabled` 属性にするとフォーカスも当たらなくなり、あることが支援技術に伝わりにくい
 - **アニメーション**: 切り替えの動きが要るなら CSS か、`@angular/core` の `animate.enter` / `animate.leave` で書く。`@angular/animations` は 20.2 で非推奨なので使わない([番外 4 の 7 節](../replacing-jquery.md))
+- **振る舞いを部品に任せたいなら**: Angular チームの公式パッケージ `@angular/aria@21`(dist-tag `v21-lts`、Angular 21 用)に `ngTabs` などがある。`@angular/cdk@21` も要り、開発者プレビューである(4 節)
 
-**SSR での注意**
+#### 3.2 狭い画面ではアコーディオンにする
+
+アコーディオンだけで足りるなら、ブラウザ標準の **`<details>` / `<summary>`** が使える。JS 無しで開閉でき、キーボードでも動く。`name` 属性を揃えると、同じ名前の `<details>` は 1 つしか開かなくなる(「1 つだけ開く」アコーディオン)。
+
+```html
+@for (t of tabs; track t.id) {
+  <details name="product-info" [open]="$first">
+    <summary>{{ t.label }}</summary>
+    {{ t.body }}
+  </details>
+}
+```
+
+画面の幅でタブとアコーディオンを切り替えるなら、`matchMedia` の結果を `signal` に入れる。
+
+```ts
+import { DOCUMENT, DestroyRef, afterNextRender, inject, signal } from '@angular/core';
+
+wide = signal(true);   // サーバーと最初の描画ではタブとして描く
+
+constructor() {
+  const destroyRef = inject(DestroyRef);
+  const win = inject(DOCUMENT).defaultView;
+  afterNextRender(() => {             // ブラウザでだけ実行される
+    const mql = win!.matchMedia('(min-width: 768px)');
+    this.wide.set(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => this.wide.set(e.matches);
+    mql.addEventListener('change', onChange);
+    destroyRef.onDestroy(() => mql.removeEventListener('change', onChange));
+  });
+}
+```
+
+```html
+@if (wide()) { …3.1 節のタブ… } @else { …上の <details> の並び… }
+```
+
+- `inject()` はコンストラクタの中(注入できる場所)で呼ぶ。`afterNextRender` のコールバックの中では呼べないので、先に変数に入れておく
+- 見た目だけを変えればよいなら、JS は要らない。CSS の `@media` で、タブの並びとアコーディオンの見出しを出し分ける
+
+#### 3.3 中身を読み込む(Ajax のタブの代わり)
+
+開いたときに初めて読み込み、以後は取っておく。
+
+```ts
+import { effect, inject, signal, untracked } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+// TabsComponent の中
+tabs = [
+  { id: 'details', label: '詳細', url: '/api/p/123/details' },
+  { id: 'reviews', label: 'レビュー', url: '/api/p/123/reviews' },
+];
+html = signal<Record<string, string>>({});
+private http = inject(HttpClient);         // provideHttpClient() が要る
+
+constructor() {
+  effect(() => {
+    const t = this.tabs[this.active()];     // active が変わるたびに走る
+    if (untracked(this.html)[t.id] !== undefined) return;   // 読み込み済み
+    this.http.get(t.url, { responseType: 'text' }).subscribe((h) =>
+      this.html.update((m) => ({ ...m, [t.id]: h })),
+    );
+  });
+}
+```
+
+```html
+<div role="tabpanel" … [attr.aria-busy]="html()[t.id] === undefined">
+  <div [innerHTML]="html()[t.id] ?? ''"></div>
+</div>
+```
+
+- `[innerHTML]` は Angular が危険な要素や属性を取り除く(サニタイズ)。HTML ではなく JSON を受け取り、テンプレートで描けるなら、そのほうがよい
+- この `effect` はサーバーでも走るので、最初に開くタブの中身はサーバーでも読み込まれる
+- 同じタブを素早く何度も選んでも二重に読み込まないようにするなら、読み込み中の印(`''` など)を先に入れておく
+
+#### 3.4 URL の `#` と連動する
+
+```ts
+import { inject, linkedSignal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
+
+private fragment = toSignal(inject(ActivatedRoute).fragment);
+// # が変わるたびに計算し直す。click で active.set() しても書き換えられる
+active = linkedSignal(() => Math.max(0, this.tabs.findIndex((t) => t.id === this.fragment())));
+```
+
+- `location.hash` を直接読まない。サーバーには `location` が無く、`#` はそもそもサーバーに送られない。サーバーでは `fragment` が空なので、最初のタブで描かれ、ブラウザで `#` のタブに切り替わる
+- タブを押したときに URL も変えたいなら、`<a [routerLink]="[]" [fragment]="t.id">` にするか、`Router.navigate([], { fragment: t.id })` を呼ぶ
+
+#### 3.5 SSR での注意
 
 - タブは `signal` とテンプレートだけで書けるので、サーバーでもそのまま描ける。最初に開くタブの中身はサーバーの HTML に入るので、検索エンジンにも読まれる
 - 閉じているタブの中身を `@if` で消すと、その中身はサーバーの HTML に入らない。検索エンジンに読ませたい中身なら、`[hidden]` で隠すだけにする
-- URL の `#` で最初のタブを決めたいときは、`location.hash` を直接読まない。サーバーには `location` が無く、`#` はそもそもサーバーに送られない。Angular の `ActivatedRoute.fragment` を使い、ブラウザで切り替わる前提で書く
+- `matchMedia` のようなブラウザの API は、`afterNextRender` の中で呼ぶ(3.2 節)。コンストラクタなどで分けるなら `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)で判定する
 
 ---
 
@@ -235,9 +348,10 @@ export class TabsComponent {
 |---|---|
 | Spartacus の画面でタブを出す | `cx-tab`(`TabComponent`) |
 | 狭い画面でアコーディオンに切り替えたい | `cx-tab` の `config.breakpoint` |
-| アコーディオンだけでよく、JS を使いたくない | `<details>` / `<summary>`(1 つだけ開くなら `name` 属性) |
-| `cx-tab` の見た目や振る舞いが合わない | `signal` と `@for` で自前のタブを書く(3 節)。アクセシビリティの振る舞いを任せたいなら `@angular/aria@21`(開発者プレビュー) |
+| アコーディオンだけでよく、JS を使いたくない | `<details>` / `<summary>`(1 つだけ開くなら `name` 属性。3.2 節) |
+| `cx-tab` の見た目や振る舞いが合わない | `signal` と `@for` で自前のタブを書く(3.1 節)。アクセシビリティの振る舞いを任せたいなら `@angular/aria@21`(開発者プレビュー) |
 | タブの中身を Ajax で読みたい | Ajax は使わない。パネルの中のコンポーネントが、Facade 経由でデータを取る([15 章](../../15-facade-connector-adapter.md)) |
+| Spartacus を使わない Angular のアプリでタブを出す | `signal` + `@for` + `role="tab"` で書く(3.1 節)。狭い画面は `<details>` と `matchMedia`(3.2 節)、中身の読み込みは `HttpClient`(3.3 節)、`#` との連動は `ActivatedRoute.fragment`(3.4 節) |
 
 ---
 

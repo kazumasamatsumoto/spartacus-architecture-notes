@@ -275,11 +275,19 @@ Colorbox は `$.colorbox({ href })` を呼ぶと、その場で膜と箱の DOM 
 | アニメーション | `elastic` / `fade` | Bootstrap の `fade` クラス。凝った動きは無い |
 | SSR | 考慮なし(ブラウザ専用) | Angular の描画なので、サーバーでも動く |
 
+#### 2.6 Spartacus の部品と組み合わせる例
+
+- Spartacus の画面の中で確認や入力のダイアログを出すなら、まず 2.1 節の `LaunchDialogService` を使う。3 節の `<dialog>` は、画像ギャラリーのように独自の作りが要る場面か、Spartacus の外の画面で使う
+- 3 節の `<dialog>` のコンポーネントを Spartacus の画面に置くこともできる。`body` に触るときに `inject(DOCUMENT)` と `Renderer2` を使う点は、Spartacus の `LaunchRenderStrategy` と同じ形である(`sf/layout/launch-dialog/services/launch-render.strategy.ts:60-65`, `:114`)
+- Spartacus の画面では、背面のスクロールを止めるのに Bootstrap の `body.modal-open` クラスも使える(2.2 節)。`overflow: hidden` を直接付ける代わりに、`renderer.addClass(document.body, 'modal-open')` と書けば、Spartacus のダイアログと同じ止め方になる
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
 
-Spartacus の画面の中なら、まず 2 節の `LaunchDialogService` を使う。Spartacus の外の小さな画面、または画像ギャラリーのように独自の作りが要る場面では、ブラウザ標準の **`<dialog>`** が使える。
+この節は、`@angular/*` とブラウザ標準(と RxJS)だけで書く。Spartacus の部品(`LaunchDialogService`、`cxFocus`)を使う書き方は 2 節にまとめた。
+
+#### 3.1 土台はブラウザ標準の `<dialog>`
 
 `<dialog>` を `showModal()` で開くと、ブラウザが次のことを引き受ける。
 
@@ -288,36 +296,51 @@ Spartacus の画面の中なら、まず 2 節の `LaunchDialogService` を使�
 - Esc キーで閉じる(`cancel` イベントが出る)
 - `::backdrop` 疑似要素で背景を描ける
 
-背面のスクロールは止まらない。止めたいときは、開いている間だけ `body` に `overflow: hidden` を付ける。閉じたあとのフォーカスは、主要なブラウザでは開く前の要素に戻る。ただし、確実にしたいなら自分で戻す。
+背面のスクロールは止まらない。止めたいときは、開いている間だけ `body` に `overflow: hidden` を付ける。閉じたあとのフォーカスは、主要なブラウザでは開く前の要素に戻る。ただし、確実にしたいなら自分で戻す(下の例)。
+
+#### 3.2 画像を送るライトボックス
 
 ```ts
-import { Component, ElementRef, afterNextRender, signal, viewChild, input } from '@angular/core';
+import {
+  Component, ElementRef, Renderer2, DOCUMENT, inject, input, output, signal, viewChild,
+} from '@angular/core';
 
 @Component({
   selector: 'app-lightbox',
   template: `
-    <dialog #dlg (close)="opened.set(false)" (click)="onBackdrop($event)"
+    <dialog #dlg (close)="onClosed()" (click)="onBackdrop($event)"
+            (keydown.arrowleft)="move(-1)" (keydown.arrowright)="move(1)"
             aria-labelledby="lbTitle">
       @if (opened()) {
-        <h2 id="lbTitle" class="visually-hidden">画像 {{ index() + 1 }} / {{ images().length }}</h2>
+        <h2 id="lbTitle">画像 {{ index() + 1 }} / {{ images().length }}</h2>
         <img [src]="images()[index()].url" [alt]="images()[index()].alt" />
         <button type="button" (click)="move(-1)" aria-label="前へ">‹</button>
         <button type="button" (click)="move(1)" aria-label="次へ">›</button>
         <button type="button" (click)="dlg.close()">閉じる</button>
       }
     </dialog>`,
-  host: { '(keydown.arrowleft)': 'move(-1)', '(keydown.arrowright)': 'move(1)' },
+  styles: `
+    dialog::backdrop { background: rgb(0 0 0 / 0.75); }   /* Colorbox の opacity */
+    img { max-width: 90vw; max-height: 80vh; }            /* Colorbox の maxWidth / maxHeight */
+  `,
 })
 export class LightboxComponent {
   images = input.required<{ url: string; alt: string }[]>();
+  closed = output<void>();                    // Colorbox の onClosed
+
   index = signal(0);
   opened = signal(false);
   private dlg = viewChild.required<ElementRef<HTMLDialogElement>>('dlg');
+  private document = inject(DOCUMENT);
+  private renderer = inject(Renderer2);
+  private returnTo: HTMLElement | null = null;
 
-  open(i: number) {
+  open(i: number) {                           // ブラウザでクリックされたときだけ呼ばれる
+    this.returnTo = this.document.activeElement as HTMLElement | null;   // Colorbox の returnFocus
     this.index.set(i);
     this.opened.set(true);
-    this.dlg().nativeElement.showModal();   // ブラウザでクリックされたときだけ呼ばれる
+    this.renderer.setStyle(this.document.body, 'overflow', 'hidden');   // 背面のスクロールを止める
+    this.dlg().nativeElement.showModal();
   }
 
   move(step: number) {
@@ -329,20 +352,67 @@ export class LightboxComponent {
   onBackdrop(e: MouseEvent) {
     if (e.target === this.dlg().nativeElement) this.dlg().nativeElement.close();
   }
+
+  // Esc、閉じるボタン、背景のクリックのどれで閉じても、ここを通る
+  onClosed() {
+    this.opened.set(false);
+    this.renderer.removeStyle(this.document.body, 'overflow');
+    this.returnTo?.focus();
+    this.closed.emit();
+  }
 }
 ```
 
-**ポイント**
+```html
+<!-- 使う側。サムネイルのボタンから開く(Colorbox の rel でまとめたグループにあたる) -->
+@for (img of images; track img.url; let i = $index) {
+  <button type="button" (click)="lb.open(i)"><img [src]="img.thumb" [alt]="img.alt" /></button>
+}
+<app-lightbox #lb [images]="images" />
+```
 
+- `DOCUMENT` は `@angular/core` から import できる(`@angular/core@21.2.26` の型定義で確かめた)。`@angular/common` からも import できる
 - 中身は `@if (opened())` の中に置く。閉じている間は DOM に作らないので、画像も読み込まない
-- 開く・閉じるのアニメーションは CSS で書く。`dialog[open]` と `@starting-style`、または Angular の `animate.enter` / `animate.leave` を使う(`@angular/core` の機能。`@angular/animations` は 20.2 で非推奨なので使わない)。詳しくは [番外 4 の 7 節](../replacing-jquery.md)
-- `<dialog>` を使わず `div` で作るなら、背面の要素に `inert` 属性を付けると、背面をまとめて操作できなくできる。ただし、ダイアログを背面の外(`body` の直下など)に置く必要がある
+- 矢印キーは `<dialog>` に付ける。フォーカスは開いている間ダイアログの中にあるので、キーはここに届く
 
-**SSR での注意**
+#### 3.3 画像以外の中身(`html` / `inline` / `iframe` / Ajax)
+
+| Colorbox | Angular 標準での書き方 |
+|---|---|
+| `inline`(ページ内の要素を移す) | 移さない。`<dialog>` の中に、`<ng-content />` か `ng-template` で中身を書く |
+| `html`(HTML 文字列) | `[innerHTML]` に渡す。Angular が危険な要素や属性を取り除く(サニタイズ) |
+| `href` を Ajax で読む | `HttpClient` の `get(url, { responseType: 'text' })` で取り、`signal` に入れて `[innerHTML]` で出す |
+| `iframe` | `<iframe [src]="safeUrl">`。`src` には `DomSanitizer.bypassSecurityTrustResourceUrl()`(`@angular/platform-browser`)を通した値が要る。信頼できる URL にだけ使う |
+| `onOpen` / `onClosed` などのコールバック | `output()` で外に知らせる(上の例の `closed`) |
+| `transition`(`elastic` / `fade`) | CSS で書く。`dialog[open]` と `@starting-style`、または `@angular/core` の `animate.enter` / `animate.leave`。`@angular/animations` は 20.2 で非推奨なので使わない。詳しくは [番外 4 の 7 節](../replacing-jquery.md) |
+
+```ts
+import { inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+// Ajax で読んだ HTML を出す例(Colorbox の href)
+private http = inject(HttpClient);          // @angular/common/http。provideHttpClient() が要る
+html = signal('');
+
+load(url: string) {
+  this.http.get(url, { responseType: 'text' }).subscribe((h: string) => this.html.set(h));
+}
+// テンプレート: <div [innerHTML]="html()"></div>
+```
+
+#### 3.4 `<dialog>` を使わない場合
+
+`div` で作るなら、背面の要素に `inert` 属性を付けると、背面をまとめて操作できなくできる。ただし、ダイアログを背面の外(`body` の直下など)に置く必要がある。Tab キーの循環、Esc、`aria-modal="true"` も自分で書くことになる。
+
+Angular チームの公式パッケージ **`@angular/cdk@21`**(dist-tag `v21-lts`、Angular 21 用)の `Dialog` を使うと、フォーカスの閉じ込め・戻し、スクロールの制御、オーバーレイがそろう。依存が 1 つ増えるので、`<dialog>` で足りないときに選ぶ(4 節)。
+
+#### 3.5 SSR での注意
 
 - `showModal()` はブラウザの API なので、サーバーでは呼ばない。上の例のように、クリックなどブラウザでしか起きない操作から呼べば安全である
 - 「ページを開いたらすぐダイアログを出す」ときは、`afterNextRender(() => …)` の中で `showModal()` を呼ぶ。`afterNextRender` はブラウザでだけ実行される
-- `document.body` にクラスを付けるときは、`inject(DOCUMENT)` と `Renderer2` を使う。Spartacus の `LaunchRenderStrategy` もこの形である(`launch-render.strategy.ts:61-66`, `:114`)
+- `document.body` に触るときは、グローバルの `document` ではなく `inject(DOCUMENT)` と `Renderer2` を使う(上の例)。サーバーでも `DOCUMENT` は描画用の文書を指す
+- ブラウザでだけ動かしたい処理をコンストラクタなどで分けるなら、`isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)で判定する
+- フレームワーク非依存のライブラリ(4 節)を使うときは、`afterNextRender` の中で初期化し、`inject(DestroyRef).onDestroy()` で破棄する
 
 ---
 
@@ -370,8 +440,9 @@ export class LightboxComponent {
 |---|---|
 | Spartacus の画面の中で、確認や入力のダイアログを出す | `LaunchDialogService` + `cxFocus`(2 節) |
 | 商品画像を大きく見せる | Spartacus の画像ズーム(`fl/product/image-zoom`)を使う、または拡張する |
-| 画像を何枚か送る、汎用のライトボックスが要る | `<dialog>` で小さなコンポーネントを書く(3 節)。ピンチやスワイプまで要るなら `photoswipe` |
-| CMS の HTML の中のリンクから、iframe や外部ページを開きたい | まず、別ページへの遷移で済まないかを考える。要るなら `<dialog>` の中に `<iframe>` を置く |
+| 画像を何枚か送る、汎用のライトボックスが要る | `<dialog>` で小さなコンポーネントを書く(3.2 節)。ピンチやスワイプまで要るなら `photoswipe` |
+| CMS の HTML の中のリンクから、iframe や外部ページを開きたい | まず、別ページへの遷移で済まないかを考える。要るなら `<dialog>` の中に `<iframe>` を置く(3.3 節) |
+| Spartacus を使わない Angular のアプリでダイアログやライトボックスを出す | `<dialog>` + `signal` で書く(3 節)。部品を多くそろえたいなら `@angular/cdk@21` の `Dialog` |
 | 多くの画面で多種類のダイアログを、Spartacus の外の仕組みでそろえたい | `@angular/cdk@21` の `Dialog`。依存が増えることを受け入れる |
 
 ---
