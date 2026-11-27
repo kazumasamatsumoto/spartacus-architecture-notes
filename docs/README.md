@@ -154,4 +154,5 @@
 - [29-3. 差し替えが届かない場所: 7 つの例外とサブスロット](29-3-where-replacement-does-not-reach.md)
 - [番外. サブエージェントとスキルの分け方: 23 パターンの地図](extra-agent-split-patterns.md)(対話版: [extras/agent-split-map.html](extras/agent-split-map.html)。実例: SAP/spartacus の `.claude/`)
 - [番外 2. GitHub Universe 2026 サマリー](extras/github-universe-2026-summary.md) — 6 つの発表、GitHub の思想(アンビエント・インテリジェンス)、GitHub Intelligence、GitHub Next(gh-aw / Chopin / Ace)、批判的な視点
+- [番外 3. Angular CDK の BreakpointObserver と Spartacus の BreakpointService](extras/breakpoint-observer.md) — CDK の `matchMedia` 方式と Spartacus の `resize` 方式、SSR での値、使い分け、アクセラレータの `enquire.js` からの移行
 - [付録](appendix.md)
