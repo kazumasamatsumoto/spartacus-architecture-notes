@@ -117,9 +117,30 @@ $zoomOutWhileLoading: false !default;
 
 `sf/`、`fl/`、`integration-libs/` の `.ts` を `new Image()`、`.decode()`、`naturalWidth` で探しても、見つかりませんでした。Spartacus の中に、画像を JS で読み直して待つコードはありません。
 
+#### 2.3 Spartacus の部品と組み合わせる例
+
+3 節の書き方を Spartacus の中で使うときは、`<img>` の代わりに `cx-media` を使い、`(load)` / `(error)` の代わりに `loaded` を受け取ります。
+
+```html
+<!-- 1 枚を待つ(3.2 節に当たる) -->
+<cx-media [container]="product.images?.PRIMARY" format="product" (loaded)="ready.set($event.valueOf())" />
+
+<!-- 複数を全部待つ(3.3 節に当たる)。true でも false でも「終わった」に数える -->
+@for (image of gallery; track $index) {
+  <cx-media [container]="image" format="product" [loading]="'eager'" (loaded)="mark($index)" />
+}
+```
+
+- `loaded` の型は `EventEmitter<Boolean>`(大文字の `Boolean`。`sf/shared/components/media/media.component.ts:122`)なので、`signal<boolean>` に入れるときは `valueOf()` で小文字の `boolean` にする
+- `mark()` は 3.3 節と同じく、終わったものを `Set` に足す。ここでは `cx-media` に URL が無いので、番号で数える
+- 場所を先に取る(3.1 節)のは、`cx-media` なら `media.width` / `media.height` があれば `img` の属性に出す(`sf/shared/components/media/media.component.html:40-41`)
+- 読み込み中の見た目は、自分でクラスを付けなくても、2.1 節の `is-loading` / `is-missing` を CSS で使える
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節のコードは、`@angular/core` と `@angular/common`、ブラウザ標準の API だけで書きます。Spartacus の部品(`cx-media` の `loaded` など)を使う書き方は 2 節です。
 
 #### 3.1 まず、待たなくて済むようにする
 
@@ -129,58 +150,144 @@ waitForImages が要ったのは、画像の寸法が決まるまで配置が決
 .thumb img { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; }
 ```
 
-`img` に `width` と `height` の属性を書いても、ブラウザは縦横比を先に計算します(`cx-media` は `media.width` / `media.height` があれば属性に出します。`media.component.html:40-41`)。
+`img` に `width` と `height` の属性を書いても、ブラウザは縦横比を先に計算します。
+
+```html
+<img [src]="img.src" [width]="img.width" [height]="img.height" [alt]="img.alt" />
+```
 
 #### 3.2 1 枚を待つ
 
-```html
-<img [src]="src" (load)="ready.set(true)" (error)="failed.set(true)" />
-@if (!ready()) { <span class="spinner" aria-hidden="true"></span> }
+```ts
+import { Component, input, signal } from '@angular/core';
+
+@Component({
+  selector: 'app-photo',
+  template: `
+    <div class="photo" [class.is-loading]="!ready() && !failed()" [class.is-missing]="failed()">
+      <img [src]="src()" [alt]="alt()" (load)="ready.set(true)" (error)="failed.set(true)" />
+      @if (!ready() && !failed()) { <span class="spinner" aria-hidden="true"></span> }
+    </div>
+  `,
+})
+export class PhotoComponent {
+  src = input.required<string>();
+  alt = input('');
+  ready = signal(false);
+  failed = signal(false);
+}
 ```
 
-Spartacus の中なら、`<img>` の代わりに `<cx-media (loaded)="ready.set($event)" />` と書きます。
+`is-loading` / `is-missing` のクラス名は、2.1 節の `cx-media` に合わせました。CSS の書き方を Spartacus と共通にできます。
 
 #### 3.3 複数を全部待つ
 
 ```ts
-import { Component, computed, input, signal } from '@angular/core';
+import {
+  Component, ElementRef, afterNextRender, computed, input, linkedSignal, viewChildren,
+} from '@angular/core';
+
+export interface GalleryImage { src: string; alt: string; }
 
 @Component({
   selector: 'app-gallery',
   template: `
-    <div class="gallery" [class.is-ready]="allDone()" [attr.aria-busy]="!allDone()">
+    <div class="gallery" [class.is-ready]="allDone()" [attr.aria-busy]="allDone() ? null : 'true'">
       @for (img of images(); track img.src) {
-        <img [src]="img.src" [alt]="img.alt" loading="eager"
-             (load)="done.update((n) => n + 1)" (error)="done.update((n) => n + 1)" />
+        <img #photo [src]="img.src" [alt]="img.alt" loading="eager"
+             (load)="mark(img.src)" (error)="mark(img.src)" />
       }
     </div>
   `,
 })
 export class GalleryComponent {
-  images = input.required<{ src: string; alt: string }[]>();
-  done = signal(0);
-  allDone = computed(() => this.done() >= this.images().length);
+  images = input.required<GalleryImage[]>();
+  private photos = viewChildren<ElementRef<HTMLImageElement>>('photo');
+
+  // images が変わったら空に戻る。同じ画像を 2 回数えないよう、URL の Set で持つ
+  private settled = linkedSignal({ source: this.images, computation: () => new Set<string>() });
+  allDone = computed(() => this.images().every((i) => this.settled().has(i.src)));
+
+  constructor() {
+    // SSR のあとでは、Angular がイベントを付ける前に読み終わっている画像がある。
+    // complete(失敗した画像でも true になる)を見て、取りこぼしを拾う
+    afterNextRender(() => {
+      for (const ref of this.photos()) {
+        const el = ref.nativeElement;
+        if (el.complete) this.mark(el.getAttribute('src') ?? '');
+      }
+    });
+  }
+
+  mark(src: string) {
+    this.settled.update((s) => (s.has(src) ? s : new Set(s).add(src)));
+  }
 }
 ```
 
-- 画像の配列が変わるときは、`done` を 0 に戻す
+- 失敗(`error`)も「終わった」に数える。waitForImages と同じで、1 枚が壊れていても待ち続けない
 - `loading="lazy"` の画像は、画面に近づくまで読まれない。「全部待つ」とずっと終わらないことがある。待つ画像は `eager` にするか、見えている分だけを待つ
-- JS で 1 枚の準備を確かめたいなら、`HTMLImageElement.decode()` が使える。読み込みとデコードが終わると解決する Promise を返す。失敗すると拒否される
+- waitForImages の `each`(1 枚ごと)に当たるのは `mark()`。進み具合は `settled().size` と `images().length` で出せる
+
+JS で 1 枚の準備を確かめたいなら、`HTMLImageElement.decode()` が使えます。読み込みとデコードが終わると解決する Promise を返し、失敗すると拒否されます。
 
 ```ts
-private img = viewChild.required<ElementRef<HTMLImageElement>>('img');
+import { Component, ElementRef, afterNextRender, signal, viewChild } from '@angular/core';
+
+@Component({
+  selector: 'app-decoded-photo',
+  template: `<img #img src="large.jpg" alt="" [class.is-ready]="ready()" />`,
+})
+export class DecodedPhotoComponent {
+  ready = signal(false);
+  failed = signal(false);
+  private img = viewChild.required<ElementRef<HTMLImageElement>>('img');
+
+  constructor() {
+    afterNextRender(async () => {           // ブラウザでだけ動く
+      try { await this.img().nativeElement.decode(); this.ready.set(true); }
+      catch { this.failed.set(true); }
+    });
+  }
+}
+```
+
+#### 3.4 背景画像も待つ(`waitForAll` に当たるもの)
+
+背景画像を待ちたいときは、CSS の背景をやめて `<img>`(`object-fit` で背景のように見せる)にするのが簡単です。どうしても CSS の背景を待つなら、waitForImages と同じく URL を集めて読み直します。
+
+```ts
+import { DOCUMENT, DestroyRef, ElementRef, afterNextRender, inject, signal } from '@angular/core';
+
+// コンポーネントの中で
+private host = inject<ElementRef<HTMLElement>>(ElementRef);
+private doc = inject(DOCUMENT);               // v21 では @angular/core から import できる
+bgReady = signal(false);
 
 constructor() {
-  afterNextRender(async () => {           // ブラウザでだけ動く
-    try { await this.img().nativeElement.decode(); this.ready.set(true); }
-    catch { this.failed.set(true); }
+  const destroyRef = inject(DestroyRef);
+  afterNextRender(() => {
+    const view = this.doc.defaultView!;          // ブラウザでは window
+    const urls = [this.host.nativeElement, ...this.host.nativeElement.querySelectorAll('*')]
+      .flatMap((el) => [...view.getComputedStyle(el).backgroundImage.matchAll(/url\("?(.+?)"?\)/g)])
+      .map((m) => m[1]);
+    let alive = true;
+    destroyRef.onDestroy(() => (alive = false));
+    Promise.allSettled(urls.map((u) => { const i = new Image(); i.src = u; return i.decode(); }))
+      .then(() => { if (alive) this.bgReady.set(true); });
   });
 }
 ```
 
-背景画像を待ちたいときは、CSS の背景をやめて `<img>`(`object-fit` で背景のように見せる)にするのが簡単です。
+waitForImages の `waitForAll` と同じく、要素の数だけ `getComputedStyle` を呼ぶので重い作りです。対象の要素を絞って使います。
 
-**SSR での注意**: サーバーでは画像は読まれず、`load` も起きない。「読めたら表示する」作りにすると、サーバーの HTML では画像が隠れたままになる。サーバーの HTML では見える状態にしておき、ブラウザで状態を足す。`decode()` や `new Image()` は `afterNextRender()` の中で呼ぶ(`@angular/core@21.2.26` の `types/core.d.ts:2576`)。
+#### 3.5 SSR での注意
+
+- サーバーでは画像は読まれず、`load` も起きない。「読めたら表示する」作りにすると、サーバーの HTML では画像が隠れたままになる。サーバーの HTML では見える状態にしておき、ブラウザで状態を足す
+- SSR のあとのブラウザでは、Angular がイベントを付ける前に `load` が終わっていることがある。3.3 節のように、`afterNextRender()` の中で `complete` を確かめる
+- `decode()`、`new Image()`、`getComputedStyle()` は `afterNextRender()` の中で呼ぶ(ブラウザでだけ動く。`@angular/core@21.2.26` の `types/core.d.ts:2576`)。`document` や `window` は `inject(DOCUMENT)` とその `defaultView` で受け取る
+- 描画と関係なく、サービスの中で「ブラウザかどうか」で分けたいときは `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)を使う
+- コンポーネントが消えたあとに Promise が解決することがある。`DestroyRef.onDestroy()` で印を付け、消えたあとは状態を書き換えない
 
 ---
 
@@ -190,7 +297,7 @@ constructor() {
 |---|---|---|---|---|
 | `imagesloaded` | 5.0.0 | 無い(依存は `ev-emitter`) | フレームワーク非依存 | waitForImages と同じ役割で、jQuery が無くても動く。背景画像も `{ background: true }` で待てる。`afterNextRender()` の中で呼ぶ |
 
-Angular 向けの専用ライブラリを足す理由は、ほとんどありません。3 節の数行で足ります。
+Angular 向けの専用ライブラリを足す理由は、ほとんどありません。3.2 節と 3.3 節の数行で足ります。
 
 ---
 
@@ -201,8 +308,11 @@ Angular 向けの専用ライブラリを足す理由は、ほとんどありま
 | 画像が読めるまで場所が崩れる | 待たずに、`aspect-ratio` か `width` / `height` 属性で場所を取る |
 | 読み込み中の見た目を変えたい | `cx-media` の `is-loading` / `is-missing` のクラスを CSS で使う。商品画像なら `$spinWhileLoading` などの変数 |
 | 1 枚読めたら何かをしたい | `cx-media` の `(loaded)`(`true` / `false`) |
-| 複数を全部待ちたい | `(load)` / `(error)`(または `loaded`)を `signal` で数える |
+| 複数を全部待ちたい | `cx-media` の `loaded` を数える(2.3 節) |
 | 背景画像も含めて待ちたい | `<img>` に置き換える。どうしても背景なら `imagesloaded` |
+| Spartacus を使わない Angular アプリで、1 枚読めたら何かをしたい | `<img>` の `(load)` / `(error)`(3.2 節)。JS で待つなら `decode()` |
+| Spartacus を使わず、複数を全部待ちたい | `(load)` / `(error)` を `linkedSignal` の `Set` で数え、`afterNextRender()` で `complete` も確かめる(3.3 節) |
+| Spartacus を使わず、背景画像も待ちたい | `<img>` に置き換える。どうしても背景なら 3.4 節か `imagesloaded` |
 
 ---
 

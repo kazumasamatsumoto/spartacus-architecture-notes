@@ -142,65 +142,200 @@ $('.owl-carousel').trigger('next.owl.carousel');  // 外から操作する
 
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
 
-`cx-carousel-scrolling` と同じ考え方で、スクロールをブラウザに任せるのが一番軽いです。
+この節のコードは、`@angular/core` と `@angular/common`、ブラウザ標準の API だけで書きます。Spartacus の部品(`cx-carousel` など)を使う書き方は 2 節です。
+
+考え方は 2.2 節の `cx-carousel-scrolling` と同じです。スクロールそのものはブラウザに任せ、Angular は「前後ボタン」「ページの印」「自動再生」だけを受け持ちます。
+
+#### 3.1 前後ボタン、ドット、画面幅ごとの表示数
 
 ```ts
-import { Component, ElementRef, signal, viewChild, input } from '@angular/core';
+import {
+  Component, DestroyRef, ElementRef, afterNextRender, afterRenderEffect,
+  computed, inject, input, signal, viewChild,
+} from '@angular/core';
+
+export interface Slide { id: string; name: string; image: string; url: string; }
 
 @Component({
-  selector: 'app-scroll-carousel',
+  selector: 'app-carousel',
   template: `
-    <button type="button" aria-label="前へ" (click)="move(-1)">‹</button>
-    <ul #track class="track">
-      @for (item of items(); track item.id) {
-        <li class="item">{{ item.name }}</li>
+    <section class="carousel" aria-roledescription="carousel" [attr.aria-label]="label()">
+      <button type="button" class="nav" aria-label="前へ" [disabled]="atStart()" (click)="move(-1)">‹</button>
+      <ul #track class="track" (scroll)="measure()">
+        @for (item of items(); track item.id) {
+          <li class="item">
+            <a [href]="item.url">
+              <img [src]="item.image" alt="" loading="lazy" />
+              {{ item.name }}
+            </a>
+          </li>
+        }
+      </ul>
+      <button type="button" class="nav" aria-label="次へ" [disabled]="atEnd()" (click)="move(1)">›</button>
+      @if (pages() > 1) {
+        <div class="dots">
+          @for (p of pageList(); track p) {
+            <button type="button" (click)="goTo(p)"
+                    [attr.aria-label]="(p + 1) + ' / ' + pages() + ' ページ'"
+                    [attr.aria-current]="p === page() ? 'true' : null"></button>
+          }
+        </div>
       }
-    </ul>
-    <button type="button" aria-label="次へ" (click)="move(1)">›</button>
+    </section>
   `,
   styles: `
-    .track { display: flex; gap: 16px; overflow-x: auto;
-             scroll-snap-type: x mandatory; scroll-behavior: smooth; }
-    .item  { flex: 0 0 min(300px, 80%); scroll-snap-align: start; }
+    :host { display: block; container-type: inline-size; }
+    .track { --per-view: 1; --gap: 16px;
+             display: flex; gap: var(--gap); margin: 0; padding: 0; list-style: none;
+             overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+             overscroll-behavior-x: contain; }
+    .item  { flex: 0 0 calc((100% - var(--gap) * (var(--per-view) - 1)) / var(--per-view));
+             scroll-snap-align: start; }
+    @container (min-width: 640px)  { .track { --per-view: 2; } }
+    @container (min-width: 1024px) { .track { --per-view: 4; } }
     @media (prefers-reduced-motion: reduce) { .track { scroll-behavior: auto; } }
   `,
 })
-export class ScrollCarouselComponent {
-  items = input.required<{ id: string; name: string }[]>();
-  private track = viewChild.required<ElementRef<HTMLElement>>('track');
+export class CarouselComponent {
+  items = input.required<Slide[]>();
+  label = input('おすすめ商品');
 
+  private track = viewChild.required<ElementRef<HTMLElement>>('track');
+  private pos = signal({ left: 0, width: 1, scroll: 1 });   // サーバーでは 1 ページとみなす
+
+  atStart = computed(() => this.pos().left <= 0);
+  atEnd   = computed(() => { const p = this.pos(); return p.left + p.width >= p.scroll - 1; });
+  pages   = computed(() => { const p = this.pos(); return Math.max(1, Math.ceil(p.scroll / p.width - 0.01)); });
+  page    = computed(() => this.atEnd() ? this.pages() - 1 : Math.round(this.pos().left / this.pos().width));
+  pageList = computed(() => Array.from({ length: this.pages() }, (_, i) => i));
+
+  constructor() {
+    // 要素が描かれたあと(と items が変わったあと)に寸法を読む。ブラウザでだけ動く
+    afterRenderEffect(() => { this.items(); this.measure(); });
+
+    // 箱の幅が変わったら読み直す
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const ro = new ResizeObserver(() => this.measure());
+      ro.observe(this.track().nativeElement);
+      destroyRef.onDestroy(() => ro.disconnect());
+    });
+  }
+
+  measure() {
+    const el = this.track().nativeElement;
+    this.pos.set({ left: el.scrollLeft, width: el.clientWidth || 1, scroll: el.scrollWidth });
+  }
   move(dir: 1 | -1) {
     const el = this.track().nativeElement;
-    el.scrollBy({ left: dir * el.clientWidth });   // 見えている幅だけ送る
+    el.scrollBy({ left: dir * el.clientWidth });   // 見えている幅だけ送る。止まる位置は scroll-snap が決める
+  }
+  goTo(page: number) {
+    const el = this.track().nativeElement;
+    el.scrollTo({ left: page * el.clientWidth });
   }
 }
 ```
 
-画面幅ごとの表示数は、`.item` の `flex-basis` をメディアクエリかコンテナクエリで変えます。JS で数える必要はありません。
+- 画面幅ごとの表示数は、CSS 変数 `--per-view` とコンテナクエリで決める。JS で数えないので、サーバーとブラウザで HTML が同じになる。Owl の `responsive` は `window.innerWidth` で決まる(1.3 節)。ページ全体の幅で決めたいなら、`@container` を `@media` に変える
+- 端の判定とページ数は、`scrollLeft` / `clientWidth` / `scrollWidth` から計算する。`scroll` は頻繁に起きるので、重くなるなら `requestAnimationFrame` で 1 フレームに 1 回にまとめる
+- 前後ボタンは `<button>` なので、Tab と Enter / Space で使える。端では `disabled` にする。ボタンにフォーカスがあるまま `disabled` になるとフォーカスが外れるので、気になるなら `aria-disabled` にして `move()` の中で止める
+- 中のリンクに Tab で入ると、ブラウザがその要素が見える位置までスクロールする。`cx-carousel-scrolling` が `scrollIntoView` でしていることは、横スクロールの箱ならブラウザが自分でする
+- 左右の矢印キーは、横スクロールの箱にフォーカスがあればブラウザがスクロールする。箱にフォーカスを置けるようにするなら `tabindex="0"` と `aria-label` を付ける
 
-**自動再生を足すとき**: WCAG 2.2.2(一時停止、停止、非表示)は、自動で始まり 5 秒より長く動き、ほかの内容と並んで出る動きに対して、止める仕組みを求めます。Owl の `autoplayHoverPause` はマウスでしか止まらず、これだけでは足りません。
+Owl のオプションとの対応は次のとおりです。
+
+| Owl のオプション | Angular 標準とブラウザ標準での書き方 |
+|---|---|
+| `items` / `responsive` | `--per-view` を `@container` か `@media` で変える |
+| `margin` | `gap` |
+| `stagePadding` | `.track` の `padding-inline` と `scroll-padding-inline` |
+| `nav` / `navText` | `<button>` を 2 つ。中身はテンプレートに書く |
+| `dots` | `pages()` と `goTo()` |
+| `touchDrag` | ブラウザの横スクロール(JS は要らない) |
+| `mouseDrag` | ブラウザ標準には無い。ホイール、トラックパッド、前後ボタンで足りることが多い。どうしても要るなら Pointer Events で `scrollLeft` を動かす |
+| `smartSpeed` | `scroll-behavior: smooth`。時間は指定できない |
+| `lazyLoad` | `<img loading="lazy">` |
+| `autoplay` 系 | 3.2 節 |
+| `loop` | 3.3 節 |
+
+#### 3.2 自動再生を足す
+
+WCAG 2.2.2(一時停止、停止、非表示)は、自動で始まり 5 秒より長く動き、ほかの内容と並んで出る動きに対して、止める仕組みを求めます。Owl の `autoplayHoverPause` はマウスでしか止まらず、これだけでは足りません。次の 4 つを入れます。
+
+1. 見える「一時停止 / 再生」ボタン
+2. フォーカスが中にある間とマウスが乗っている間は送らない
+3. 動きを減らす設定(`prefers-reduced-motion`)の人には、自動では始めない
+4. タブが裏にある間は送らない(Owl も `document.hidden` を見ている。1.3 節)
+
+3.1 節のコンポーネントに足す部分だけを示します。
 
 ```ts
-playing = signal(false);   // サーバーでは止めておく
+import { DOCUMENT, effect } from '@angular/core';   // DOCUMENT は v21 では @angular/core から import できる
+
+autoplay = input(false);
+interval = input(5000);
+
+playing = signal(false);       // サーバーでは止めておく
+hovered = signal(false);     // テンプレートから使うので private にしない
+focused = signal(false);
+private doc = inject(DOCUMENT);
 
 constructor() {
-  afterNextRender(() => {  // ブラウザでだけ動く
-    // 動きを減らす設定の人には、自動では始めない
-    this.playing.set(!matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // …3.1 節の処理…
+  afterNextRender(() => {      // ブラウザでだけ動く
+    const reduce = this.doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.playing.set(this.autoplay() && !reduce);
   });
-  // playing() が true の間だけ setInterval で move(1) を呼ぶ。破棄時に clearInterval
+
+  // playing() が true の間だけタイマーを動かす。false になるか、破棄されると止まる
+  effect((onCleanup) => {
+    if (!this.playing()) return;
+    const id = setInterval(() => {
+      if (this.hovered() || this.focused() || this.doc.hidden) return;
+      if (this.atEnd()) this.goTo(0);   // 末尾まで来たら先頭へ戻す
+      else this.move(1);
+    }, this.interval());
+    onCleanup(() => clearInterval(id));
+  });
 }
-// テンプレート: <button type="button" (click)="playing.set(!playing())">{{ playing() ? '一時停止' : '再生' }}</button>
-// フォーカスが中に入ったら止める: (focusin)="playing.set(false)"
 ```
 
-**SSR での注意**:
+```html
+<!-- テンプレートに足す。ボタンはカルーセルの先頭に置き、最初に見つかるようにする -->
+<section … (pointerenter)="hovered.set(true)" (pointerleave)="hovered.set(false)"
+           (focusin)="focused.set(true)" (focusout)="focused.set(false)">
+  @if (autoplay()) {
+    <button type="button" (click)="playing.set(!playing())">
+      {{ playing() ? '一時停止' : '再生' }}
+    </button>
+  }
+  …
+</section>
+```
 
-- サーバーには `window` も `matchMedia` も無い。タイマーや `matchMedia` は `afterNextRender()`(ブラウザでだけ動く。`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中で始める
-- サーバー側でタイマーを動かすと、アプリが安定せずに SSR が終わらないことがある
-- JS で表示数を数える作りは、サーバーとブラウザで HTML が変わる。`cx-carousel` が `ngSkipHydration` を付けているのはこのため。CSS で幅を決める作りなら、この問題は起きない
+- `effect()` はサーバーでも動くが、サーバーでは `playing()` が `false` のままなので、タイマーは作られない
+- `focusout` は、中の要素から中の別の要素へ移るときにも起きる。厳密にするなら、`focusout` で `event.relatedTarget` が `section` の中にあるかを `contains()` で確かめる
+- 送るたびに読み上げさせたいなら、止まっているときだけ `.track` に `aria-live="polite"` を付ける。自動で動いている間に読み上げ続けるのは煩わしい
+
+#### 3.3 ループ
+
+Owl のループは、要素を `outerHTML` で複製して前後に足します(1.3 節)。Angular で書くなら、複製は作りません。
+
+- **横スクロール型(3.1 節)**: 末尾で「次へ」を押したら先頭へ戻す(`goTo(0)`)。Owl の `rewind` オプション(`pkg/src/js/owl.carousel.js:185`)と同じ振る舞い。3.2 節の自動再生もこの形
+- **1 枚ずつのバナー型**: 「今何枚目か」を `signal` で持ち、`index.update((i) => (i + 1) % n)` で回す。表示は `transform: translateX(-100% × index)` で決める。書き方は [slideViewer の章](./jquery-slideviewer.md) 3.1 節と同じ
+- 端から端へ「つながって見える」動きがどうしても要るなら、4 節のライブラリを使う(`embla-carousel-angular` なら、本体 `embla-carousel@8.6.0` の `loop` オプション。`esm/components/Options.d.ts:30`)
+
+#### 3.4 SSR での注意
+
+- サーバーには `window` も `matchMedia` も `ResizeObserver` も無い。これらは `afterNextRender()` か `afterRenderEffect()`(どちらもブラウザでだけ動く。`@angular/core@21.2.26` の `types/core.d.ts:2576`、`:2612`)の中で使う
+- `document` が要るときは、グローバルの `document` ではなく `inject(DOCUMENT)` で受け取る。`window` は `inject(DOCUMENT).defaultView` で取る(サーバーでは `null` のことがある)
+- サービスやディレクティブの中で、描画と関係なく「ブラウザかどうか」で分けたいなら、`isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)を使う
+- サーバー側でタイマーを動かすと、アプリが安定せずに SSR が終わらないことがある。3.2 節のようにブラウザでだけタイマーを作る
+- 後始末は `DestroyRef.onDestroy()` か、`effect()` の `onCleanup` で書く
+- JS で表示数を数える作りは、サーバーとブラウザで HTML が変わる。2.1 節の `cx-carousel` が `ngSkipHydration` を付けているのはこのため。3.1 節のように CSS で幅を決める作りなら、この問題は起きない
 
 ---
 
@@ -226,6 +361,8 @@ Angular CDK にはカルーセルの部品はありません。なお Spartacus 
 | バナーを 1 枚ずつ見せる | `cx-carousel` に `itemWidth="100%"`(`RotatingImagesComponent` の標準) |
 | 標準の見た目を少し変えたい | SCSS を上書きする。`template` で中身を差し替える |
 | スクロール型で、標準に無い振る舞いが少し要る | 3 節のように `scroll-snap` で自前のコンポーネントを書く |
+| Spartacus を使わない Angular アプリで、横に並べて送るだけ | 3.1 節のコンポーネント(`scroll-snap` とコンテナクエリ)。ライブラリは要らない |
+| Spartacus を使わず、自動再生も要る | 3.2 節を足す。ループやドラッグまで要るなら `embla-carousel-angular@21` |
 | 自動再生、ループ、ドラッグが必須 | `embla-carousel-angular@21` か `ngx-owl-carousel-o@21`。自動再生には停止ボタンを付ける |
 | Owl の設定をそのまま移したい | `ngx-owl-carousel-o@21`(オプション名がほぼ同じ) |
 

@@ -99,57 +99,136 @@ $('.js-zoom').trigger('zoom.destroy');   // 外す
 | キーボード | 無い | ズームボタン(機能トグル) |
 | ギャラリー | 無い(別のプラグインと組み合わせる) | 前後ボタンとサムネイルを含む |
 
+#### 2.4 Spartacus の部品と組み合わせる例
+
+3.1 節の自前のコンポーネントを Spartacus の中で使うときは、`img` を `cx-media` にし、`container` に商品の画像群を渡します。形式の選び方と `srcset` を Spartacus に任せられます。拡大したときの画像は、`format` を渡さない `cx-media` にすると、2.2 節と同じく一番大きい形式が選ばれます。作ったコンポーネントは、CMS の `ProductImagesComponent` に割り当てて差し替えます。
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節のコードは、`@angular/core` とブラウザ標準の API だけで書きます。Spartacus の部品(`cx-media`、`@spartacus/product/image-zoom` など)を使う書き方は 2 節です。
 
 「乗せるだけで、その場で拡大」を書くなら、大きな画像を重ねずに、同じ `img` を `transform: scale()` で拡大し、`transform-origin` をポインタの位置にします。画像の寸法を読む必要がありません。
 
+#### 3.1 乗せて拡大、押している間だけ拡大、押して切り替え
+
 ```ts
-import { Component, input, signal } from '@angular/core';
+import { Component, computed, input, linkedSignal, output, signal } from '@angular/core';
+
+type ZoomOn = 'mouseover' | 'grab' | 'toggle';   // jQuery Zoom の on に合わせた名前
 
 @Component({
-  selector: 'app-hover-zoom',
+  selector: 'app-zoom',
   template: `
-    <div class="frame"
-         (pointerenter)="on.set(true)" (pointerleave)="on.set(false)"
+    <div class="frame" [class.is-zoomed]="zoomed()"
+         (pointerenter)="enter()" (pointerleave)="leave()"
+         (pointerdown)="down()" (pointerup)="up()" (click)="clickFrame()"
          (pointermove)="move($event)">
-      <img [src]="src()" [attr.srcset]="srcset()" [alt]="alt()"
-           [style.transform]="on() ? 'scale(' + scale() + ')' : null"
-           [style.transform-origin]="origin()" />
+      <img [src]="shownSrc()" [attr.srcset]="zoomed() && largeReady() ? null : srcset()" [alt]="alt()"
+           [style.transform]="zoomed() ? 'scale(' + magnify() + ')' : null"
+           [style.transform-origin]="x() + '% ' + y() + '%'" />
     </div>
-    <button type="button" (click)="on.set(!on())" [attr.aria-pressed]="on()">拡大</button>
+    <button type="button" [attr.aria-pressed]="zoomed()" (click)="setZoom(!zoomed())"
+            (keydown.arrowleft)="nudge(-10, 0, $event)" (keydown.arrowright)="nudge(10, 0, $event)"
+            (keydown.arrowup)="nudge(0, -10, $event)" (keydown.arrowdown)="nudge(0, 10, $event)">
+      拡大
+    </button>
   `,
   styles: `
     .frame { overflow: hidden; cursor: zoom-in; touch-action: pan-y; }
+    .frame.is-zoomed { cursor: zoom-out; }
     .frame img { display: block; width: 100%; transition: transform 120ms; }
     @media (prefers-reduced-motion: reduce) { .frame img { transition: none; } }
   `,
 })
-export class HoverZoomComponent {
+export class ZoomComponent {
   src = input.required<string>();
-  srcset = input<string>();          // 大きい画像も srcset に入れておけば、拡大時もぼやけにくい
+  srcset = input<string>();
   alt = input('');
-  scale = input(2);
-  on = signal(false);
-  origin = signal('50% 50%');
+  large = input<string>();          // 拡大に使う別の大きな画像(jQuery Zoom の url)
+  on = input<ZoomOn>('mouseover');
+  magnify = input(2);
+  zoomIn = output<void>();
+  zoomOut = output<void>();
+
+  zoomed = signal(false);
+  x = signal(50);
+  y = signal(50);
+  // large が変わったら「まだ読んでいない」に戻る
+  largeReady = linkedSignal({ source: this.large, computation: () => false });
+  shownSrc = computed(() => (this.zoomed() && this.largeReady() ? this.large()! : this.src()));
+
+  enter() { if (this.on() === 'mouseover') this.setZoom(true); }
+  leave() { if (this.on() !== 'toggle') this.setZoom(false); }
+  down()  { if (this.on() === 'grab') this.setZoom(true); }
+  up()    { if (this.on() === 'grab') this.setZoom(false); }
+  clickFrame() { if (this.on() === 'toggle') this.setZoom(!this.zoomed()); }
 
   move(e: PointerEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
-    this.origin.set(`${x}% ${y}%`);
+    this.x.set(clamp(((e.clientX - r.left) / r.width) * 100));
+    this.y.set(clamp(((e.clientY - r.top) / r.height) * 100));
+  }
+
+  // 拡大中は、ボタンにフォーカスがある状態で矢印キーを押すと、拡大する場所が動く
+  nudge(dx: number, dy: number, e: Event) {
+    if (!this.zoomed()) return;
+    e.preventDefault();              // ページがスクロールしないように
+    this.x.update((v) => clamp(v + dx));
+    this.y.update((v) => clamp(v + dy));
+  }
+
+  setZoom(on: boolean) {
+    if (on === this.zoomed()) return;
+    this.zoomed.set(on);
+    if (on) { this.loadLarge(); this.zoomIn.emit(); } else { this.zoomOut.emit(); }
+  }
+
+  // 大きな画像は、初めて拡大したときに読む。読み終わるまでは元の画像を拡大して見せる
+  private loadLarge() {
+    const url = this.large();
+    if (!url || this.largeReady()) return;
+    const img = new Image();          // イベントの中からしか呼ばれないので、サーバーでは動かない
+    img.src = url;
+    img.decode().then(
+      () => { if (this.large() === url) this.largeReady.set(true); },
+      () => { /* 読めなければ元の画像のまま */ },
+    );
   }
 }
+
+const clamp = (v: number) => Math.min(100, Math.max(0, v));
 ```
 
-- マウスとタッチは Pointer Events でまとめて受け取れる。jQuery Zoom のように `mouse*` と `touch*` を別々に書かなくてよい
-- `touch-action: pan-y` で、縦のスクロールはブラウザに残す。jQuery Zoom はタッチで `preventDefault()` するので、画像の上ではページがスクロールしなかった
-- キーボードの人のために、拡大を切り替えるボタンを付ける。拡大した状態で矢印キーで `transform-origin` を動かすと、さらによい
-- 別の大きな画像を使いたいなら、拡大したときだけ `src` を差し替える。読み終わるまでは、`img` の `load` を待ってから `on` を `true` にする([waitForImages の章](./jquery-waitforimages.md))
-- Spartacus の中で作るなら、`img` は `cx-media` にし、`container` に商品の画像群を渡す。形式の選び方と `srcset` を Spartacus に任せられる
+jQuery Zoom のオプションとの対応は次のとおりです。
 
-**SSR での注意**: `pointermove` などのイベントはブラウザでしか起きないので、上のコードはサーバーでもそのまま描ける。最初の状態(拡大していない)はサーバーとブラウザで同じ。`getBoundingClientRect()` はイベントの中でだけ呼ぶ。コンストラクタや `ngOnInit` で呼ぶとサーバーで失敗する。
+| jQuery Zoom のオプション(1.2 節) | この書き方 |
+|---|---|
+| `url` | `large`。初めて拡大したときに `new Image()` と `decode()` で読み、読み終わったら `src` を差し替える |
+| `on: 'mouseover'` | `pointerenter` / `pointerleave` |
+| `on: 'grab'` | `pointerdown` / `pointerup` |
+| `on: 'click'` / `'toggle'` | `click` で切り替える(`'toggle'`)。「どこかを押すと終わる」`'click'` が要るなら、`inject(DOCUMENT)` の `click` を `afterNextRender()` の中で受け、`DestroyRef.onDestroy()` で外す |
+| `touch` | Pointer Events がタッチも受け取る。`touch-action: pan-y` で縦のスクロールはブラウザに残す |
+| `magnify` | `magnify`(`scale()` の倍率) |
+| `duration` | `transition` の時間 |
+| `target`(別の場所に出す) | 同じ画像を `target` 側の箱に置き、そちらに `transform` を付ける。座標は `x()` / `y()` をそのまま使える |
+| `callback` / `onZoomIn` / `onZoomOut` | `output()` の `zoomIn` / `zoomOut`。読み終わりは `largeReady()` |
+| `zoom.destroy` | 要らない。イベントはテンプレートに書いているので、コンポーネントが消えると外れる |
+
+- マウスとタッチは Pointer Events でまとめて受け取れる。jQuery Zoom のように `mouse*` と `touch*` を別々に書かなくてよい
+- jQuery Zoom はタッチで `preventDefault()` するので、画像の上ではページがスクロールしなかった。`touch-action: pan-y` なら、縦に払えばページがスクロールし、横に動かせば拡大の位置が動く
+- キーボードの人のために、拡大を切り替えるボタン(`aria-pressed`)を付け、矢印キーで場所を動かせるようにする。jQuery Zoom にはキーボードの手段が無かった(1.3 節)
+- 拡大した画像は見た目だけの変化なので、`alt` はそのままでよい
+- 画像の読み込みを待つ書き方は、[waitForImages の章](./jquery-waitforimages.md) 3 節にまとめた
+
+#### 3.2 SSR での注意
+
+- `pointermove` などのイベントはブラウザでしか起きないので、3.1 節のコードはサーバーでもそのまま描ける。最初の状態(拡大していない)はサーバーとブラウザで同じ
+- `getBoundingClientRect()` と `new Image()` は、イベントの中でだけ呼んでいる。コンストラクタや `ngOnInit` で呼ぶと、サーバーで失敗する
+- 大きな画像を先に読んでおきたい(最初の拡大を速くしたい)なら、`afterNextRender()`(ブラウザでだけ動く。`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中で `loadLarge()` を呼ぶ
+- `document` や `window` が要るときは、グローバルではなく `inject(DOCUMENT)`(v21 では `@angular/core` から import できる)と、その `defaultView` を使う。描画と関係なく分けたいときは `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)
+- 後始末は `DestroyRef.onDestroy()` で書く
 
 ---
 
@@ -173,7 +252,9 @@ export class HoverZoomComponent {
 |---|---|
 | 拡大できればよい(ダイアログでよい) | `@spartacus/product/image-zoom` を入れる。機能トグル `a11yKeyboardAccessibleZoom` は既定で有効なので、切らない |
 | 倍率や見た目を変えたい | `_product-image-zoom-view.scss` の `scale(2)` などを上書きする |
-| ページの上で、乗せるだけで拡大したい | 3 節の自前コンポーネントを作り、`ProductImagesComponent` に割り当てる |
+| ページの上で、乗せるだけで拡大したい | 3.1 節の自前コンポーネントを作り、2.4 節のように `ProductImagesComponent` に割り当てる |
+| Spartacus を使わない Angular アプリで、その場で拡大したい | 3.1 節のコンポーネント(`transform: scale()` と Pointer Events)。ライブラリは要らない |
+| Spartacus を使わず、ダイアログで大きく見せたい | ブラウザ標準の `<dialog>` と `showModal()` の中に 3.1 節のコンポーネントを置く。全画面のギャラリーまで要るなら `photoswipe` |
 | 乗せると横に別枠で拡大したい | `drift-zoom` を薄いコンポーネントで包む |
 | ピンチやホイールでの拡大が要る | `@panzoom/panzoom` か `photoswipe` |
 

@@ -113,58 +113,106 @@ CMS の `ProductImagesComponent` に `ProductImagesComponent`(`selector: 'cx-pro
 
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節のコードは、`@angular/core` とブラウザ標準の API だけで書きます。Spartacus の部品(`cx-product-images` など)を使う書き方は 2 節です。
 
 「横に滑る 1 枚ずつのスライド」を書くなら、状態は「今何枚目か」の 1 つだけです。滑らせるのは CSS に任せます。
 
+#### 3.1 番号のボタン、前後ボタン、キーボード
+
 ```ts
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, linkedSignal } from '@angular/core';
+
+export interface GalleryImage { src: string; alt: string; }
 
 @Component({
   selector: 'app-slide-viewer',
   template: `
-    <div class="viewport" role="group" aria-roledescription="carousel" aria-label="商品画像">
-      <ul class="strip" [style.transform]="offset()">
-        @for (img of images(); track img.src; let i = $index) {
-          <li [attr.aria-hidden]="i !== index()">
-            <img [src]="img.src" [alt]="img.alt" loading="lazy" />
-          </li>
+    <section class="viewer" aria-roledescription="carousel" [attr.aria-label]="label()"
+             (keydown.arrowleft)="step(-1)" (keydown.arrowright)="step(1)">
+      <div class="viewport">
+        <ul class="strip" [style.transform]="offset()">
+          @for (img of images(); track img.src; let i = $index) {
+            <li [attr.aria-hidden]="i !== index() ? 'true' : null">
+              <img [src]="img.src" [alt]="img.alt" [attr.loading]="i === 0 ? null : 'lazy'" />
+            </li>
+          }
+        </ul>
+        @if (images().length > 1) {
+          <button type="button" class="prev" aria-label="前の画像" (click)="step(-1)">‹</button>
+          <button type="button" class="next" aria-label="次の画像" (click)="step(1)">›</button>
         }
-      </ul>
-    </div>
-    <div class="pager">
-      @for (img of images(); track img.src; let i = $index) {
-        <button type="button" (click)="index.set(i)"
-                [attr.aria-current]="i === index()"
-                [attr.aria-label]="(i + 1) + '枚目: ' + img.alt">{{ i + 1 }}</button>
+      </div>
+      <p class="status" aria-live="polite">{{ index() + 1 }} / {{ images().length }}: {{ current()?.alt }}</p>
+      @if (images().length > 1) {
+        <div class="pager">
+          @for (img of images(); track img.src; let i = $index) {
+            <button type="button" (click)="index.set(i)"
+                    [attr.aria-current]="i === index() ? 'true' : null"
+                    [attr.aria-label]="(i + 1) + '枚目: ' + img.alt"
+                    [title]="img.alt">{{ i + 1 }}</button>
+          }
+        </div>
       }
-    </div>
+    </section>
   `,
   styles: `
-    .viewport { overflow: hidden; aspect-ratio: 1 / 1; }
-    .strip    { display: flex; margin: 0; padding: 0; list-style: none;
+    .viewport { position: relative; overflow: hidden; aspect-ratio: 1 / 1; }
+    .strip    { display: flex; height: 100%; margin: 0; padding: 0; list-style: none;
                 transition: transform 750ms cubic-bezier(0.87, 0, 0.13, 1); }  /* easeInOutExpo に近い */
     .strip li { flex: 0 0 100%; }
     .strip img { width: 100%; height: 100%; object-fit: contain; }
+    .prev, .next { position: absolute; inset-block: 0; width: 50%; opacity: 0; }  /* 画像の左半分・右半分 */
+    .prev { inset-inline-start: 0; cursor: w-resize; }
+    .next { inset-inline-end: 0; cursor: e-resize; }
+    .prev:focus-visible, .next:focus-visible { opacity: 1; }
     @media (prefers-reduced-motion: reduce) { .strip { transition: none; } }
   `,
 })
 export class SlideViewerComponent {
-  images = input.required<{ src: string; alt: string }[]>();
-  index = signal(0);
+  images = input.required<GalleryImage[]>();
+  label = input('商品画像');
+
+  // images が変わったら 0 枚目に戻る。ボタンで set() もできる
+  index = linkedSignal({ source: this.images, computation: () => 0 });
+  current = computed(() => this.images()[this.index()]);
   offset = computed(() => `translateX(${-100 * this.index()}%)`);
+
+  step(dir: 1 | -1) {
+    const n = this.images().length;
+    if (n > 0) this.index.update((i) => (i + dir + n) % n);   // 端では反対の端へ(slideViewer と同じ)
+  }
 }
 ```
 
-slideViewer との違いは次のとおりです。
+slideViewer の機能との対応は次のとおりです。
 
-- 幅は `%` で決めるので、最初の画像の寸法を JS で読む必要がない。画像が読み終わるのを待つ必要もない
-- 番号のボタンは `<button>` にし、`aria-label` と `aria-current` を付ける
-- 画像の左右を押して送る操作が要るなら、見える「前へ」「次へ」のボタンにする。キーボードでも使える
+| slideViewer の機能(1 節) | この書き方 |
+|---|---|
+| 横一列に並べて `left` を `animate()` | `flex: 0 0 100%` で並べ、`transform` を `transition` で動かす。`easeTime` / `easeFunc` は `transition` の時間と `cubic-bezier()`。`jquery.easing` は要らない |
+| 番号のリンク | `<button>`。`aria-label` に画像の `alt`、`aria-current` で今の画像 |
+| 画像の左半分・右半分を押して送る | 画像の上に、透明な「前の画像」「次の画像」の `<button>` を半分ずつ重ねる。キーボードでも押せ、フォーカスが当たると見える |
+| 端では反対の端へ戻る | `step()` の `% n` |
+| `toolTip`(番号に乗せると `alt` を出す) | `title` 属性。読み上げには `aria-label` が効くので、ツールチップに頼らない。今の画像の説明は `.status` に文字で出す |
+| `uiBefore`(番号を画像の上に置く) | テンプレートで `.pager` を前に書く |
+| 読み込み中のくるくる | 要らない。`aspect-ratio` で場所を先に取るので、読み込みを待たずに配置が決まる |
+| グローバルな連番 ID | 要らない。状態はコンポーネントのインスタンスが持つ |
 
-ネイティブのスワイプが要るなら、`transform` の代わりに `scroll-snap` で書きます([Owl Carousel の章](./owl-carousel.md) 3 節)。
+- 左右の矢印キーは、フォーカスが `section` の中にあるときに効く。`(keydown.arrowleft)` は、キーの名前でイベントを絞る Angular のテンプレートの書き方
+- `aria-hidden` は、見えていない画像を読み上げから外すため。画像の中にリンクやボタンを入れるなら、`aria-hidden` ではなく `inert` 属性にする(Tab でも入れなくなる)
+- `.status` の `aria-live="polite"` で、切り替えたときに「2 / 5: 側面」と読み上げる
 
-**SSR での注意**: この書き方は `window` も `document` も使わないので、サーバーでもそのまま描ける。サーバーとブラウザで同じ HTML になる(最初は 0 枚目)。slideViewer のように画像の寸法を読む作りは、サーバーでは寸法が 0 になる。
+#### 3.2 ネイティブのスワイプが要るとき
+
+`transform` で動かす書き方では、指で横に払っても送れません。スワイプが要るなら、`transform` の代わりに横スクロールと `scroll-snap` で書きます([Owl Carousel の章](./owl-carousel.md) 3.1 節)。`.item` を `flex: 0 0 100%` にすれば 1 枚ずつになります。番号のボタンは `scrollTo({ left: i * clientWidth })` で送ります。
+
+#### 3.3 SSR での注意
+
+- 3.1 節の書き方は `window` も `document` も使わないので、サーバーでもそのまま描ける。サーバーとブラウザで同じ HTML になる(最初は 0 枚目)
+- slideViewer のように画像の寸法を読む作りは、サーバーでは寸法が 0 になる。寸法が要るなら、`afterNextRender()`(ブラウザでだけ動く。`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中で読む
+- 3.2 節のスクロール型で `scrollTo()` を使うのはクリックの中だけなので、サーバーでは呼ばれない。最初の表示位置を JS で変えたいときだけ `afterNextRender()` を使う
+- `document` が要るときは `inject(DOCUMENT)`(v21 では `@angular/core` から import できる)、ブラウザかどうかで分けたいときは `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)を使う
 
 ---
 
@@ -186,7 +234,9 @@ slideViewer との違いは次のとおりです。
 | メイン画像とサムネイルで足りる | `cx-product-images`(標準のまま) |
 | 見た目だけ変えたい(縦並びを横並びに、など) | `_product-images.scss` の `%cx-product-images` を上書きする |
 | 拡大も要る | `@spartacus/product/image-zoom`([jQuery Zoom の章](./jquery-zoom.md)) |
-| 横に滑るスライドと番号のボタンが要る | 3 節の自前コンポーネントを作り、CMS の `ProductImagesComponent` に割り当てる |
+| 横に滑るスライドと番号のボタンが要る | 3.1 節の自前コンポーネントを作り、CMS の `ProductImagesComponent` に割り当てる |
+| Spartacus を使わない Angular アプリで、横に滑るギャラリーが要る | 3.1 節のコンポーネント(`linkedSignal` と CSS の `transform`)。ライブラリは要らない |
+| Spartacus を使わず、スワイプも要る | 3.2 節の `scroll-snap` で書く |
 | 全画面で見せたい | `photoswipe` |
 
 ---
