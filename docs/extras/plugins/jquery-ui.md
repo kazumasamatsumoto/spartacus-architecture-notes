@@ -15,7 +15,7 @@ jQuery UI は 1 つの部品ではありません。入力補完、日付選択�
 
 Spartacus には、半分ほどのウィジェットに相当する標準の部品があります。検索候補は `cx-searchbox`、日付は `cx-date-picker`、ダイアログは `LaunchDialogService`、タブとアコーディオンは `cx-tab`、セレクトは ng-select です。スライダーと並べ替え(ドラッグ)は Spartacus にありません。
 
-標準に無いものは、まずブラウザの標準の要素を検討します。`<input type="range">`、`<dialog>`、`<details>`、`<progress>`、Popover API などで、多くのウィジェットが置き換わります。
+標準に無いものは、まずブラウザの標準の要素を検討します。`<input type="range">`、`<dialog>`、`<details>`、`<progress>`、Popover API などで、多くのウィジェットが置き換わります。Spartacus を使わない Angular のプロジェクトでも同じです。タブや入力補完のように標準の要素が無いものは、signal とキーボードの処理を自分で書きます(3 節)。
 
 なお 1.12.1 には、修正済みの XSS の脆弱性が 4 件あります(1.4 節)。jQuery UI を残す場合でも、この版のままにはできません。
 
@@ -210,52 +210,128 @@ tabConfig: TabConfig = {
 
 `cxPopover` はホバーではなく、クリックと Enter / Space で開きます(`sf/shared/components/popover/popover.directive.ts:83-115`)。表示位置は `cxPopoverOptions` の `placement`、`autoPositioning`、`appendToBody` で決めます(`popover.model.ts:46`、`:56`、`:78`)。マウスを乗せただけで出る吹き出しは、Spartacus にありません。
 
----
+#### 2.7 Spartacus の部品と組み合わせる例
 
-### 3. Angular で書くとどうなるか
-
-#### 3.1 入力補完(サーバーに問い合わせる)
+Spartacus の中で、商品検索以外の入力補完を自分で書くなら、通信は自作の Facade に任せます([15 章](../../15-facade-connector-adapter.md))。3.1 節のコンポーネントの `HttpClient` を、Facade に差し替えた形です。
 
 ```ts
-import { Component, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { debounceTime, distinctUntilChanged, filter, switchMap } from 'rxjs';
-
-@Component({
-  selector: 'app-city-input',
-  template: `
-    <label for="city">市区町村</label>
-    <input id="city" role="combobox" autocomplete="off"
-           aria-controls="city-list" [attr.aria-expanded]="items().length > 0"
-           (input)="term.set($any($event.target).value)" />
-    @if (items().length) {
-      <ul id="city-list" role="listbox">
-        @for (c of items(); track c.code) {
-          <li role="option" (click)="pick(c)">{{ c.name }}</li>
-        }
-      </ul>
-    }
-  `,
-})
 export class CityInputComponent {
   private api = inject(CityFacade);   // 通信は Facade に任せる(15 章)
   term = signal('');
   items = toSignal(
     toObservable(this.term).pipe(
-      debounceTime(300),                 // jQuery UI の delay
+      debounceTime(300),                   // jQuery UI の delay
       distinctUntilChanged(),
-      filter((t) => t.length >= 2),      // jQuery UI の minLength
+      filter((t) => t.length >= 2),        // jQuery UI の minLength
       switchMap((t) => this.api.search(t)) // 前の問い合わせを捨てる(jQuery UI の xhr.abort())
     ),
     { initialValue: [] }
   );
-  pick(c: City) { /* 値を入れて閉じる */ }
 }
 ```
 
-`switchMap` が、jQuery UI の「前の通信を `abort()` する」(`pkg/ui/widgets/autocomplete.js:398-400`)にあたります。上下キーで候補を選ぶ処理と `aria-activedescendant` も要ります。手間を省くなら ng-select の `typeahead` を使います(4 節)。
+ダイアログは、Spartacus のページの中では `LaunchDialogService` と `[cxFocus]`(2.4 節)を使うほうが無難です。フォーカスの扱いと見た目が、ほかのダイアログと揃います。`<dialog>`(3.2 節)は、Spartacus の外の画面や、`LaunchDialogService` に登録するほどでもない確認に向きます。
 
-一覧が小さく、手元にあるなら `<datalist>` で足ります。
+---
+
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は `@angular/*` とブラウザ標準(と RxJS)だけで書きます。`cx-*` の部品、`LaunchDialogService`、Facade など、Spartacus の部品を使う書き方は 2 節(とくに 2.7 節)です。キーボード操作と `aria-*` も、ここでは自分で書きます。
+
+#### 3.1 入力補完(サーバーに問い合わせる)
+
+```ts
+import { Component, inject, linkedSignal, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+
+interface City { code: string; name: string; }
+
+@Component({
+  selector: 'app-city-input',
+  template: `
+    <label for="city">市区町村</label>
+    <input id="city" role="combobox" autocomplete="off" aria-autocomplete="list"
+           aria-controls="city-list" [attr.aria-expanded]="open()"
+           [attr.aria-activedescendant]="active() >= 0 ? 'city-' + active() : null"
+           [value]="value()" (input)="onInput($any($event.target).value)"
+           (keydown)="onKey($event)" (blur)="open.set(false)" />
+    <ul id="city-list" role="listbox" aria-label="候補" [hidden]="!open()">
+      @for (c of items(); track c.code; let i = $index) {
+        <li role="option" [id]="'city-' + i" [attr.aria-selected]="i === active()"
+            (mousedown)="$event.preventDefault()" (click)="pick(c)">{{ c.name }}</li>
+      }
+    </ul>
+    <!-- jQuery UI の liveRegion にあたる。候補の数を読み上げる -->
+    <p class="sr-only" role="status">{{ open() ? items().length + ' 件の候補があります' : '' }}</p>
+  `,
+  styles: `.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }`,
+})
+export class CityInputComponent {
+  private http = inject(HttpClient);
+  value = signal('');
+  private term = signal('');
+  items = toSignal(
+    toObservable(this.term).pipe(
+      debounceTime(300),                          // jQuery UI の delay
+      distinctUntilChanged(),
+      switchMap((t) =>                            // 前の問い合わせを捨てる(jQuery UI の xhr.abort())
+        t.length < 2                              // jQuery UI の minLength
+          ? of([])
+          : this.http
+              .get<City[]>('/api/cities', { params: { q: t } })
+              .pipe(catchError(() => of([])))
+      )
+    ),
+    { initialValue: [] as City[] }
+  );
+  open = linkedSignal(() => this.items().length > 0);                    // 候補が届いたら開く
+  active = linkedSignal({ source: this.items, computation: () => -1 });  // 候補が変わったら選択を外す
+
+  onInput(v: string) {
+    this.value.set(v);
+    this.term.set(v);
+  }
+
+  onKey(e: KeyboardEvent) {
+    const n = this.items().length;
+    if (e.key === 'ArrowDown' && n) {
+      e.preventDefault();
+      this.open.set(true);
+      this.active.update((i) => (i + 1) % n);
+    } else if (e.key === 'ArrowUp' && n) {
+      e.preventDefault();
+      this.open.set(true);
+      this.active.update((i) => (i <= 0 ? n - 1 : i - 1));
+    } else if (e.key === 'Enter' && this.open() && this.active() >= 0) {
+      e.preventDefault();
+      this.pick(this.items()[this.active()]);
+    } else if (e.key === 'Escape') {
+      this.open.set(false);
+    }
+  }
+
+  pick(c: City) {
+    this.value.set(c.name);
+    this.open.set(false);
+  }
+}
+```
+
+| jQuery UI Autocomplete | このコンポーネント |
+|---|---|
+| `source` が URL | `HttpClient.get()` |
+| `delay: 300` | `debounceTime(300)` |
+| `minLength` | `t.length < 2` なら問い合わせない |
+| 前の通信を `abort()` する(`pkg/ui/widgets/autocomplete.js:398-400`) | `switchMap`。購読をやめると `HttpClient` が XHR を `abort()` する(`@angular/common@21.2.26` の `fesm2022/_module-chunk.mjs:1242-1244`) |
+| Menu ウィジェットの上下キー | `onKey()` と `aria-activedescendant`。フォーカスは入力欄に置いたまま、選んでいる候補だけを伝える |
+| `liveRegion` | `role="status"` の要素 |
+| `close` | Esc とフォーカスが外れたとき |
+
+候補の `mousedown` で `preventDefault()` しているのは、クリックの前に入力欄の `blur` が起きて一覧が閉じるのを防ぐためです。
+
+一覧が小さく、手元にあるなら `<datalist>` で足ります。キーボード操作と読み上げはブラウザが受け持ちます。
 
 ```html
 <input list="prefs" name="pref" />
@@ -266,9 +342,11 @@ export class CityInputComponent {
 
 #### 3.2 ダイアログ
 
-Spartacus の外で独自のダイアログが要るときは、ネイティブの `<dialog>` が使えます。`showModal()` で開くと、背景が操作できなくなり、Esc で閉じ、`::backdrop` で覆いを描けます。jQuery UI の `modal: true` が JS でやっていたこと(`pkg/ui/widgets/dialog.js:328-375`、`:869`)を、ブラウザが担います。
+独自のダイアログには、ネイティブの `<dialog>` が使えます。`showModal()` で開くと、背景が操作できなくなり、Esc で閉じ、`::backdrop` で覆いを描けます。jQuery UI の `modal: true` が JS でやっていたこと(`pkg/ui/widgets/dialog.js:328-375`、`:869`)を、ブラウザが担います。
 
 ```ts
+import { Component, ElementRef, viewChild } from '@angular/core';
+
 @Component({
   selector: 'app-confirm',
   template: `
@@ -287,9 +365,9 @@ export class ConfirmComponent {
 }
 ```
 
-Spartacus のページの中では、フォーカスの扱いと見た目を揃えるため、`LaunchDialogService` を使うほうが無難です。
+どちらのボタンで閉じたかは、`close` イベントのあとに `dialog.returnValue`(`'cancel'` か `'ok'`)で分かります。jQuery UI の `buttons` オプションの代わりです。
 
-#### 3.3 アコーディオン、スライダー、進捗
+#### 3.3 アコーディオン、スライダー、進捗、日付、数値
 
 ```html
 <!-- アコーディオン: name が同じ details は 1 つしか開かない -->
@@ -302,9 +380,15 @@ Spartacus のページの中では、フォーカスの扱いと見た目を揃�
 
 <!-- 進捗 -->
 <progress [value]="done()" [max]="total()"></progress>
+
+<!-- 日付(Datepicker): min / max は yyyy-mm-dd -->
+<label>お届け希望日 <input type="date" min="2026-12-01" max="2026-12-31" [formControl]="date" /></label>
+
+<!-- 数値(Spinner) -->
+<label>数量 <input type="number" min="1" max="99" step="1" [formControl]="qty" /></label>
 ```
 
-取っ手が 2 つの範囲スライダー(jQuery UI の `range: true`)は、ネイティブの `<input type="range">` にはありません。2 本重ねて CSS で見た目を作るか、ライブラリを使います(4 節)。
+`[formControl]` は `@angular/forms` の `ReactiveFormsModule` の指定です。取っ手が 2 つの範囲スライダー(jQuery UI の `range: true`)は、ネイティブの `<input type="range">` にはありません。2 本重ねて CSS で見た目を作るか、ライブラリを使います(4 節)。祝日を選べなくする(`beforeShowDay`)ことは、`<input type="date">` ではできません。バリデーターで弾いてエラーを出します。
 
 #### 3.4 並べ替え(Sortable)
 
@@ -321,10 +405,116 @@ move(i: number, d: -1 | 1) {
 }
 ```
 
+ボタンを押したあとは、動かした行のボタンにフォーカスを戻し、`role="status"` の要素で「3 番目に移しました」のように知らせます。
+
+#### 3.5 タブ
+
+タブは、HTML の標準の要素にありません。`role="tablist"` / `tab` / `tabpanel` と、矢印キーの操作を自分で書きます。
+
+```ts
+import { Component, ElementRef, signal, viewChildren } from '@angular/core';
+
+@Component({
+  selector: 'app-tabs',
+  template: `
+    <div role="tablist" aria-label="商品の情報" (keydown)="onKey($event)">
+      @for (t of tabs; track t.id; let i = $index) {
+        <button #tab type="button" role="tab" [id]="'tab-' + t.id"
+                [attr.aria-selected]="i === active()" [attr.aria-controls]="'panel-' + t.id"
+                [tabIndex]="i === active() ? 0 : -1" (click)="active.set(i)">{{ t.label }}</button>
+      }
+    </div>
+    @for (t of tabs; track t.id; let i = $index) {
+      <div role="tabpanel" tabindex="0" [id]="'panel-' + t.id"
+           [attr.aria-labelledby]="'tab-' + t.id" [hidden]="i !== active()">{{ t.body }}</div>
+    }
+  `,
+})
+export class TabsComponent {
+  tabs = [
+    { id: 'desc', label: '説明', body: '…' },
+    { id: 'spec', label: '仕様', body: '…' },
+  ];
+  active = signal(0);
+  private buttons = viewChildren<ElementRef<HTMLButtonElement>>('tab');
+
+  onKey(e: KeyboardEvent) {
+    const n = this.tabs.length;
+    const keys: Record<string, number> = {
+      ArrowRight: this.active() + 1, ArrowLeft: this.active() - 1 + n, Home: 0, End: n - 1,
+    };
+    if (!(e.key in keys)) return;
+    e.preventDefault();
+    const next = keys[e.key] % n;
+    this.active.set(next);
+    this.buttons()[next].nativeElement.focus();   // 選んだタブにフォーカスを移す
+  }
+}
+```
+
+- Tab キーで止まるのは選ばれているタブ 1 つだけにする(`tabIndex` が `0` と `-1`)。タブの間は矢印キーで移る。jQuery UI の Tabs と同じ操作である
+- jQuery UI の Tabs は、`href` が URL なら中身を Ajax で読んだ。同じことをするなら、タブが選ばれたときに `HttpClient` で取り、結果を signal に入れる
+
+#### 3.6 吹き出し(Tooltip)と位置合わせ
+
+クリックで開く吹き出しは、Popover API だけで書けます。Esc とほかの場所のクリックで閉じるのも、最前面に出すのも、ブラウザが受け持ちます。
+
+```html
+<button type="button" popovertarget="ship-help">送料について</button>
+<div id="ship-help" popover>3,000 円以上のご注文で送料無料です</div>
+```
+
+マウスを乗せたとき、フォーカスが来たときに出す吹き出し(jQuery UI の Tooltip)は、`popover="manual"` にして自分で開け閉めします。位置は、開いたあとにボタンの位置から決めます(jQuery UI の `.position()` の、はみ出したときの反転を除いた形)。
+
+```ts
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-help-tip',
+  template: `
+    <button #b type="button" aria-describedby="tip"
+            (mouseenter)="show(b, tip)" (mouseleave)="tip.hidePopover()"
+            (focus)="show(b, tip)" (blur)="tip.hidePopover()"
+            (keydown.escape)="tip.hidePopover()">?</button>
+    <div #tip id="tip" popover="manual" role="tooltip">3,000 円以上で送料無料です</div>
+  `,
+  styles: `[popover] { position: fixed; inset: auto; margin: 0; }`,
+})
+export class HelpTipComponent {
+  show(b: HTMLElement, tip: HTMLElement) {
+    if (!tip.matches(':popover-open')) tip.showPopover();
+    const r = b.getBoundingClientRect();
+    tip.style.left = `${r.left}px`;
+    tip.style.top = `${r.bottom + 4}px`;        // ボタンのすぐ下
+  }
+}
+```
+
+- `aria-describedby` で結び付けておくと、吹き出しが閉じていても、読み上げはボタンの説明として中身を読む
+- Esc で閉じられること、吹き出しの上にマウスを移しても消えないことは、WCAG 1.4.13(ホバーまたはフォーカスで表示されるコンテンツ)の要件である。上の例は後者を満たしていない。満たすなら、吹き出しの `mouseenter` / `mouseleave` も見る
+- 画面の端で反転させるなら `@floating-ui/dom`(4 節)を使う
+
+#### 3.7 Angular CDK を使う場合
+
+ここまでの書き方で、キーボード操作とフォーカスの管理を毎回自分で書くのが重いなら、Angular チームの公式パッケージ **`@angular/cdk@21`**(dist-tag `v21-lts`、2026-11-27 時点で 21.2.14。Angular 21 用。peerDependencies の `@angular/core` は `^21.0.0 || ^22.0.0`)が使えます。見た目を持たず、動きとアクセシビリティだけを提供します。
+
+| jQuery UI | `@angular/cdk@21` の部品 | 場所(21.2.14 の型定義) |
+|---|---|---|
+| Autocomplete / Menu の上下キー | `ActiveDescendantKeyManager`(3.1 節の `onKey()` の代わり) | `types/_activedescendant-key-manager-chunk.d.ts:14` |
+| Selectmenu | `CdkListbox` / `CdkOption` | `types/listbox.d.ts:87`、`:24` |
+| Dialog | `Dialog`(フォーカスの閉じ込めと戻しを含む)、`cdkTrapFocus` | `types/dialog.d.ts:309`、`types/_a11y-module-chunk.d.ts:180` |
+| Accordion | `CdkAccordion` | `types/accordion.d.ts:15` |
+| Sortable / Draggable | `CdkDropList` / `CdkDrag` | `types/drag-drop.d.ts:328`、`:643` |
+| `.position()`、Tooltip | `CdkConnectedOverlay`(はみ出したときの反転も含む) | `types/_overlay-module-chunk.d.ts:794` |
+| Menu | `CdkMenu` | `types/menu.d.ts:687` |
+
+CDK の DragDrop もキーボードでは並べ替えられないので、3.4 節のボタンは CDK を使っても要ります。Spartacus は `@angular/cdk` に依存していないので、Spartacus の中で使うと新しい依存が 1 つ増えます(4 節)。
+
 **SSR での注意**:
 
-- `showModal()`、`focus()`、ドラッグの処理はブラウザでだけ動かす。クリックなどのイベントの中で呼ぶなら、サーバーでは呼ばれないので問題ない。ページを開いた直後に呼ぶなら `afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中で呼ぶ
-- `<details>`、`<dialog>`、`<input type="range">` は HTML なので、サーバーで描いてもそのまま動く。jQuery UI のように「ブラウザで JS が動くまで素の HTML が見える」ことが無い
+- `showModal()`、`showPopover()`、`focus()`、`getBoundingClientRect()`、ドラッグの処理はブラウザでだけ動かす。クリックなどのイベントの中で呼ぶなら、サーバーでは呼ばれないので問題ない。ページを開いた直後に呼ぶなら `afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中で呼ぶ
+- 「ほかの場所をクリックしたら閉じる」のように `document` 全体でイベントを受けるときは、グローバルの `document` ではなく `inject(DOCUMENT)`(`@angular/core` から import できる。`types/core.d.ts:9439`)を使い、`afterNextRender()` の中で登録し、`DestroyRef` の `onDestroy` で外す。`isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)で分けてもよい
+- `<details>`、`<dialog>`、`<input type="range">`、`<input type="date">`、`popover` は HTML なので、サーバーで描いてもそのまま動く。jQuery UI のように「ブラウザで JS が動くまで素の HTML が見える」ことが無い
 
 ---
 
@@ -359,7 +549,9 @@ move(i: number, d: -1 | 1) {
 | スライダー(取っ手 1 つ) | `<input type="range">` |
 | 範囲スライダー(取っ手 2 つ) | `nouislider`、または `<input type="range">` を 2 本 |
 | 並べ替え | 「上へ / 下へ」ボタン + 必要なら `sortablejs`。CDK を入れてよいなら `@angular/cdk@21` の DragDrop |
-| 吹き出し | `[cxPopover]`。ホバーで出したいなら Popover API と CSS |
+| 吹き出し | `[cxPopover]`。ホバーで出したいなら Popover API(3.6 節) |
+| Spartacus を使わない Angular のプロジェクト | 3 節。入力補完は 3.1 節、ダイアログは `<dialog>`(3.2 節)、アコーディオン・スライダー・日付・数値は標準の要素(3.3 節)、タブは 3.5 節、吹き出しは Popover API(3.6 節) |
+| キーボード操作とフォーカスの管理を毎回書きたくない | `@angular/cdk@21` の `ActiveDescendantKeyManager`、`Dialog`、`CdkAccordion` など(3.7 節) |
 | jQuery UI を当面残す | 1.14.2 に上げる。テーマの CSS が Spartacus の SCSS とぶつからないか確かめる |
 
 ---

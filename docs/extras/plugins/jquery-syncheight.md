@@ -16,7 +16,7 @@ syncHeight は、指定した要素の高さを測り、一番高いものに合
 
 Spartacus に同じプラグインはありません。要りません。商品の一覧は Bootstrap の `.row`(flexbox)の中にカードを並べているので、**同じ行のカードは CSS だけで同じ高さになります**。カードの中も flexbox で縦に並べ、商品名の高さを固定し、価格の欄を伸ばして下を揃えています。
 
-Angular で新しく書くなら、CSS Grid を使います。カードの中の「画像」「名前」「価格」の位置まで行ごとに揃えたいなら、CSS の `subgrid` が使えます。JS で高さを測るのは、CSS でどうしても揃えられないときの最後の手段です。
+Angular で新しく書くなら、Spartacus を使うかどうかに関わらず、CSS Grid を使います。カードの中の「画像」「名前」「価格」の位置まで行ごとに揃えたいなら、CSS の `subgrid` が使えます。JS で高さを測るのは、CSS でどうしても揃えられないときの最後の手段です。
 
 ---
 
@@ -105,11 +105,17 @@ syncHeight との差:
 
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は `@angular/*` とブラウザ標準(CSS と `ResizeObserver`)だけで書きます。Spartacus の商品グリッドと SCSS がどう揃えているかは 2 節です。Bootstrap の `.row` / `col-*` も使いません。
 
 #### 3.1 CSS Grid で並べる
 
 ```ts
+import { Component, input } from '@angular/core';
+
+interface Tile { id: string; image: string; name: string; price: string; }
+
 @Component({
   selector: 'app-tile-list',
   template: `
@@ -166,6 +172,8 @@ export class TileListComponent {
 CSS で揃えられない配置(行をまたいだ揃え、別々の親にある要素どうし)では、`ResizeObserver` で測ります。`resize` ではなく要素の大きさの変化を受け取るので、画像やフォントの読み込みにも反応します。
 
 ```ts
+import { DestroyRef, Directive, ElementRef, afterNextRender, inject } from '@angular/core';
+
 @Directive({ selector: '[appSyncHeight]' })
 export class SyncHeightDirective {
   private host = inject(ElementRef<HTMLElement>);
@@ -191,9 +199,41 @@ export class SyncHeightDirective {
 
 ここでの `min-height` の書き込み自体も大きさの変化なので、`ResizeObserver` がもう一度呼ばれます。値が変わらなければ止まりますが、無限に呼び合わないか確かめておきます。
 
+```html
+<div appSyncHeight>
+  @for (n of notes(); track n.id) {
+    <section appSyncItem>…</section>
+  }
+</div>
+```
+
+この例は、最初に描かれた要素だけを測ります。`@for` で要素が増えたり減ったりするなら、`contentChildren()` で `appSyncItem` を集め、変わるたびに `observe()` し直します。
+
+#### 3.4 syncHeight のオプションを CSS で書く
+
+```css
+/* height: 300(測らずに決まった高さ) */
+.tile-name { height: 3lh; overflow: hidden; }     /* 3 行分。lh は行の高さの単位 */
+
+/* unSyncHeight(狭い画面では揃えない) */
+@media (max-width: 499.98px) {
+  .tiles { grid-template-columns: 1fr; }          /* 1 列なら揃える相手が無い */
+  .tile { grid-row: auto; grid-template-rows: none; }
+}
+```
+
+| syncHeight | CSS |
+|---|---|
+| `syncHeight()` | grid / flexbox の行。同じ行のものが同じ高さになる |
+| `updateOnResize: true` | 書かなくてよい。ブラウザが配置し直す |
+| `height: <数値>` | `height` か `min-height`。行数で決めるなら `lh` の単位か `line-clamp` |
+| `unSyncHeight()` | `@media` で並べ方を変える。置き場所の幅で決めるなら `@container` |
+| `$.getSyncedHeight()` | 要らない。どうしても値が要るなら 3.3 節のように測る |
+
 **SSR での注意**:
 
-- サーバーには配置の計算が無い。`offsetHeight` は測れず、`ResizeObserver` も無い。測る処理は `afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中に置く
+- サーバーには配置の計算が無い。`offsetHeight` は測れず、`ResizeObserver` も無い。測る処理は `afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中に置く。`afterNextRender()` はサーバーでは呼ばれない
+- 測るのをやめる処理は `DestroyRef` の `onDestroy` に置く。`window` の `resize` を自分で受ける場合も、グローバルの `window` ではなく `inject(DOCUMENT).defaultView`(`DOCUMENT` は `@angular/core` から import できる。`types/core.d.ts:9439`)を `afterNextRender()` の中で使う。分岐を書くなら `isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common`)
 - JS で揃える作りは、サーバーで描いた HTML では揃っておらず、ブラウザで JS が動いた瞬間に高さが変わる。画面がガタつく(CLS が増える)。CSS で揃える作りなら、この問題は起きない
 
 ---
@@ -213,6 +253,7 @@ export class SyncHeightDirective {
 | Spartacus の商品一覧 | 何もしない。標準で行ごとに揃っている |
 | 商品一覧の見た目を変えたい(名前の行数など) | `.cx-product-name` の `height` と `line-clamp` を SCSS で上書きする |
 | 独自のカードの一覧 | CSS Grid か `.row` + `col-*`。ボタンを下端に置くなら `margin-top: auto` |
+| Spartacus も Bootstrap も使わない Angular のプロジェクト | 3.1 節の CSS Grid。段まで揃えるなら 3.2 節の `subgrid`。狭い画面の扱いは 3.4 節の `@media` |
 | カードの中の段(名前、価格)の位置まで揃えたい | `grid-template-rows: subgrid` |
 | 画像の高さで崩れる | `img` に `width` / `height` 属性か `aspect-ratio` |
 | 別々の親にある要素の高さを揃えたい | 配置を見直す。どうしても要るなら 3.3 節の `ResizeObserver` |

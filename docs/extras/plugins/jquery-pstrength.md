@@ -18,7 +18,7 @@ pstrength は、パスワードの入力欄の下に細いバーと「Weak」「
 
 Spartacus に強さのメーターはありません。その代わり、**パスワードの規則をバリデーターで検査** し、満たしていない規則を `cx-form-errors` で 1 つずつ表示します。規則は「8 文字以上 128 文字以下」「大文字・数字・記号を 1 つ以上」「同じ文字を続けない」などです。パスワードを表示して確かめるボタン(`cxPasswordVisibilitySwitch`)もあります。
 
-メーターがどうしても要るなら、Angular では `computed()` で点数を出し、`<meter>` 要素で描けば数行で書けます。点数の計算には、文字の種類を数える方式ではなく、よく使われるパスワードや辞書の単語を見つける `zxcvbn` 系のライブラリを使うほうが、実際の強さに近くなります。
+メーターがどうしても要るなら、Angular では `computed()` で点数を出し、`<meter>` 要素で描けば数行で書けます。Spartacus を使わないプロジェクトでも、規則の検査は `@angular/forms` のバリデーターで、表示の切り替えはボタン 1 つで書けます(3 節)。点数の計算には、文字の種類を数える方式ではなく、よく使われるパスワードや辞書の単語を見つける `zxcvbn` 系のライブラリを使うほうが、実際の強さに近くなります。
 
 ---
 
@@ -133,11 +133,27 @@ password: ['', [Validators.required, ...this.passwordValidators]],
 | 読み上げ | 伝わらない | `cx-form-errors` の `aria-live="polite"` で伝わる |
 | サーバー側 | — | 規則はフロントの検査。サーバー側の規則と合わせる必要がある |
 
+#### 2.4 Spartacus の部品と組み合わせる例
+
+Spartacus の会員登録の画面に、3.1 節のメーターを足すときの形です。規則の検査は 2.1 節の `securePasswordValidators` と `cx-form-errors` のまま残し、メーターは目安として並べます。
+
+```html
+<!-- 親のテンプレート(会員登録のフォームの中) -->
+<input type="password" formControlName="password" cxPasswordVisibilitySwitch
+       aria-describedby="password-input-hint pw-meter-text" />
+<app-password-meter [password]="registerForm.controls.password.value ?? ''" />
+<cx-form-errors [control]="registerForm.get('password')" />
+```
+
 ---
 
-### 3. Angular で書くとどうなるか
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
 
-メーターを足すなら、パスワードの値から点数を `computed()` で出し、`<meter>` で描きます。`<meter>` は「範囲の中のどこにあるか」を表す標準の要素で、`low` / `high` / `optimum` を渡すと、ブラウザが良し悪しの色を付けます。
+この節は `@angular/*` とブラウザ標準(と RxJS)だけで書きます。`CustomFormValidators`、`cx-form-errors`、`cxPasswordVisibilitySwitch` など、Spartacus の部品を使う書き方は 2 節(組み合わせ方は 2.4 節)です。
+
+#### 3.1 強さのメーター
+
+メーターは、パスワードの値から点数を `computed()` で出し、`<meter>` で描きます。`<meter>` は「範囲の中のどこにあるか」を表す標準の要素で、`low` / `high` / `optimum` を渡すと、ブラウザが良し悪しの色を付けます。
 
 ```ts
 import { Component, computed, input } from '@angular/core';
@@ -167,23 +183,93 @@ export class PasswordMeterComponent {
 }
 ```
 
-```html
-<!-- 親のテンプレート -->
-<input type="password" formControlName="password" cxPasswordVisibilitySwitch
-       aria-describedby="password-input-hint pw-meter-text" />
-<app-password-meter [password]="registerForm.controls.password.value ?? ''" />
+#### 3.2 規則の検査: 自分のバリデーター
+
+Spartacus の `securePasswordValidators` にあたるものは、`@angular/forms` の `ValidatorFn` で書きます。規則を 1 つの配列にまとめておくと、バリデーターと、画面のチェックリスト(3.3 節)の両方で同じ規則を使えます。
+
+```ts
+// password-rules.ts
+import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+
+const COMMON = ['password', 'qwerty', 'letmein', '123456'];   // pstrength の common にあたる
+
+export const PASSWORD_RULES = [
+  { key: 'length', label: '8 文字以上 128 文字以下', test: (p: string) => p.length >= 8 && p.length <= 128 },
+  { key: 'upper', label: '大文字を 1 つ以上', test: (p: string) => /[A-Z]/.test(p) },
+  { key: 'digit', label: '数字を 1 つ以上', test: (p: string) => /\d/.test(p) },
+  { key: 'symbol', label: '記号を 1 つ以上', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { key: 'common', label: 'よく使われるパスワードではない', test: (p: string) => !COMMON.includes(p.toLowerCase()) },
+];
+
+export const passwordRules: ValidatorFn = (c: AbstractControl): ValidationErrors | null => {
+  const p = String(c.value ?? '');
+  const failed = PASSWORD_RULES.filter((r) => !r.test(p));
+  return failed.length ? Object.fromEntries(failed.map((r) => [r.key, true])) : null;
+};
 ```
+
+- pstrength の `minchar` は `length` の規則に、`common` は `common` の規則になる。pstrength は点数を下げるだけだったが、ここでは送信を止める
+- ここでは使っていないが、`Validators.minLength()` は空の値を通す(長さ 0 ならエラーにしない。`@angular/forms@21.2.26` の `fesm2022/forms.mjs:351-356`)。`passwordRules` は空の値も規則に照らすが、空の欄の文言を分けたいなら `Validators.required` を一緒に付ける(3.3 節)
+- 禁止語は pstrength と同じく完全一致だけを見ている。漏えい済みのパスワードと照らすのは、サーバーの仕事にする(6 節)
+
+#### 3.3 入力欄にまとめる: チェックリスト、表示の切り替え、メーター
+
+```ts
+import { Component, computed, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { PASSWORD_RULES, passwordRules } from './password-rules';
+import { PasswordMeterComponent } from './password-meter.component';
+
+@Component({
+  selector: 'app-password-field',
+  imports: [ReactiveFormsModule, PasswordMeterComponent],
+  template: `
+    <label for="pw">パスワード</label>
+    <input id="pw" [type]="visible() ? 'text' : 'password'" [formControl]="pw"
+           autocomplete="new-password" aria-describedby="pw-rules pw-meter-text"
+           [attr.aria-invalid]="pw.invalid && (pw.dirty || pw.touched)" />
+    <!-- cxPasswordVisibilitySwitch にあたる。ラベルは変えず、aria-pressed で状態を伝える -->
+    <button type="button" aria-controls="pw" [attr.aria-pressed]="visible()"
+            (click)="visible.set(!visible())">パスワードを表示</button>
+
+    <ul id="pw-rules">
+      @for (r of checks(); track r.key) {
+        <!-- 色だけに頼らず、言葉でも「済」「未」を出す -->
+        <li [class.ok]="r.ok">{{ r.ok ? '済' : '未' }}: {{ r.label }}</li>
+      }
+    </ul>
+
+    <app-password-meter [password]="value()" />
+  `,
+})
+export class PasswordFieldComponent {
+  pw = new FormControl('', { nonNullable: true, validators: [Validators.required, passwordRules] });
+  visible = signal(false);
+  value = toSignal(this.pw.valueChanges, { initialValue: '' });
+  checks = computed(() => PASSWORD_RULES.map((r) => ({ ...r, ok: r.test(this.value()) })));
+}
+```
+
+| pstrength | このコンポーネント |
+|---|---|
+| `keyup` のたびに `runPassword` | `valueChanges` → `toSignal` → `computed`。値が変われば必ず計算し直す |
+| バーの幅と色 | `<meter>`(3.1 節) |
+| 段階の言葉(`verdects`) | `labels` と `aria-live="polite"` |
+| `minchar`、`common` | `PASSWORD_RULES`(3.2 節)。送信も止める |
+| 無い | 規則ごとのチェックリスト、表示の切り替え |
 
 ポイント:
 
 - **`keyup` ではなく値から計算する**: Reactive Forms の値は、貼り付けやパスワードマネージャーの自動入力でも変わる。pstrength のように `keyup` を見る必要はない
-- **メーターは送信を止めない**: 送信の可否は、2.1 節のバリデーターで決める。メーターは目安として並べる
-- **読み上げ**: 段階の言葉を `aria-live="polite"` の要素に入れる。1 文字ごとに読まれてうるさい場合は、段階が変わったときだけ文を変える(`computed` の値が同じなら、テンプレートの文も変わらない)
+- **メーターは送信を止めない**: 送信の可否は、3.2 節のバリデーター(Spartacus なら 2.1 節)で決める。メーターは目安として並べる
+- **読み上げ**: 段階の言葉を `aria-live="polite"` の要素に入れる。1 文字ごとに読まれてうるさい場合は、段階が変わったときだけ文を変える(`computed` の値が同じなら、テンプレートの文も変わらない)。チェックリストは `aria-live` にせず、`aria-describedby` で入力欄に結び付けるだけにする。打つたびに全部が読まれるのを避けるためである
+- **表示の切り替え**: `type` を `password` と `text` で替える。ボタンのラベルを「表示」「隠す」と替える書き方もあるが、ここでは `aria-pressed` で押されているかを伝える
 
 **SSR での注意**:
 
-- 点数の計算は文字列の処理だけなので、サーバーで動いても問題ない。サーバーでは空のパスワードとして描かれる
-- 辞書を使うライブラリ(4 節)は、辞書が数 MB ある。サーバーでもブラウザでも、パスワード欄のある画面でだけ読み込むよう、動的 `import()` にする
+- 点数の計算と規則の検査は文字列の処理だけなので、サーバーで動いても問題ない。サーバーでは空のパスワードとして描かれ、チェックリストはすべて「未」になる
+- 辞書を使うライブラリ(4 節)は、辞書が数 MB ある。サーバーでもブラウザでも、パスワード欄のある画面でだけ読み込むよう、動的 `import()` にする。読み込みをブラウザだけに限るなら、`afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中か、`isPlatformBrowser(inject(PLATFORM_ID))` で分けた中で読み込む
 
 ---
 
@@ -228,10 +314,11 @@ async ensureLoaded() {          // パスワード欄にフォーカスが来た
 |---|---|
 | 規則を満たしているかを示せばよい | Spartacus 標準(`securePasswordValidators` + `cx-form-errors` + 入力の手引き) |
 | 規則を変えたい(長さ、記号の種類) | 自分のバリデーターを書き、`FormGroup` の作成を差し替える。サーバー側の規則も同じにする |
-| 規則ごとに「満たした / まだ」を一覧で見せたい | `control.errors` のキーを見て、チェックリストを描く(`cx-form-errors` は満たしていないものだけを出す) |
-| 強さのメーターが要る(見た目の目安) | 3 節の `computed()` + `<meter>` |
+| 規則ごとに「満たした / まだ」を一覧で見せたい | 規則を 1 つの配列にまとめ、値からチェックリストを描く(3.3 節。`cx-form-errors` は満たしていないものだけを出す) |
+| Spartacus を使わない Angular のプロジェクト | 3.2 節の `ValidatorFn` + 3.3 節の入力欄(チェックリスト、表示の切り替え)。メーターは 3.1 節 |
+| 強さのメーターが要る(見た目の目安) | 3.1 節の `computed()` + `<meter>` |
 | 実際の強さに近い評価が要る | `@zxcvbn-ts/core` + `language-common` + `language-ja` を動的 `import()` で |
-| pstrength の見た目をそのまま再現したい | 3 節のコンポーネントで、`scores` と `colors` を同じ値にする |
+| pstrength の見た目をそのまま再現したい | 3.1 節のコンポーネントで、`scores` と `colors` を同じ値にする |
 
 ---
 

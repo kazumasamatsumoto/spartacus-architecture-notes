@@ -17,6 +17,8 @@ Spartacus に同じプラグインはありませんし、要りません。フ�
 
 置き換えで大きいのは、書き方より **送り先と返ってくるもの** です。アクセラレータの送り先は JSP のコントローラで、返ってくるのは HTML の断片でした。Spartacus では OCC の API に JSON を送り、JSON を受け取ります。ファイルの添付は `FormData` を `HttpClient` で送れば済みます。
 
+Spartacus を使わない Angular のプロジェクトなら、Facade を挟まず、コンポーネントから `HttpClient` を直接呼ぶ形で足ります(3 節)。進み具合の表示、送信の中止、共通のヘッダーも Angular の標準の機能で書けます。
+
 ---
 
 ### 1. jQuery Form Plugin は何をするか
@@ -142,11 +144,9 @@ uploadAttachment(customerId: string, ticketId: string, eventCode: string, file: 
 
 アップロードの進み具合(jQuery Form Plugin の `uploadProgress`)を出している箇所は、`sf/`、`fl/`、`integration-libs/` の `.ts` にありません(`reportProgress` と `HttpEventType.UploadProgress` で探した)。
 
----
+#### 2.4 Spartacus の部品と組み合わせる例
 
-### 3. Angular で書くとどうなるか
-
-#### 3.1 普通のフォーム
+Spartacus の中で、標準に無いフォームを足すときの形です。値は Reactive Forms で持ち、エラーの表示は `cx-form-errors` に任せ、送信は自作の Facade に頼みます([15 章](../../15-facade-connector-adapter.md))。Spartacus を使わない書き方は 3 節です。
 
 ```ts
 @Component({
@@ -182,7 +182,7 @@ export class InquiryFormComponent {
 }
 ```
 
-#### 3.2 ファイルと進み具合
+ファイルの送信と進み具合は、Adapter の中で `HttpClient` を使って書きます。2.3 節の `uploadAttachment` に `reportProgress` を足した形です。
 
 ```ts
 // Adapter の中
@@ -198,13 +198,278 @@ upload(file: File): Observable<number> {
 }
 ```
 
-`FormData` を渡すと、`Content-Type: multipart/form-data` と境界文字列はブラウザが付けます。自分で `Content-Type` を指定しないようにします。
+Spartacus の中では、ページを開いたときに Facade が何かを送る処理(初期値の保存など)は、SSR のサーバーでも動きます。ファイルを扱う処理は、ユーザーのイベントの中に閉じ込めます。
+
+---
+
+### 3. Angular 標準で書くとどうなるか(Spartacus を使わない)
+
+この節は `@angular/*` とブラウザ標準(と RxJS)だけで書きます。Facade / Connector / Adapter の形や `cx-form-errors` など、Spartacus の部品を使う書き方は 2.4 節です。ここでは、コンポーネントが `HttpClient` を直接使います。
+
+#### 3.1 準備: `HttpClient` を使えるようにする
+
+```ts
+// app.config.ts
+import { ApplicationConfig } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { requestedWith } from './requested-with.interceptor';   // 3.5 節
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideHttpClient(withInterceptors([requestedWith]))],
+};
+```
+
+- `@angular/common@21.2.26` の `HttpClient` は `providedIn: 'root'` なので、`provideHttpClient()` を書かなくても `inject(HttpClient)` できる(`fesm2022/_module-chunk.mjs:1748-1756`)。そのときの送信は `XMLHttpRequest` で行う(`HttpBackend` の既定が `HttpXhrBackend`。`:1476-1483`)。インターセプターを足すなら `provideHttpClient()` を書く
+- `withFetch()` を足すと、送信に `fetch` を使う。ただし **`fetch` ではアップロードの進み具合が取れない**(`types/http.d.ts:4209-4218` の注記)。3.4 節の進み具合が要るなら付けない。SSR との関係は、この節の最後に書いた
+
+#### 3.2 普通のフォームを JSON で送る
+
+jQuery Form Plugin の `ajaxForm` + `beforeSubmit` + `success` + `resetForm` を、1 つのコンポーネントで書くと次の形です。エラーの文言と、送信の結果の読み上げも自分で書きます。
+
+```ts
+import { Component, ElementRef, inject, signal } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { finalize } from 'rxjs';
+
+@Component({
+  selector: 'app-inquiry-form',
+  imports: [ReactiveFormsModule],
+  template: `
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label for="subject">件名</label>
+      <input id="subject" formControlName="subject"
+             [attr.aria-invalid]="shows('subject')"
+             [attr.aria-describedby]="shows('subject') ? 'subject-error' : null" />
+      @if (shows('subject')) {
+        <p id="subject-error">
+          @if (form.controls.subject.hasError('required')) { 件名を入れてください }
+          @else { 100 文字以内にしてください }
+        </p>
+      }
+
+      <label for="email">メールアドレス</label>
+      <input id="email" type="email" formControlName="email" autocomplete="email"
+             [attr.aria-invalid]="shows('email')"
+             [attr.aria-describedby]="shows('email') ? 'email-error' : null" />
+      @if (shows('email')) {
+        <p id="email-error">メールアドレスの形で入れてください</p>
+      }
+
+      <button type="submit" [disabled]="busy()">送信</button>
+      <!-- role="status" は aria-live="polite" と同じ働き。最初から DOM に置いておく -->
+      <p role="status">{{ message() }}</p>
+    </form>
+  `,
+})
+export class InquiryFormComponent {
+  private http = inject(HttpClient);
+  private host = inject<ElementRef<HTMLElement>>(ElementRef);
+  busy = signal(false);
+  message = signal('');
+  form = inject(FormBuilder).nonNullable.group({
+    subject: ['', [Validators.required, Validators.maxLength(100)]],
+    email: ['', [Validators.required, Validators.email]],
+  });
+
+  shows(name: 'subject' | 'email') {
+    const c = this.form.controls[name];
+    return c.invalid && (c.dirty || c.touched);
+  }
+
+  submit() {
+    if (this.form.invalid) {                  // beforeSubmit で false を返すのと同じ
+      this.form.markAllAsTouched();           // エラーを全部出す
+      this.host.nativeElement
+        .querySelector<HTMLElement>('input.ng-invalid, select.ng-invalid, textarea.ng-invalid')
+        ?.focus();                            // 最初の誤りへフォーカスを移す
+      return;
+    }
+    this.busy.set(true);
+    this.message.set('');
+    this.http
+      .post<{ id: string }>('/api/inquiries', this.form.getRawValue())   // JSON で送る
+      .pipe(finalize(() => this.busy.set(false)))
+      .subscribe({
+        next: (r) => {
+          this.form.reset();                  // resetForm。nonNullable なので初期値の '' に戻る
+          this.message.set(`受け付けました(番号 ${r.id})`);
+        },
+        error: (e: HttpErrorResponse) =>
+          this.message.set(e.status === 400 ? '入力を確かめてください' : '送信できませんでした'),
+      });
+  }
+}
+```
+
+| jQuery Form Plugin | このコンポーネント |
+|---|---|
+| `url` / `type`(既定はフォームの `action` / `method`) | `http.post(url, body)` に書く |
+| `beforeSubmit` で検証し、`false` で中止 | `Validators` と `form.invalid` |
+| 値を集める(`formSerialize`) | `form.getRawValue()`。集める処理は要らない |
+| `success` / `error` | `subscribe` の `next` / `error` |
+| `resetForm` | `form.reset()` |
+| `target` に HTML を差し込む | 差し込まない。結果は signal に入れ、テンプレートで描く(3.6 節) |
+| 二重送信の防止(プラグインには無い) | 送信中はボタンを `disabled` にする |
+
+`ng-invalid` のクラスは、Reactive Forms がコントロールの状態に合わせて付けます。最初の描画の時点で付いているので、`markAllAsTouched()` の直後でも探せます。
+
+#### 3.3 フォームの形式のまま送る
+
+送り先が JSON ではなく、HTML のフォームと同じ形式(`application/x-www-form-urlencoded`)を待っている場合は、本文を `HttpParams` にします。`HttpClient` が `Content-Type: application/x-www-form-urlencoded;charset=UTF-8` を付けます(`@angular/common@21.2.26` の `fesm2022/_module-chunk.mjs:557-558`)。jQuery Form Plugin が `$.ajax` で送っていたときと同じ形式です。
+
+```ts
+import { HttpParams } from '@angular/common/http';
+
+const body = new HttpParams({ fromObject: this.form.getRawValue() });
+this.http.post('/contact', body).subscribe(…);
+```
+
+フォームの要素から、ブラウザの規則のまま値を集めることもできます。`new FormData(form)` は、jQuery Form Plugin の `formToArray()` と同じく、`name` のある欄だけを集め、`disabled` の欄を除きます。第 2 引数に `submitter` を渡すと、押されたボタンの `name` / `value` も入ります(`ajaxForm` が押されたボタンを覚えていたのと同じ)。
+
+```ts
+@Component({
+  selector: 'app-legacy-form',
+  template: `
+    <form #f action="/my-account/address" method="post" (submit)="send($event, f)">
+      <input name="town" required />
+      <button name="action" value="save">保存</button>
+      <button name="action" value="saveAndNext">保存して次へ</button>
+    </form>
+  `,
+})
+export class LegacyFormComponent {
+  private http = inject(HttpClient);
+
+  send(e: SubmitEvent, f: HTMLFormElement) {
+    e.preventDefault();                                     // ページの移動を止める
+    const body = new FormData(f, e.submitter);              // multipart/form-data で送る
+    this.http.post(f.action, body).subscribe(…);            // url の既定は action(jQuery Form Plugin と同じ)
+  }
+}
+```
+
+この例は `FormsModule` / `ReactiveFormsModule` を読み込みません。どちらかを読み込むと、`<form>` に Angular のフォームのディレクティブが付きます。`FormData` で送るのは `multipart/form-data` なので、送り先がそれを受け取れるかを確かめます。
+
+#### 3.4 ファイルを送り、進み具合を出す
+
+```ts
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { HttpClient, HttpEventType } from '@angular/common/http';
+import { Subscription } from 'rxjs';
+
+@Component({
+  selector: 'app-upload',
+  template: `
+    <label for="file">添付ファイル(5MB まで)</label>
+    <input id="file" type="file" accept=".pdf,image/*" (change)="pick($event)" />
+    @if (percent() !== null) {
+      <progress max="100" [value]="percent() ?? 0" aria-label="送信の進み具合">{{ percent() }}%</progress>
+    }
+    <button type="button" (click)="upload()" [disabled]="!file() || percent() !== null">送る</button>
+    <button type="button" (click)="cancel()" [disabled]="percent() === null">やめる</button>
+    <p role="status">{{ message() }}</p>
+  `,
+})
+export class UploadComponent {
+  private http = inject(HttpClient);
+  file = signal<File | null>(null);
+  percent = signal<number | null>(null);
+  message = signal('');
+  private sub?: Subscription;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.sub?.unsubscribe());   // 画面を離れたら送信もやめる
+  }
+
+  pick(e: Event) {
+    const f = (e.target as HTMLInputElement).files?.[0] ?? null;
+    const tooBig = !!f && f.size > 5 * 1024 * 1024;
+    this.file.set(tooBig ? null : f);
+    this.message.set(tooBig ? '5MB 以下のファイルにしてください' : '');
+  }
+
+  upload() {
+    const f = this.file();
+    if (!f) return;
+    const body = new FormData();
+    body.append('file', f);
+    this.percent.set(0);
+    this.sub = this.http
+      .post('/api/attachments', body, { reportProgress: true, observe: 'events' })
+      .subscribe({
+        next: (e) => {
+          if (e.type === HttpEventType.UploadProgress && e.total) {
+            this.percent.set(Math.round((100 * e.loaded) / e.total));   // uploadProgress
+          } else if (e.type === HttpEventType.Response) {
+            this.percent.set(null);
+            this.message.set('送りました');
+          }
+        },
+        error: () => {
+          this.percent.set(null);
+          this.message.set('送れませんでした');
+        },
+      });
+  }
+
+  cancel() {
+    this.sub?.unsubscribe();     // 購読をやめると、送信中の XHR も abort() される
+    this.percent.set(null);
+    this.message.set('送信をやめました');
+  }
+}
+```
+
+- `FormData` を渡すと、`Content-Type: multipart/form-data` と境界文字列はブラウザが付ける(`HttpClient` は `FormData` のときに `Content-Type` を決めない。`fesm2022/_module-chunk.mjs:545-546`)。自分で `Content-Type` を指定しない
+- 購読をやめたとき、`HttpXhrBackend` は終わっていない XHR を `abort()` する(`fesm2022/_module-chunk.mjs:1242-1244`)。jQuery Form Plugin には「送信をやめる」API が無かった
+- `e.total` は、ブラウザが全体の大きさを知らないときに `undefined` になる。そのときは割合を出さない
+
+#### 3.5 送信の前後に共通の処理を挟む: インターセプター
+
+jQuery Form Plugin では、共通の処理を各フォームの `beforeSubmit` や `error` に書いていました。Angular では `HttpInterceptorFn` に 1 回書けば、`HttpClient` のすべての送信に効きます。
+
+```ts
+// requested-with.interceptor.ts
+import { HttpInterceptorFn } from '@angular/common/http';
+
+// jQuery の $.ajax は、同じオリジンへの送信に X-Requested-With: XMLHttpRequest を自動で付けていた。
+// サーバーがこのヘッダーで Ajax かどうかを見分けているなら、HttpClient でも付ける
+export const requestedWith: HttpInterceptorFn = (req, next) =>
+  req.url.startsWith('/')
+    ? next(req.clone({ setHeaders: { 'X-Requested-With': 'XMLHttpRequest' } }))
+    : next(req);
+```
+
+- jQuery が付けていたことは、npm の `jquery@3.5.1` の `src/ajax/xhr.js:59-66` で確かめた。`HttpClient` は付けない
+- CSRF の対策: `HttpClient` には、クッキー `XSRF-TOKEN` の値をヘッダー `X-XSRF-TOKEN` に写す仕組みが最初から入っている。`GET` / `HEAD` と、別のオリジンへの送信には付けない(`fesm2022/_module-chunk.mjs:1283-1292`、`:1371-1400`)。名前が違うなら `withXsrfConfiguration({ cookieName, headerName })` で変える。サーバー側がこの名前で受け取れるかは、別に確かめる
+
+#### 3.6 応答の HTML を差し込む(`target`)は避ける
+
+応答の HTML をそのまま画面に入れる形は、Angular では勧めません。JSON を受け取り、テンプレートで描きます。
+
+どうしても HTML の断片を受け取るなら、`responseType: 'text'` で受け、`[innerHTML]` に渡します。Angular は、入れる前に `<script>` や `on*` 属性などを取り除きます(取り除くと、開発時に `WARNING: sanitizing HTML stripped some content` と出る。`@angular/core@21.2.26` の `fesm2022/_debug_node-chunk.mjs:3210`)。ただし、差し込んだ HTML の中のボタンには、Angular のイベントは付きません。
+
+```ts
+fragment = signal('');
+load() {
+  this.http.get('/cart/rollover', { responseType: 'text' }).subscribe((h) => this.fragment.set(h));
+}
+// <div [innerHTML]="fragment()"></div>
+```
 
 **SSR での注意**:
 
-- フォームの送信はユーザーの操作で起きるので、サーバーでは走らない。送信の処理に `window` を使っていても、多くの場合は問題にならない
-- ただし、ページを開いたときに Facade で何かを送る処理(初期値の保存など)は、サーバーでも動く。`File` や `FormData` はサーバーの Node.js にもあるが、ユーザーのファイルは無い。ファイルを扱う処理はイベントの中に閉じ込める
-- サーバーで描いたフォームは、JS が動く前に送信されることがある。`action` の無い `<form>` は自分の URL に GET で送ってしまう。Spartacus のフォームも同じで、Angular の `ngSubmit` が動くまでは素の HTML のフォームとして振る舞う
+- フォームの送信はユーザーの操作で起きるので、サーバーでは走らない。ただし `HttpClient` そのものはサーバーでも動く。ページを開いたときに送る処理(初期値の読み込みなど)はサーバーでも実行される
+- `File`、`FileReader`、`focus()` など、ブラウザでしか意味が無い処理は、イベントの中に閉じ込める。ページを開いた直後に使うなら `afterNextRender()`(`@angular/core@21.2.26` の `types/core.d.ts:2576`)の中に置くか、`isPlatformBrowser(inject(PLATFORM_ID))`(`@angular/common@21.2.26` の `types/common.d.ts:823`)で分ける
+- `withFetch()` を付けずに SSR を動かすと、開発時に「SSR では `fetch` を使うよう強く勧める」という警告が出る(`fesm2022/_module-chunk.mjs:1508-1512`)。一方で、`fetch` ではアップロードの進み具合が取れない(3.1 節)。進み具合の表示と、この警告への対応は両立しないので、どちらを取るかを決める
+- **ハイドレーションの前に押された送信**: サーバーで描いたフォームは、JS が動く前にも押せる。押されると、ブラウザは素の HTML のフォームとして送る(`action` の無い `<form>` は自分の URL に GET で送る)。`provideClientHydration(withEventReplay())`(`@angular/platform-browser@21.2.26` の `types/platform-browser.d.ts:694`、`:760`)はハイドレーション前のイベントを記録してあとで再生するが、既定の動作を止める処理は `<a>` のクリックにしか無い(`@angular/core@21.2.26` の `fesm2022/primitives-event-dispatch.mjs:491-493`)。送信ボタンを最初は `disabled` で描き、ブラウザで有効にすれば防げる
+
+```ts
+ready = signal(false);                                  // サーバーでは false のまま描かれる
+constructor() { afterNextRender(() => this.ready.set(true)); }
+// <button type="submit" [disabled]="busy() || !ready()">送信</button>
+```
 
 ---
 
@@ -212,7 +477,7 @@ upload(file: File): Observable<number> {
 
 ライブラリは要りません。Angular の `HttpClient` と Reactive Forms で足ります。
 
-フレームワークに依存しない方法としては、ブラウザ標準の `fetch(url, { method: 'POST', body: new FormData(form) })` があります。`new FormData(form)` は、jQuery Form Plugin の `formToArray()` と同じく、ブラウザの送信規則で値を集めます。ただし `fetch` はアップロードの進み具合を取れません(取るなら `XMLHttpRequest` か `HttpClient`)。Spartacus の中では、認証のヘッダーや言語・通貨のパラメータを付ける `HttpInterceptor` を通すため、`fetch` ではなく `HttpClient` を使います。
+フレームワークに依存しない方法としては、ブラウザ標準の `fetch(url, { method: 'POST', body: new FormData(form) })` があります。`new FormData(form)` は、jQuery Form Plugin の `formToArray()` と同じく、ブラウザの送信規則で値を集めます。ただし `fetch` はアップロードの進み具合を取れません(取るなら `XMLHttpRequest` か、`withFetch()` を付けない `HttpClient`)。Spartacus の中では、認証のヘッダーや言語・通貨のパラメータを付ける `HttpInterceptor` を通すため、`fetch` ではなく `HttpClient` を使います。
 
 ---
 
@@ -221,9 +486,12 @@ upload(file: File): Observable<number> {
 | 条件 | 方法 |
 |---|---|
 | Spartacus にある機能(会員登録、住所、パスワード変更など)のフォーム | 標準のコンポーネント。見た目だけ変えるならテンプレートと SCSS |
-| 標準に無いフォーム | Reactive Forms + 自作の Facade / Connector / Adapter([15 章](../../15-facade-connector-adapter.md)) |
-| ファイルを送る | `cx-file-upload` + Adapter で `FormData` |
-| 進み具合を出したい | `HttpClient` の `reportProgress: true, observe: 'events'` |
+| 標準に無いフォーム | Reactive Forms + 自作の Facade / Connector / Adapter([15 章](../../15-facade-connector-adapter.md)、2.4 節) |
+| Spartacus を使わない Angular のプロジェクトのフォーム | Reactive Forms + コンポーネントから `HttpClient` を直接(3.2 節) |
+| 送り先がフォームの形式(urlencoded / multipart)しか受けない | `HttpParams` か `new FormData(form, submitter)`(3.3 節) |
+| ファイルを送る | Spartacus の中なら `cx-file-upload` + Adapter で `FormData`。使わないなら `<input type="file">` + `FormData`(3.4 節) |
+| 進み具合を出したい | `HttpClient` の `reportProgress: true, observe: 'events'`(3.4 節)。`withFetch()` は付けない |
+| 全部の送信に同じヘッダーや処理を付けたい | `HttpInterceptorFn` + `withInterceptors()`(3.5 節) |
 | 送り先が JSP のコントローラしか無い | フロントだけでは移せない。OCC に API を作る([12 章](../../12-backend-api-granularity.md)、[13 章](../../13-jsp-to-headless.md)) |
 | サーバーが HTML の断片を返している | JSON を返す API に変え、HTML はコンポーネントで描く |
 
